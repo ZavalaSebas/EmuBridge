@@ -1,0 +1,17 @@
+[
+  { "Id": "nes", "Name": "Nintendo Entertainment System", "Extensions": ["nes"] },
+  { "Id": "snes", "Name": "Super Nintendo Entertainment System", "Extensions": ["sfc", "smc"] },
+  { "Id": "n64", "Name": "Nintendo 64", "Extensions": ["n64", "z64", "v64"] },
+  { "Id": "gb", "Name": "Game Boy", "Extensions": ["gb"] },
+  { "Id": "gbc", "Name": "Game Boy Color", "Extensions": ["gbc"] },
+  { "Id": "gba", "Name": "Game Boy Advance", "Extensions": ["gba"] },
+  { "Id": "nds", "Name": "Nintendo DS", "Extensions": ["nds"] },
+  { "Id": "genesis", "Name": "Sega Genesis / Mega Drive", "Extensions": ["md", "gen", "smd"] },
+  { "Id": "sms", "Name": "Sega Master System", "Extensions": ["sms"] },
+  { "Id": "gamegear", "Name": "Sega Game Gear", "Extensions": ["gg"] },
+  { "Id": "atari2600", "Name": "Atari 2600", "Extensions": ["a26"] },
+  { "Id": "atari7800", "Name": "Atari 7800", "Extensions": ["a78"] },
+  { "Id": "pcengine", "Name": "PC Engine / TurboGrafx-16", "Extensions": ["pce"] },
+  { "Id": "lynx", "Name": "Atari Lynx", "Extensions": ["lnx"] },
+  { "Id": "wonderswan", "Name": "WonderSwan / WonderSwan Color", "Extensions": ["ws", "wsc"] }
+]

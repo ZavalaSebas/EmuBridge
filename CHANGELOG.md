@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial project scaffold from project-template
+- `LibraryRepository` (LiteDB-backed persistence: platforms, games, scan folders) and `RomScannerService` (recursive folder scan, extension→platform detection, missing-ROM tracking on rescan) — no UI yet, covered by 15 unit tests
+- Built-in seed data for 15 common cartridge/handheld platforms (`Resources/SeedSystems.json`)
 
 ---
 

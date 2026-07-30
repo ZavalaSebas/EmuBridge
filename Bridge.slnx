@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Bridge/Bridge.csproj" />
+  <Project Path="Bridge.Tests/Bridge.Tests.csproj" />
+</Solution>

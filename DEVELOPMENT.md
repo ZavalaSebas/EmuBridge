@@ -48,21 +48,34 @@ Bridge's service design, technology stack rationale, and key design decisions (i
 
 ```
 Bridge/
-├── Bridge/                 # Main WPF project (not yet created)
+├── Bridge/                     # Main WPF project
+│   ├── Exceptions/
+│   │   └── BridgeException.cs
 │   ├── Models/
+│   │   ├── Platform.cs
+│   │   ├── Game.cs
+│   │   ├── EmulatorConfig.cs   # not yet consumed — schema only, EmulatorService not built yet
+│   │   ├── ScanFolder.cs
+│   │   └── ScanResult.cs
+│   ├── Resources/
+│   │   └── SeedSystems.json    # EmbeddedResource — 15 built-in platforms
 │   ├── Services/
-│   │   ├── RomScannerService
-│   │   ├── MetadataService
-│   │   ├── ImageCacheService
-│   │   ├── EmulatorService
-│   │   ├── LaunchService
-│   │   └── LibraryRepository
-│   ├── ViewModels/
-│   ├── Views/
+│   │   ├── ILibraryRepository.cs / LibraryRepository.cs
+│   │   ├── IRomScannerService.cs / RomScannerService.cs
+│   │   ├── MetadataService        # not yet created
+│   │   ├── ImageCacheService      # not yet created
+│   │   ├── EmulatorService        # not yet created
+│   │   └── LaunchService          # not yet created
+│   ├── ViewModels/                # not yet created
+│   ├── Views/                     # not yet created
 │   └── Config.cs
-├── Bridge.Tests/            # (not yet created)
+├── Bridge.Tests/
+│   └── Services/
+│       ├── LibraryRepositoryTests.cs
+│       ├── RomScannerServiceTests.cs
+│       └── FakeLibraryRepository.cs
 ├── docs/
-└── Bridge.slnx              # (not yet created)
+└── Bridge.slnx
 ```
 
 ---
@@ -555,14 +568,15 @@ public static class Config
 
 | File | Purpose |
 |------|---------|
-| `Bridge/Config.cs` | Centralized constants (paths, URLs, timeouts) — not yet created |
+| `Bridge/Config.cs` | Centralized constants: `AppDataPath`, `LibraryDbPath`, `UnknownPlatformId`, seed resource name |
 | `Bridge/App.xaml.cs` | DI container setup, global exception handler — not yet created |
-| `Bridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to system — not yet created |
+| `Bridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to platform, tracks missing ROMs — implemented, tested |
+| `Bridge/Services/LibraryRepository.cs` | LiteDB-backed persistence: platforms (seeded), games, scan folders — implemented, tested |
+| `Bridge/Resources/SeedSystems.json` | 15 built-in platforms (cartridge/handheld only — see ARCHITECTURE.md → ADR-7), embedded resource |
 | `Bridge/Services/MetadataService.cs` | SteamGridDB wrapper, local caching, rate-limit handling — not yet created |
 | `Bridge/Services/ImageCacheService.cs` | Resizes and caches box art locally at display resolution — not yet created |
-| `Bridge/Services/EmulatorService.cs` | System→emulator→launch-argument-template mapping, data-driven — not yet created |
+| `Bridge/Services/EmulatorService.cs` | Platform→emulator→launch-argument-template mapping, data-driven — not yet created |
 | `Bridge/Services/LaunchService.cs` | Assembles the final command (emulator + args + ROM path) and launches the process — not yet created |
-| `Bridge/Services/LibraryRepository.cs` | Persists the library (detected ROMs, cached metadata, emulator assignments) — not yet created |
 
 This table is aspirational until the corresponding files exist — update the "not yet created" note to the real purpose/status as each file is implemented.
 
@@ -570,7 +584,11 @@ This table is aspirational until the corresponding files exist — update the "n
 
 ## Known Limitations
 
-No known limitations yet — this project has not been implemented. Populate this table as limitations are discovered during development.
+| Limitation | Reason | Workaround |
+|------------|--------|------------|
+| `LaunchService`'s Phase 1 exit detection does not correctly detect when the emulator has closed if the launched process is a wrapper/launcher that spawns the real emulator process and exits itself (e.g. an updater shim, a single-instance relaunch, or a `.bat`/`.cmd` wrapper) — Bridge would return control to the launcher while the actual emulator is still running. | Phase 1 tracks the process handle returned directly by `Process.Start()` (see PLAN.md → Open Decisions #5, ARCHITECTURE.md → ADR-1), chosen deliberately over Windows Job Object process-tree tracking to avoid P/Invoke complexity before the wrapper/launcher problem is confirmed to occur frequently in practice. Directly related to the process-exit-detection bug class found in OrbSpoofer. | If this proves frequent for real emulators being configured, implement process-tree tracking via Windows Job Objects (`CreateJobObject`/`AssignProcessToJobObject`) — see ARCHITECTURE.md → ADR-1 for the noted improvement path. |
+
+Populate further rows as additional limitations are discovered during development.
 
 ---
 
