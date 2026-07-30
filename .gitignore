@@ -1,0 +1,62 @@
+# .NET
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.nupkg
+project.lock.json
+packages.lock.json
+artifacts/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Rider
+_ReSharper*/
+*.DotSettings.user
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+bld/
+
+# NuGet
+[Pp]ackages/
+*.nuget.props
+*.nuget.targets
+
+# Logs
+[Ll]og/
+[Ll]ogs/
+*.log
+
+# Publish output
+publish/
+
+# Local history
+.localhistory/
+
+# Test results
+TestResults/
+*.trx
+
+# Coverage
+*.coverage
+*.coveragexml
+
+# Temporary files
+*.tmp
+*.temp

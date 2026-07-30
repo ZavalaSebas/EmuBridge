@@ -1,0 +1,21 @@
+# Please see the documentation for all configuration options:
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+    reviewers:
+      - ZavalaSebas
+    ignore:
+      # Ignorar si hay razón para no actualizar un paquete específico
+      - dependency-name: "Microsoft.*" # Ejemplo: no actualizar paquetes Microsoft
+        # reasons:
+        #   - reason-name
