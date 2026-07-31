@@ -28,8 +28,17 @@ public class EmulatorInstallerServiceTests : IDisposable
         // not a mock of it. DownloadVerificationService's own hash/size verification is already
         // covered elsewhere, so FakeDownloadVerificationService bypasses it here and just points
         // at these real archives.
+        //
+        // The frontend entry is deliberately nested (RetroArch-Win64/retroarch.exe), matching the
+        // real RetroArch 1.22.2 archive's actual layout — confirmed by extracting the real
+        // downloaded .7z after a real "Auto-Install" click failed with
+        // ExecutableNotFoundAfterExtraction on 2026-08-03 (see ARCHITECTURE.md -> ADR-11 update).
+        // The original fixture used a flat "retroarch.exe" entry, matching the wrong
+        // third-party-sourced ExecutableRelativePath the manifest shipped with at the time — every
+        // test here passed against that wrong assumption because the fixture matched it, not
+        // reality. Keep this nested; flattening it back would silently re-hide the same bug class.
         _frontendArchivePath = Path.Combine(_tempRoot, "frontend.zip");
-        BuildZip(_frontendArchivePath, ("retroarch.exe", [1, 2, 3]));
+        BuildZip(_frontendArchivePath, ("RetroArch-Win64/retroarch.exe", [1, 2, 3]));
 
         _coreArchivePath = Path.Combine(_tempRoot, "core.zip");
         BuildZip(_coreArchivePath, ("fceumm_libretro.dll", [4, 5, 6]));
@@ -65,7 +74,7 @@ public class EmulatorInstallerServiceTests : IDisposable
         DownloadUrl = FrontendUrl,
         Sha256 = "irrelevant-not-checked-by-fake",
         ExpectedSizeBytes = 3,
-        ExecutableRelativePath = "retroarch.exe",
+        ExecutableRelativePath = "RetroArch-Win64\\retroarch.exe",
         Cores =
         [
             new KnownEmulatorCore
