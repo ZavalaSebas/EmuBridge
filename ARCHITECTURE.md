@@ -479,6 +479,36 @@ The remaining 14 of 15 seed platforms still have no `KnownEmulatorCore` entry at
 
 ---
 
+### ADR-12: Bundle native WPF dependencies into the single-file `.exe` (`IncludeNativeLibrariesForSelfExtract`)
+
+**Status:** Accepted
+
+**Date:** 2026-08-01
+
+**Context:**
+The `v0.1.0` GitHub Release's `Bridge.exe` did not open at all for a real user — no window, no dialog, no visible error, on a machine where it had never run before. Following `DEVELOPMENT.md` → Bug Investigation Process: the first specific hypothesis (an exception thrown during `App()`'s constructor, before `DispatcherUnhandledException` is wired — e.g. `LibraryRepository` failing to open LiteDB because `%LocalAppData%\Bridge\` doesn't exist yet on a clean machine) was tested with temporary file-based diagnostic logging and a simulated clean-machine run, and was **ruled out by direct evidence** — the full startup sequence completed with zero exceptions logged.
+
+The real cause required questioning an assumption made when the release was originally cut: that `dotnet publish -p:PublishSingleFile=true` produces one file and nothing else worth checking. It doesn't, for a WPF app specifically. A full listing of a fresh publish output directory (not just `Bridge.exe`'s own byte size, which is all that had been checked before) showed `Bridge.exe` sitting next to `Bridge.pdb` and five native interop DLLs WPF depends on (`D3DCompiler_47_cor3.dll`, `PenImc_cor3.dll`, `PresentationNative_cor3.dll`, `vcruntime140_cor3.dll`, `wpfgfx_cor3.dll`) — `PublishSingleFile` bundles managed assemblies into the `.exe`, but leaves native (non-managed) libraries as loose sibling files by default. `gh release create v0.1.0 publish/Bridge.exe` uploaded only the named `.exe`, never these five files — the release asset was incomplete from the moment it was published, not corrupted afterward. Confirmed directly, not assumed: copying only `Bridge.exe` into an empty folder and running it reproduced the exact symptom — `System.DllNotFoundException` thrown from inside WPF's own native window-subclassing code (`MS.Win32.HwndSubclass`) before a single line of `App()`'s constructor ran (the diagnostic log file was never even created), an unhandled exception written only to stderr — invisible to a user double-clicking from Explorer, exactly matching "doesn't open at all."
+
+**Decision:** `Bridge.csproj` sets `<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>`, which bundles those native libraries into the single-file `.exe` too, instead of leaving them as required sibling files.
+
+**Trade-off, stated explicitly, not left implicit:** with this flag on, the bundled native libraries are extracted to `%TEMP%/.net` on every startup before the app can use them — the exact "startup extraction cost" already weighed and rejected for SQLite back in Decision #1 / ADR-3 (`LibraryRepository`'s storage choice), where it was one reason LiteDB (pure managed code, no native interop) won over `Microsoft.Data.Sqlite`. It's being accepted here for a different reason: WPF itself requires these native libraries to run at all — there is no "zero extraction" alternative available the way there was for storage (LiteDB vs. SQLite was a real choice; a WPF app either ships these DLLs as loose files or extracts them from the bundle, no third option). This was already true before the fix — the DLLs always had to end up on disk somewhere; the flag changes where they come from (bundled in `Bridge.exe`, extracted to `%TEMP%/.net`) rather than whether the cost exists at all.
+
+Fix confirmed with the same reproduction method that found the bug, not assumed from the flag being set: republished with the flag on, copied only the resulting `Bridge.exe` into an empty folder (no sibling DLLs at all), ran it — it opened normally.
+
+**Consequences:**
+- ✅ `Bridge.exe` alone, with nothing else in the folder, now actually matches what "single-file" was always supposed to mean — confirmed by the same isolated-folder reproduction that found the bug, not just by re-running the publish command and assuming success
+- ✅ The `v0.1.0` release asset was replaced in place (same tag, same commit) with a working build — no new tag/version, since the underlying commit and source didn't change, only the packaging flag
+- ✅ Release Checklist (`DEVELOPMENT.md`) now requires verifying an isolated single-file `.exe` actually launches before it's attached to a release — checking the uploaded asset's byte size alone (what happened for `v0.1.0` originally) is no longer sufficient
+- ❌ Slightly larger `.exe` and a small extraction cost on every cold start (`%TEMP%/.net`) — accepted as necessary, not free, per the trade-off above
+
+**Alternatives considered:**
+
+- **Distribute the whole publish folder (zip) instead of a bare `.exe`:** rejected — abandons the single-file, double-click-to-run distribution goal that motivated `PublishSingleFile` in the first place; the bug was an incomplete implementation of that goal, not a reason to give up on it
+- **Manually attach the five native DLLs alongside `Bridge.exe` on the release page, no `.csproj` change:** rejected — fixes this one release asset without fixing the underlying publish command, so the same mistake (checking the `.exe`'s size, not the folder's contents) would silently reproduce on every future release unless the checklist also changes; `IncludeNativeLibrariesForSelfExtract` fixes the artifact itself, not just this one upload
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above

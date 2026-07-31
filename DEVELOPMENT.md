@@ -306,7 +306,7 @@ These are **not enabled by default** — add them only when the team size or pro
 
 - [ ] Verify GitHub Actions workflow completed
 - [ ] Check release page on GitHub
-- [ ] Test downloaded `.exe` works
+- [ ] **Test the downloaded `.exe` in isolation** — copy *only* the downloaded `.exe` into an empty folder and run it from there, nothing else present. Checking the asset's byte size, or running it from a folder that still has other publish output sitting next to it, is not sufficient — see ARCHITECTURE.md → ADR-12: the `v0.1.0` release shipped completely broken (WPF's native interop DLLs missing from the bundle) and the only verification done at the time was confirming `Bridge.exe`'s size matched, which caught nothing.
 - [ ] Update documentation if needed
 
 ### Hotfix

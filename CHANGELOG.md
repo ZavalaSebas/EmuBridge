@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release-build-only guard test (`KnownEmulatorsManifestTests`) rejecting any unverified placeholder value in the manifest
 - 14 new unit tests (`EmulatorServiceTests`, `LibraryRepositoryTests`, `DownloadVerificationServiceTests`, `KnownEmulatorsManifestTests`) — 97 total, passing in both Debug and Release
 
+### Fixed
+- The published self-contained single-file `.exe` didn't open at all — `PublishSingleFile` bundles managed assemblies but not WPF's native interop DLLs by default, so the app crashed with `System.DllNotFoundException` before a single line of application code ran, silently (no dialog, since it happens before any exception handler is wired). `Bridge.csproj` now sets `IncludeNativeLibrariesForSelfExtract=true`. See ARCHITECTURE.md → ADR-12. **The `v0.1.0` release asset on GitHub was replaced in place (same tag, same commit) with a working build** — the tagged source is unchanged; only the uploaded binary was corrected, since it had shipped incomplete from the start.
+
 ### Known Issues
 - 14 of 15 seed platforms have no `KnownEmulatorCore` entry yet — Phase 2's auto-detect/download isn't functionally usable end-to-end (see DEVELOPMENT.md → Known Limitations)
 - Archive-extraction/install orchestration that would consume `DownloadVerificationService`'s output isn't built yet

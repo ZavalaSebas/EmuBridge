@@ -8,6 +8,15 @@
     <UseWPF>true</UseWPF>
     <Version>0.1.0</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
+
+    <!-- PublishSingleFile only bundles managed assemblies by default — WPF's native interop DLLs
+         (D3DCompiler_47_cor3.dll, PenImc_cor3.dll, PresentationNative_cor3.dll,
+         vcruntime140_cor3.dll, wpfgfx_cor3.dll) would otherwise ship as required loose files next
+         to the .exe, which is how the v0.1.0 release asset shipped broken (see ARCHITECTURE.md ->
+         ADR-12). Extracted to %TEMP%/.net on every startup — the same cost already weighed and
+         rejected for SQLite in ADR-3, accepted here because WPF itself requires it; there is no
+         zero-extraction alternative for a WPF app the way there was for storage. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
