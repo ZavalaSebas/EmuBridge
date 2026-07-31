@@ -4,6 +4,18 @@ This document serves as a guide to this specific project AND as a reference for 
 
 ---
 
+## Current Status (as of 2026-07-31)
+
+All Phase 1 backend service logic is implemented and tested — `LibraryRepository`, `RomScannerService`, `MetadataService`, `ImageCacheService`, `SettingsService`, `EmulatorService`, `LaunchService`. 56 unit tests, all green. All 5 Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-9 in `ARCHITECTURE.md`). Full detail and commit-by-commit history: `PLAN.md` → `## Timeline`.
+
+**Next session starts with, in order:**
+1. Composition root — wire up DI in `App.xaml.cs` (nothing is registered yet; the file is still the bare Visual Studio scaffold)
+2. Phase 1 minimal UI (one functional cover grid, no animations) — including the ViewModel-level glue between services (scan → fetch box art; launch → react to `LaunchResult`) that was deliberately left out of the service layer itself
+
+Nothing is pending at the service/logic layer — this was a deliberate stopping point, not an interruption.
+
+---
+
 ## Documentation Philosophy
 
 > **IMPORTANT: This document is a living memory of the project. Treat it as such.**
@@ -585,7 +597,7 @@ public static class Config
 |------|---------|
 | `Bridge/Config.cs` | Centralized constants: `AppDataPath`, `LibraryDbPath`, `SettingsPath`, `ImageCachePath`, `UnknownPlatformId`, SteamGridDB base URL, seed resource name |
 | `Bridge/App.xaml.cs` | DI container setup, global exception handler — not yet created |
-| `Bridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to platform, tracks missing ROMs — implemented, tested |
+| `Bridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to platform, tracks missing ROMs; validates and adds scan folders (`Directory.Exists`, fails early) — implemented, tested |
 | `Bridge/Services/LibraryRepository.cs` | LiteDB-backed persistence: platforms (seeded), games, scan folders, box art — implemented, tested |
 | `Bridge/Resources/SeedSystems.json` | 15 built-in platforms (cartridge/handheld only — see ARCHITECTURE.md → ADR-7), embedded resource |
 | `Bridge/Services/MetadataService.cs` | SteamGridDB search + grids lookup, batch box-art fetch, stop-early on rate-limit/auth failure — implemented, tested (see ADR-8) |

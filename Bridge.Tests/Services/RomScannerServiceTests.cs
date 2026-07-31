@@ -1,4 +1,5 @@
 using System.IO;
+using Bridge.Exceptions;
 using Bridge.Models;
 using Bridge.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -138,5 +139,25 @@ public class RomScannerServiceTests : IDisposable
 
         Assert.Single(result.SkippedFolders);
         Assert.Single(_repository.Games);
+    }
+
+    [Fact]
+    public async Task AddScanFolderAsync_FolderDoesNotExist_ThrowsBridgeException()
+    {
+        var folder = new ScanFolder { Id = Guid.NewGuid(), Path = Path.Combine(_tempRoot, "does-not-exist") };
+
+        await Assert.ThrowsAsync<BridgeException>(() => _scanner.AddScanFolderAsync(folder));
+        Assert.Empty(_repository.ScanFolders);
+    }
+
+    [Fact]
+    public async Task AddScanFolderAsync_FolderExists_Persists()
+    {
+        var folder = new ScanFolder { Id = Guid.NewGuid(), Path = _tempRoot };
+
+        await _scanner.AddScanFolderAsync(folder);
+
+        var stored = Assert.Single(_repository.ScanFolders);
+        Assert.Equal(_tempRoot, stored.Path);
     }
 }

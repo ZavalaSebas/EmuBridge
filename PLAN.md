@@ -1,8 +1,8 @@
 # Bridge - Project Plan
 
-> **Status:** Pre-implementation — Phase 1 (MVP) not started
+> **Status:** Phase 1 (MVP) — all backend service logic implemented and tested (9/9 FRs, 56 unit tests, 9 ADRs). No UI yet. **Next session starts with the composition root (`App.xaml.cs` DI wiring) and the Phase 1 minimal UI — nothing else is pending at the service/logic layer.** See `## Timeline` below for the exact handoff state.
 >
-> **Last updated:** 2026-07-30
+> **Last updated:** 2026-07-31
 
 ## Project Overview
 
@@ -213,11 +213,21 @@ Bridge/
 
 ## Timeline
 
-No fixed dates yet. Immediate next steps, in order:
+No fixed dates yet. Progress so far, and the exact handoff state for whoever (or whichever session) picks this up next:
 
 1. ~~Create the Bridge repo from `project-template/`, following `project-template/NEW_PROJECT_CHECKLIST.md`~~ — done
 2. ~~Resolve the 5 Open Decisions above in Phase 0, before writing the first service~~ — done, see ADR-1 through ADR-5 in `ARCHITECTURE.md`
-3. Start with `RomScannerService` + minimal persistence — it's the foundation everything else depends on
+3. ~~`LibraryRepository` + `RomScannerService`~~ — done (commit `a4e781a`), ADR-1/2/3/6/7
+4. ~~`MetadataService` + `ImageCacheService` (+ `SettingsService`)~~ — done (commit `2b7cd10`), ADR-4/5/8
+5. ~~`EmulatorService` + `LaunchService`~~ — done (commit `f87d516`), ADR-9
+6. ~~Close the `AddScanFolderAsync` validation gap found during the status review~~ — done, this session
+
+**All service-layer logic for Phase 1's 9 FRs is implemented and tested (56 tests, `dotnet test` green).** Nothing is architecturally undecided — all 5 original Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-9).
+
+**Next session, in order — deliberately not started yet, by explicit decision, to keep it as dedicated fresh-focus work:**
+
+7. **Composition root** — `App.xaml.cs` has no DI container wired up yet; it's still the bare Visual Studio WPF scaffold. Register `ILibraryRepository`/`IRomScannerService`/`ISettingsService`/`IImageCacheService`/`IMetadataService`/`IEmulatorService`/`ILaunchService` (all already implemented) plus `ILogger<T>`/`HttpClient`, per the patterns already documented in `DEVELOPMENT.md` → Dependency Injection.
+8. **Phase 1 minimal UI** — one functional cover grid view (no animations yet, per the foundation document). This is also where the ViewModel-level orchestration glue gets written: e.g. "after scan, fetch missing box art" (call `RomScannerService.ScanAsync()` then `MetadataService.FetchMissingBoxArtAsync()` in sequence) and "launch a game" (call `LaunchService.LaunchAsync()`, react to `LaunchResult`) — this glue was deliberately left out of the service layer itself; see ARCHITECTURE.md → ADR-8/ADR-9 consequences.
 
 ---
 

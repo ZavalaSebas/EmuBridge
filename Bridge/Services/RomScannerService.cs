@@ -1,4 +1,5 @@
 using System.IO;
+using Bridge.Exceptions;
 using Bridge.Models;
 using Microsoft.Extensions.Logging;
 
@@ -13,6 +14,20 @@ public class RomScannerService : IRomScannerService
     {
         _repository = repository;
         _logger = logger;
+    }
+
+    // Validation lives here, not in LibraryRepository — same layering as
+    // EmulatorService.SaveEmulatorConfigAsync (repository stays pure storage; the domain-aware
+    // service in front of it validates and fails early). Throws, doesn't fail silently, matching
+    // that same precedent: a bad folder path is caller input, not an expected runtime outcome.
+    public async Task AddScanFolderAsync(ScanFolder folder, CancellationToken ct = default)
+    {
+        if (!Directory.Exists(folder.Path))
+        {
+            throw new BridgeException($"Folder not found at '{folder.Path}'.");
+        }
+
+        await _repository.AddScanFolderAsync(folder, ct);
     }
 
     public async Task<ScanResult> ScanAsync(IProgress<int>? progress = null, CancellationToken ct = default)
