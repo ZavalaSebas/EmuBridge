@@ -87,10 +87,12 @@ public partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        var platformId = SelectedPlatform.PlatformId;
+
         try
         {
             await _emulatorService.SaveProfileAsync(
-                SelectedPlatform.PlatformId,
+                platformId,
                 $"{SelectedPlatform.PlatformName} Emulator",
                 ExecutablePath,
                 ArgumentTemplate);
@@ -101,8 +103,12 @@ public partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        // Reselect before setting the final status message, not after — reassigning
+        // SelectedPlatform fires OnSelectedPlatformChanged, which itself clears StatusMessage
+        // (by design, for when the user manually switches platforms). Setting the message first
+        // would just get wiped out by that side effect.
+        await ReloadPlatformsAndReselectAsync(platformId);
         StatusMessage = "Saved.";
-        await LoadPlatformsAsync();
     }
 
     [RelayCommand]
@@ -113,8 +119,15 @@ public partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        // Captured upfront, not read again after the awaits below — nothing stops the user from
+        // changing the ListBox selection while a long install is in flight (only the Save/
+        // Auto-Install buttons are IsBusy-guarded, not the platform list itself), and installing
+        // against a since-changed SelectedPlatform would be a real, if narrow, correctness bug.
+        var platformId = SelectedPlatform.PlatformId;
+        var platformName = SelectedPlatform.PlatformName;
+
         var confirmed = _messageBoxService.Show(
-            $"This will download and install an emulator for {SelectedPlatform.PlatformName} automatically. It may take a while depending on your connection. Continue?",
+            $"This will download and install an emulator for {platformName} automatically. It may take a while depending on your connection. Continue?",
             "Auto-Install Emulator",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
@@ -130,7 +143,7 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var progress = new Progress<string>(message => StatusMessage = message);
-            var result = await _installerService.InstallAsync(SelectedPlatform.PlatformId, progress, _installCts.Token);
+            var result = await _installerService.InstallAsync(platformId, progress, _installCts.Token);
 
             if (result.Outcome != InstallOutcome.Success)
             {
@@ -143,8 +156,10 @@ public partial class SettingsViewModel : ObservableObject
                 return;
             }
 
+            // Same ordering reason as SaveEmulatorProfileAsync: reselect first, set the final
+            // message after — OnSelectedPlatformChanged clears StatusMessage as a side effect.
+            await ReloadPlatformsAndReselectAsync(platformId);
             StatusMessage = "Installed.";
-            await LoadPlatformsAsync();
         }
         catch (OperationCanceledException)
         {
@@ -201,5 +216,16 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         Platforms = new ObservableCollection<PlatformConfigItem>(items.OrderBy(p => p.PlatformName));
+    }
+
+    // LoadPlatformsAsync rebuilds Platforms with brand-new PlatformConfigItem instances every
+    // call — SelectedPlatform, left pointing at the old (now orphaned) instance, would otherwise
+    // keep showing pre-reload data (ExecutablePath/ArgumentTemplate only refresh inside
+    // OnSelectedPlatformChanged, which only fires on a real reassignment). Explicitly reselecting
+    // the matching item from the fresh collection is what actually triggers that refresh.
+    private async Task ReloadPlatformsAndReselectAsync(string platformId, CancellationToken ct = default)
+    {
+        await LoadPlatformsAsync(ct);
+        SelectedPlatform = Platforms.FirstOrDefault(p => p.PlatformId == platformId);
     }
 }

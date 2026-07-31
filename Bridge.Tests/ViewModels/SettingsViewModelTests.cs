@@ -127,6 +127,25 @@ public class SettingsViewModelTests
         Assert.True(_viewModel.Platforms.Single(p => p.PlatformId == "nes").IsConfigured);
     }
 
+    // Regression test: LoadPlatformsAsync rebuilds Platforms with brand-new PlatformConfigItem
+    // instances every call. Before the fix, SelectedPlatform kept pointing at the stale,
+    // now-orphaned pre-save instance, so IsConfigured here read false even though the save
+    // succeeded and the reloaded Platforms list already reflected it correctly.
+    [Fact]
+    public async Task SaveEmulatorProfileCommand_Success_ReselectsPlatformSoSelectedPlatformReflectsSavedState()
+    {
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
+        _viewModel.ExecutablePath = @"C:\emu\nes.exe";
+        _viewModel.ArgumentTemplate = "\"{RomPath}\"";
+
+        await _viewModel.SaveEmulatorProfileCommand.ExecuteAsync(null);
+
+        Assert.NotNull(_viewModel.SelectedPlatform);
+        Assert.Equal("nes", _viewModel.SelectedPlatform!.PlatformId);
+        Assert.True(_viewModel.SelectedPlatform.IsConfigured);
+    }
+
     [Fact]
     public async Task SaveApiKeyCommand_EmptyKey_DoesNotSave()
     {
@@ -217,6 +236,39 @@ public class SettingsViewModelTests
         Assert.Equal("Installed.", _viewModel.StatusMessage);
         Assert.Contains("nes", _installerService.InstalledPlatformIds);
         Assert.False(_viewModel.IsBusy);
+    }
+
+    // Regression test for the exact bug reported from real interactive use: right after a
+    // successful Auto-Install, the Executable field appeared empty — LoadPlatformsAsync rebuilds
+    // Platforms with fresh PlatformConfigItem instances, but SelectedPlatform kept pointing at
+    // the stale pre-install one, so OnSelectedPlatformChanged (the only thing that populates the
+    // ExecutablePath/ArgumentTemplate text-box-bound properties) never re-fired. Leaving Settings
+    // and re-entering "fixed" it only because re-selecting the platform manually re-triggered
+    // that hook — this test exercises the same refresh without needing a real navigate-away.
+    [Fact]
+    public async Task AutoInstallCommand_Success_ReselectsPlatformSoExecutablePathFieldRefreshes()
+    {
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
+        _messageBox.NextResult = MessageBoxResult.Yes;
+        _installerService.NextResult = new InstallResult { Outcome = InstallOutcome.Success };
+        // Simulates what a real install would have registered via EmulatorService by the time
+        // LoadPlatformsAsync re-reads it — FakeEmulatorInstallerService doesn't touch
+        // FakeEmulatorService itself, so this stands in for "the install already happened".
+        _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
+        {
+            PlatformId = "nes",
+            ExecutablePath = @"C:\emu\retroarch\RetroArch-Win64\retroarch.exe",
+            ArgumentTemplate = "-L {CorePath} {RomPath}"
+        };
+
+        await _viewModel.AutoInstallCommand.ExecuteAsync(null);
+
+        Assert.NotNull(_viewModel.SelectedPlatform);
+        Assert.Equal("nes", _viewModel.SelectedPlatform!.PlatformId);
+        Assert.True(_viewModel.SelectedPlatform.IsConfigured);
+        Assert.Equal(@"C:\emu\retroarch\RetroArch-Win64\retroarch.exe", _viewModel.ExecutablePath);
+        Assert.Equal("-L {CorePath} {RomPath}", _viewModel.ArgumentTemplate);
     }
 
     [Fact]
