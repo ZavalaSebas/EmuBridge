@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `BoxArt` persistence (LiteDB) tracking per-game box art status
 - `EmulatorService` (validates and persists `EmulatorConfig`: executable exists, `{RomPath}` token present, platform reference valid) and `LaunchService` (launches a `Game` through its configured emulator, re-validates ROM/executable existence at launch time, exposes process exit as a `Task`) — no UI yet, covered by 20 unit tests
 - `ArgumentTemplate` shared `{Token}` resolver (single-pass expansion, context-aware quoting), used by both new services
+- DI composition root in `App.xaml.cs` (all services registered, lifetimes individually justified — see ARCHITECTURE.md → ADR-10), replacing the default `StartupUri` mechanism
+- `MainWindow`/`MainViewModel`: functional cover grid, empty-state guidance, scan/box-art progress with cancel, add-folder/rescan/settings toolbar, click-to-launch
+- `SettingsWindow`/`SettingsViewModel`: per-platform emulator configuration, SteamGridDB API key entry
+- `IMessageBoxService`/`IFolderPickerService`/`IFilePickerService` testable dialog wrappers, covered by 27 new ViewModel/dialog unit tests (83 total)
+- `DispatcherUnhandledException` global handler in `App.xaml.cs` — logs, shows the user a Yes/No dialog, shuts down cleanly on No
+
+### Known Issues
+- The UI has not yet been manually run/observed in a real window from this environment
 
 ---
 

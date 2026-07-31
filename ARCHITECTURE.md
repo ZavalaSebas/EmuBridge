@@ -394,6 +394,44 @@ A shared static `ArgumentTemplate` class (`Validate`/`Expand`) implements ADR-4'
 
 ---
 
+### ADR-10: Composition root + Phase 1 minimal UI (MainWindow/MainViewModel, SettingsWindow/SettingsViewModel)
+
+**Status:** Accepted
+
+**Date:** 2026-07-31
+
+**Context:**
+`App.xaml.cs` had no DI wiring; `MainWindow.xaml`/`MainWindow.xaml.cs` were the untouched Visual Studio scaffold, still using the default `StartupUri="MainWindow.xaml"` mechanism. Phase 1's UI design (grid + empty state + progress + toolbar + Settings) was approved in a prior design pass, anchored to the already-implemented backend services (RomScannerService/MetadataService/LaunchService/EmulatorService), not inventing new behavior.
+
+**Decision — composition root:**
+`App`'s constructor builds the `ServiceCollection`/`ServiceProvider` before `OnStartup` runs. `OnStartup` now explicitly constructs `MainWindow`, resolves `MainViewModel` from DI, sets `DataContext`, and shows it — replacing the default `StartupUri` mechanism now that a real ViewModel exists to wire up (this was explicitly deferred, not skipped, when the composition root was first built). `StartupUri` was removed from `App.xaml`.
+
+Every service lifetime is `Singleton`, chosen and reviewed field-by-field, not assumed from precedent: `LibraryRepository` needs it (owns the one `LiteDatabase` connection); the other nine registrations (`RomScannerService`, `SettingsService`, `ImageCacheService`, `MetadataService`, `EmulatorService`, `LaunchService`, plus the three dialog wrappers below) hold no mutable instance state at all — `Transient` would be equally correct, `Singleton` is a documented simplicity choice, not a technical requirement. `MainViewModel`/`SettingsViewModel` are `Transient`, matching SteamManager's ViewModel registration convention.
+
+**Decision — testable dialog wrappers:** `IMessageBoxService`/`MessageBoxService` (message boxes), `IFolderPickerService`/`FolderPickerService` (`Microsoft.Win32.OpenFolderDialog`, WPF's native folder picker since .NET 8 — confirmed against official Microsoft docs, not the old WinForms interop), and `IFilePickerService`/`FilePickerService` (`Microsoft.Win32.OpenFileDialog`) — all mirroring `IMessageBoxService`'s exact shape from `SteamManager/Services/MessageBoxService.cs`. ViewModels depend on these interfaces, never on the WPF dialog types directly, so `MainViewModelTests`/`SettingsViewModelTests` drive dialog outcomes (folder chosen, file chosen, user cancelled) through `Fake*` doubles — consistent with every other Bridge test so far — without needing a real OS dialog to exist.
+
+**Decision — MainViewModel:** `GameTile` is a flat, rebuilt-wholesale display DTO joining `Game` + `BoxArt` for the View — `NotFetched`/`NotFoundOnProvider`/`FetchFailed` all resolve to `CoverImagePath = null` (placeholder), no visual distinction, per the same reasoning as ADR-8. `RefreshLibraryCommand` is the orchestration glue explicitly flagged as pending in the prior session handoff (`PLAN.md` → Timeline) — it calls `RomScannerService.ScanAsync` then `MetadataService.FetchMissingBoxArtAsync` in sequence, guarded against concurrent execution (`if (IsBusy) return;`), with a shared `CancellationTokenSource` so `CancelScanCommand` can interrupt either phase. `LaunchGameCommand` shows `LaunchResult.ErrorMessage` via `IMessageBoxService` for any non-`Started` outcome and does not await `GameSessionEndedTask` inline (a background continuation just logs when the session ends) — awaiting it inside the command would keep the command's running state occupied for the emulator's entire lifetime.
+
+Found and fixed during this pass: loading box art per-game in a loop (`GetBoxArtAsync` × N) would be the same N+1 pattern already avoided in `RomScannerService`/ADR-6 — added `ILibraryRepository.GetAllBoxArtAsync` (bulk fetch, dictionary lookup) instead, for the same reason (Games can scale to "thousands", per the NFR).
+
+**Decision — SettingsViewModel:** the Platform list excludes the `"unknown"` sentinel — configuring an emulator for "couldn't identify this ROM's system" doesn't make sense, the fix there is the extension mapping, not an emulator assignment. Unlike `MainViewModel`'s box art loading, `SettingsViewModel` loads each platform's `EmulatorConfig` in an N-query loop (`GetEmulatorConfigForPlatformAsync` × ~15) without a bulk method — deliberately different from the `GetAllBoxArtAsync` decision above, because the platform list is seeded at ~15 rows, not "thousands"; a bulk method here would be optimizing a cost that doesn't exist.
+
+**Consequences:**
+- ✅ Every dialog-driven ViewModel behavior (folder/file picked or cancelled, message shown) is unit-tested without a real window or OS dialog
+- ✅ `GetAllBoxArtAsync` keeps `MainViewModel`'s initial load and every refresh at two bulk repository calls, not `O(n)` round-trips, consistent with the NFR that already shaped `RomScannerService`
+- ✅ Lifetime choices are individually justified, not copy-pasted from SteamManager's precedent — the review this ADR is based on went through it service-by-service
+- ❌ `SettingsWindow`'s emulator-config `IsEnabled` gating on `SelectedPlatform` was attempted, then removed after referencing a converter that was never actually written — the `SaveEmulatorConfigCommand` guard (`if (SelectedPlatform is null) return;`) already prevents the only real failure mode, so the form simply stays interactively enabled with nothing selected; a cosmetic gap, not a functional one
+- ❌ Same two-validation-call-sites duplication-of-effort tradeoff as ADR-9 applies again here, one layer up: `EmulatorService` validates at save time, `LaunchService` validates again at launch time — `SettingsViewModel` doesn't add a third check, it relies on `EmulatorService`'s
+
+**Alternatives considered:**
+
+- **Await `GameSessionEndedTask` inline inside `LaunchGameCommand`:** rejected — would keep the `IAsyncRelayCommand`'s running state occupied for the emulator's entire play session, a much longer window than "attempt to launch"
+- **Bulk-fetch `EmulatorConfig` for `SettingsViewModel` the same way as `GetAllBoxArtAsync`:** rejected — no scale problem to solve at ~15 platforms; would be speculative optimization
+- **Reference WPF dialog types directly from ViewModels (no `IMessageBoxService`-style wrappers):** rejected — makes the resulting dialog-driven behavior untestable without a real window, and SteamManager's own `IMessageBoxService` precedent already established the fix
+- **Keep `StartupUri` and wire `DataContext` some other way (e.g. from `MainWindow`'s own constructor via a static locator):** rejected — explicit construction in `OnStartup`, resolving from `App.Services`, is the same shape SteamManager's `App.xaml.cs` already uses, and keeps the composition root as the single place that knows how everything is wired
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above

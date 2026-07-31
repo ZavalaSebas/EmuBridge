@@ -58,6 +58,9 @@ internal class FakeLibraryRepository : ILibraryRepository
     public Task<BoxArt?> GetBoxArtAsync(Guid gameId, CancellationToken ct = default)
         => Task.FromResult(BoxArtRecords.FirstOrDefault(b => b.GameId == gameId));
 
+    public Task<IReadOnlyList<BoxArt>> GetAllBoxArtAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<BoxArt>>(BoxArtRecords.ToList());
+
     public Task UpsertBoxArtAsync(BoxArt boxArt, CancellationToken ct = default)
     {
         var index = BoxArtRecords.FindIndex(b => b.GameId == boxArt.GameId);

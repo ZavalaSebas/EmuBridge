@@ -6,13 +6,11 @@ This document serves as a guide to this specific project AND as a reference for 
 
 ## Current Status (as of 2026-07-31)
 
-All Phase 1 backend service logic is implemented and tested — `LibraryRepository`, `RomScannerService`, `MetadataService`, `ImageCacheService`, `SettingsService`, `EmulatorService`, `LaunchService`. 56 unit tests, all green. All 5 Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-9 in `ARCHITECTURE.md`). Full detail and commit-by-commit history: `PLAN.md` → `## Timeline`.
+All Phase 1 backend services are implemented and tested (`LibraryRepository`, `RomScannerService`, `MetadataService`, `ImageCacheService`, `SettingsService`, `EmulatorService`, `LaunchService`), and the Phase 1 minimal UI is now built on top of them: composition root (`App.xaml.cs`, no `StartupUri`), `MainWindow`/`MainViewModel` (cover grid, empty state, scan/box-art progress, toolbar), `SettingsWindow`/`SettingsViewModel` (emulator config, SteamGridDB API key). 83 unit tests, all green. All 5 Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-10 in `ARCHITECTURE.md`). Full detail and commit-by-commit history: `PLAN.md` → `## Timeline`.
 
-**Next session starts with, in order:**
-1. Composition root — wire up DI in `App.xaml.cs` (nothing is registered yet; the file is still the bare Visual Studio scaffold)
-2. Phase 1 minimal UI (one functional cover grid, no animations) — including the ViewModel-level glue between services (scan → fetch box art; launch → react to `LaunchResult`) that was deliberately left out of the service layer itself
+**Known, honestly-tracked gap:** the UI has never actually been run/observed — `dotnet build`/`dotnet test` pass, but no WPF window has been launched and watched from this environment. First real verification is a manual "does it run" pass.
 
-Nothing is pending at the service/logic layer — this was a deliberate stopping point, not an interruption.
+`App.xaml.cs` now has a `DispatcherUnhandledException` handler (logs, shows the user a Yes/No dialog, shuts down cleanly on No) — this was tracked as a gap earlier in this same session and closed before commit, not left as a Known Limitation, since the fix was cheap and the file was already open. Nothing else is pending at the service/logic layer.
 
 ---
 
@@ -61,6 +59,9 @@ Bridge's service design, technology stack rationale, and key design decisions (i
 ```
 Bridge/
 ├── Bridge/                     # Main WPF project
+│   ├── Converters/
+│   │   ├── InverseBooleanConverter.cs
+│   │   └── InverseBooleanToVisibilityConverter.cs
 │   ├── Exceptions/
 │   │   └── BridgeException.cs
 │   ├── Models/
@@ -82,11 +83,23 @@ Bridge/
 │   │   ├── IMetadataService.cs / MetadataService.cs
 │   │   ├── IEmulatorService.cs / EmulatorService.cs
 │   │   ├── ArgumentTemplate.cs     # shared {Token} resolver, used by EmulatorService + LaunchService
-│   │   └── ILaunchService.cs / LaunchService.cs
-│   ├── ViewModels/                # not yet created
-│   ├── Views/                     # not yet created
+│   │   ├── ILaunchService.cs / LaunchService.cs
+│   │   ├── MessageBoxService.cs      # IMessageBoxService/MessageBoxService
+│   │   ├── FolderPickerService.cs    # IFolderPickerService/FolderPickerService
+│   │   └── FilePickerService.cs      # IFilePickerService/FilePickerService
+│   ├── ViewModels/
+│   │   ├── MainViewModel.cs
+│   │   ├── GameTile.cs
+│   │   ├── SettingsViewModel.cs
+│   │   └── PlatformConfigItem.cs
+│   ├── App.xaml / App.xaml.cs        # composition root — DI wiring, no StartupUri
+│   ├── MainWindow.xaml / .xaml.cs
+│   ├── SettingsWindow.xaml / .xaml.cs
 │   └── Config.cs
 ├── Bridge.Tests/
+│   ├── ViewModels/
+│   │   ├── MainViewModelTests.cs
+│   │   └── SettingsViewModelTests.cs
 │   └── Services/
 │       ├── LibraryRepositoryTests.cs
 │       ├── RomScannerServiceTests.cs
@@ -100,6 +113,12 @@ Bridge/
 │       ├── FakeSettingsService.cs
 │       ├── FakeImageCacheService.cs
 │       ├── FakeEmulatorService.cs
+│       ├── FakeRomScannerService.cs
+│       ├── FakeMetadataService.cs
+│       ├── FakeLaunchService.cs
+│       ├── FakeMessageBoxService.cs
+│       ├── FakeFolderPickerService.cs
+│       ├── FakeFilePickerService.cs
 │       └── FakeHttpMessageHandler.cs
 ├── docs/
 └── Bridge.slnx
@@ -596,7 +615,7 @@ public static class Config
 | File | Purpose |
 |------|---------|
 | `Bridge/Config.cs` | Centralized constants: `AppDataPath`, `LibraryDbPath`, `SettingsPath`, `ImageCachePath`, `UnknownPlatformId`, SteamGridDB base URL, seed resource name |
-| `Bridge/App.xaml.cs` | DI container setup, global exception handler — not yet created |
+| `Bridge/App.xaml.cs` | DI composition root (all services + ViewModels registered), explicit `MainWindow` construction (no `StartupUri`), `DispatcherUnhandledException` global handler — implemented (see ADR-10) |
 | `Bridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to platform, tracks missing ROMs; validates and adds scan folders (`Directory.Exists`, fails early) — implemented, tested |
 | `Bridge/Services/LibraryRepository.cs` | LiteDB-backed persistence: platforms (seeded), games, scan folders, box art — implemented, tested |
 | `Bridge/Resources/SeedSystems.json` | 15 built-in platforms (cartridge/handheld only — see ARCHITECTURE.md → ADR-7), embedded resource |

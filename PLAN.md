@@ -1,6 +1,6 @@
 # Bridge - Project Plan
 
-> **Status:** Phase 1 (MVP) — all backend service logic implemented and tested (9/9 FRs, 56 unit tests, 9 ADRs). No UI yet. **Next session starts with the composition root (`App.xaml.cs` DI wiring) and the Phase 1 minimal UI — nothing else is pending at the service/logic layer.** See `## Timeline` below for the exact handoff state.
+> **Status:** Phase 1 (MVP) — backend services + composition root (with global exception handling) + minimal UI all implemented and tested (9/9 FRs wired end-to-end in code, 83 unit tests, 10 ADRs). **Not yet manually run/verified in a real window** — see `DEVELOPMENT.md` → Current Status. See `## Timeline` below for the exact handoff state.
 >
 > **Last updated:** 2026-07-31
 
@@ -101,6 +101,9 @@ Phase 2 and Phase 3 scope (see above) are explicitly deferred and tracked as bac
 ```
 Bridge/
 ├── Bridge/                     # Main WPF project
+│   ├── Converters/
+│   │   ├── InverseBooleanConverter.cs
+│   │   └── InverseBooleanToVisibilityConverter.cs
 │   ├── Exceptions/
 │   │   └── BridgeException.cs
 │   ├── Models/
@@ -122,11 +125,23 @@ Bridge/
 │   │   ├── IMetadataService.cs / MetadataService.cs
 │   │   ├── IEmulatorService.cs / EmulatorService.cs
 │   │   ├── ArgumentTemplate.cs     # shared {Token} resolver, used by EmulatorService + LaunchService
-│   │   └── ILaunchService.cs / LaunchService.cs
-│   ├── ViewModels/                # not yet created
-│   ├── Views/                     # not yet created
+│   │   ├── ILaunchService.cs / LaunchService.cs
+│   │   ├── MessageBoxService.cs      # IMessageBoxService/MessageBoxService
+│   │   ├── FolderPickerService.cs    # IFolderPickerService/FolderPickerService
+│   │   └── FilePickerService.cs      # IFilePickerService/FilePickerService
+│   ├── ViewModels/
+│   │   ├── MainViewModel.cs
+│   │   ├── GameTile.cs
+│   │   ├── SettingsViewModel.cs
+│   │   └── PlatformConfigItem.cs
+│   ├── App.xaml / App.xaml.cs        # composition root — DI wiring, no StartupUri
+│   ├── MainWindow.xaml / .xaml.cs
+│   ├── SettingsWindow.xaml / .xaml.cs
 │   └── Config.cs
 ├── Bridge.Tests/
+│   ├── ViewModels/
+│   │   ├── MainViewModelTests.cs
+│   │   └── SettingsViewModelTests.cs
 │   └── Services/
 │       ├── LibraryRepositoryTests.cs
 │       ├── RomScannerServiceTests.cs
@@ -140,6 +155,12 @@ Bridge/
 │       ├── FakeSettingsService.cs
 │       ├── FakeImageCacheService.cs
 │       ├── FakeEmulatorService.cs
+│       ├── FakeRomScannerService.cs
+│       ├── FakeMetadataService.cs
+│       ├── FakeLaunchService.cs
+│       ├── FakeMessageBoxService.cs
+│       ├── FakeFolderPickerService.cs
+│       ├── FakeFilePickerService.cs
 │       └── FakeHttpMessageHandler.cs
 ├── docs/
 ├── README.md
@@ -160,15 +181,15 @@ Bridge/
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| FR-01 | User can add one or more root ROM folders | In progress — persistence ready (`LibraryRepository.AddScanFolderAsync`), no UI yet |
-| FR-02 | System recursively scans and detects valid ROM files | In progress — `RomScannerService` implemented and tested, no UI yet |
-| FR-03 | Each detected ROM is automatically associated with a known system/console | In progress — extension→platform matching + "unknown" fallback implemented and tested, no UI yet |
-| FR-04 | Each detected ROM looks up its box art on SteamGridDB | In progress — `MetadataService` implemented and tested (search + grids, terminal/retryable status split, stop-early on rate-limit/auth failure), no UI yet |
-| FR-05 | Box art is cached locally, resized to the exact size it's displayed at | In progress — `ImageCacheService` implemented and tested (WPF-native decode-time resize, on-disk cache keyed by URL+size), no UI yet |
-| FR-06 | User configures, per system, which emulator (.exe) to use | In progress — `EmulatorService` implemented and tested (validates exe path, `{RomPath}` token, platform reference), no UI yet |
-| FR-07 | Selecting and confirming a ROM launches the emulator with correct arguments | In progress — `LaunchService` implemented and tested (argument expansion, launch-time re-validation, process tracking), no UI yet |
-| FR-08 | The library persists between sessions (no full re-scan on every launch) | In progress — LiteDB persistence implemented and tested, no UI yet |
-| FR-09 | User can trigger a manual re-scan | In progress — `ScanAsync` is safely re-runnable (dedup + missing-tracking tested), no UI trigger yet |
+| FR-01 | User can add one or more root ROM folders | UI wired — "Add Folder" button (`MainWindow`) → `OpenFolderDialog` → `RomScannerService.AddScanFolderAsync`. Not yet manually verified running (no way to launch a real WPF window from this environment — see PLAN.md → Timeline) |
+| FR-02 | System recursively scans and detects valid ROM files | UI wired — "Rescan" button / triggered automatically after "Add Folder". Same unverified-running caveat as FR-01 |
+| FR-03 | Each detected ROM is automatically associated with a known system/console | Implemented and tested at the service layer; surfaced in the grid via `GameTile`/`IsMissing`. Same unverified-running caveat |
+| FR-04 | Each detected ROM looks up its box art on SteamGridDB | UI wired — `RefreshLibraryCommand` calls `FetchMissingBoxArtAsync` after every scan. Same unverified-running caveat |
+| FR-05 | Box art is cached locally, resized to the exact size it's displayed at | UI wired — grid tiles bind to `GameTile.CoverImagePath` (`Config.CoverWidth`/`CoverHeight` placeholder values, not a final UI decision). Same unverified-running caveat |
+| FR-06 | User configures, per system, which emulator (.exe) to use | UI wired — `SettingsWindow`, platform list + executable/argument form. Same unverified-running caveat |
+| FR-07 | Selecting and confirming a ROM launches the emulator with correct arguments | UI wired — clicking a grid tile calls `LaunchGameCommand` directly, no confirmation step (see UI design notes). Same unverified-running caveat |
+| FR-08 | The library persists between sessions (no full re-scan on every launch) | Implemented and tested at the service layer (LiteDB) |
+| FR-09 | User can trigger a manual re-scan | UI wired — "Rescan" button, disabled while a scan is already running. Same unverified-running caveat |
 
 **Deliverables:**
 
@@ -220,14 +241,17 @@ No fixed dates yet. Progress so far, and the exact handoff state for whoever (or
 3. ~~`LibraryRepository` + `RomScannerService`~~ — done (commit `a4e781a`), ADR-1/2/3/6/7
 4. ~~`MetadataService` + `ImageCacheService` (+ `SettingsService`)~~ — done (commit `2b7cd10`), ADR-4/5/8
 5. ~~`EmulatorService` + `LaunchService`~~ — done (commit `f87d516`), ADR-9
-6. ~~Close the `AddScanFolderAsync` validation gap found during the status review~~ — done, this session
+6. ~~Close the `AddScanFolderAsync` validation gap found during the status review~~ — done
+7. ~~Composition root (`App.xaml.cs` DI wiring, lifetimes justified field-by-field)~~ — done
+8. ~~Phase 1 minimal UI — `MainWindow`/`MainViewModel` (grid, empty state, progress, toolbar) and `SettingsWindow`/`SettingsViewModel` (emulator config, API key)~~ — done, ADR-10
+9. ~~Global unhandled-exception handler (`DispatcherUnhandledException`) in `App.xaml.cs`~~ — done, closed in the same session it was found rather than left as a Known Limitation (the code genuinely didn't exist yet, unlike the two remaining Known Limitations rows, which are both "code exists and is correct, just untested")
 
-**All service-layer logic for Phase 1's 9 FRs is implemented and tested (56 tests, `dotnet test` green).** Nothing is architecturally undecided — all 5 original Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-9).
+**All of Phase 1's 9 FRs are wired end-to-end in code — services, composition root (with global exception handling), and UI — and covered by 83 unit tests (`dotnet test` green).** All 5 original Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-10).
 
-**Next session, in order — deliberately not started yet, by explicit decision, to keep it as dedicated fresh-focus work:**
+**Next, in order:**
 
-7. **Composition root** — `App.xaml.cs` has no DI container wired up yet; it's still the bare Visual Studio WPF scaffold. Register `ILibraryRepository`/`IRomScannerService`/`ISettingsService`/`IImageCacheService`/`IMetadataService`/`IEmulatorService`/`ILaunchService` (all already implemented) plus `ILogger<T>`/`HttpClient`, per the patterns already documented in `DEVELOPMENT.md` → Dependency Injection.
-8. **Phase 1 minimal UI** — one functional cover grid view (no animations yet, per the foundation document). This is also where the ViewModel-level orchestration glue gets written: e.g. "after scan, fetch missing box art" (call `RomScannerService.ScanAsync()` then `MetadataService.FetchMissingBoxArtAsync()` in sequence) and "launch a game" (call `LaunchService.LaunchAsync()`, react to `LaunchResult`) — this glue was deliberately left out of the service layer itself; see ARCHITECTURE.md → ADR-8/ADR-9 consequences.
+10. **Manually run the app and actually look at it** — nothing in this repo has confirmed the UI *renders* correctly or behaves as designed; `dotnet build`/`dotnet test` passing is necessary but not sufficient. This is the first real gate before Phase 1 can be called done.
+11. Whatever the manual run in step 10 surfaces — expect UI bugs on first real render (untested XAML bindings, layout issues) that unit tests structurally can't catch.
 
 ---
 

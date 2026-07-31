@@ -1,6 +1,8 @@
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Threading;
 using Bridge.Services;
+using Bridge.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -12,14 +14,64 @@ public partial class App : Application
 
     public App()
     {
-        // Built here, in the constructor, rather than in OnStartup like SteamManager's
-        // App.xaml.cs — Bridge still uses the default StartupUri="MainWindow.xaml" mechanism
-        // (no real MainViewModel to wire up yet), so this just needs Services to be ready
-        // before that default window-creation path runs. Once a real MainViewModel/MainWindow
-        // wiring step replaces StartupUri, this can move into OnStartup the same way.
         var services = new ServiceCollection();
         ConfigureServices(services);
         Services = services.BuildServiceProvider();
+
+        DispatcherUnhandledException += App_DispatcherUnhandledException;
+    }
+
+    // DEVELOPMENT.md -> Error Handling requires this. Covers the UI (dispatcher) thread, where
+    // exceptions from ViewModel commands and data binding actually surface — the common case for
+    // a WPF app. AppDomain.UnhandledException / TaskScheduler.UnobservedTaskException (background
+    // threads, unobserved fire-and-forget Tasks) aren't wired up: nothing in Bridge today runs
+    // meaningful work off the dispatcher thread, and the one fire-and-forget call that exists
+    // (MainViewModel.TrackSessionEndAsync) already catches everything internally, so there's no
+    // real gap there to close right now — not deferred, just not a currently-live risk.
+    private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        var logger = Services.GetService<ILogger<App>>();
+        logger?.LogError(e.Exception, "Unhandled exception on the UI thread.");
+
+        var result = MessageBox.Show(
+            $"Bridge ran into an unexpected error:\n\n{e.Exception.Message}\n\nTry to continue anyway? Choosing No will close Bridge.",
+            "Unexpected Error",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Error);
+
+        // Handled = true either way: we've already shown our own message and given the user a
+        // choice, so we don't also want WPF's default unhandled-exception crash behavior on top.
+        // For "No", explicitly Shutdown() rather than leaving the process to terminate on its
+        // own — that's what actually runs OnExit and disposes Services cleanly.
+        e.Handled = true;
+
+        if (result == MessageBoxResult.No)
+        {
+            Shutdown();
+        }
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        var mainWindow = new MainWindow();
+        var mainViewModel = Services.GetRequiredService<MainViewModel>();
+        mainViewModel.OpenSettingsRequested = () => OpenSettings(mainWindow);
+        mainWindow.DataContext = mainViewModel;
+
+        MainWindow = mainWindow;
+        mainWindow.Show();
+    }
+
+    private void OpenSettings(Window owner)
+    {
+        var settingsWindow = new SettingsWindow
+        {
+            Owner = owner,
+            DataContext = Services.GetRequiredService<SettingsViewModel>()
+        };
+        settingsWindow.ShowDialog();
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -40,21 +92,22 @@ public partial class App : Application
         services.AddSingleton<ILibraryRepository, LibraryRepository>();
 
         // RomScannerService/SettingsService/ImageCacheService/MetadataService/EmulatorService/
-        // LaunchService: Singleton here is a simplicity choice, not a technical requirement —
-        // documented deviation from DEVELOPMENT.md's own "Transient: lightweight stateless
-        // services" guideline, not an oversight. None of the six hold mutable instance state
-        // (checked field-by-field): every method builds its working data as local variables
-        // per call, not instance fields. Transient would be equally correct — there's no state
-        // to isolate between resolutions either way, so the choice costs nothing functionally,
-        // just a handful of avoided allocations. Secondary, non-driving reason: if one of these
-        // ever gains real state later (e.g. LaunchService tracking "is this game already
-        // running", not built today), it's already registered the way that would need.
+        // LaunchService/MessageBoxService/FolderPickerService/FilePickerService: Singleton here
+        // is a simplicity choice, not a technical requirement — documented deviation from
+        // DEVELOPMENT.md's own "Transient: lightweight stateless services" guideline, not an
+        // oversight. None hold mutable instance state (checked field-by-field for the original
+        // six; the three dialog wrappers below have no fields at all). Transient would be
+        // equally correct — there's no state to isolate between resolutions either way, so the
+        // choice costs nothing functionally, just a handful of avoided allocations.
         services.AddSingleton<IRomScannerService, RomScannerService>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IImageCacheService, ImageCacheService>();
         services.AddSingleton<IMetadataService, MetadataService>();
         services.AddSingleton<IEmulatorService, EmulatorService>();
         services.AddSingleton<ILaunchService, LaunchService>();
+        services.AddSingleton<IMessageBoxService, MessageBoxService>();
+        services.AddSingleton<IFolderPickerService, FolderPickerService>();
+        services.AddSingleton<IFilePickerService, FilePickerService>();
 
         // No factory lambdas needed for any of the above — every constructor dependency
         // (ILogger<T>, HttpClient, and the other service interfaces) is itself a directly
@@ -65,8 +118,8 @@ public partial class App : Application
         // .Stats), not on registered types themselves. If a future Bridge service ends up in that
         // same shape, register it the same way.
 
-        // ViewModels: none exist yet. The first one added here should use AddTransient,
-        // matching SteamManager's MainViewModel/GamePickerViewModel/GameManagerViewModel pattern.
+        services.AddTransient<MainViewModel>();
+        services.AddTransient<SettingsViewModel>();
     }
 
     protected override void OnExit(ExitEventArgs e)

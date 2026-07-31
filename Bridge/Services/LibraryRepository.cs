@@ -157,6 +157,14 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         return Task.FromResult<BoxArt?>(result);
     }
 
+    public Task<IReadOnlyList<BoxArt>> GetAllBoxArtAsync(CancellationToken ct = default)
+    {
+        IReadOnlyList<BoxArt> result = _db.GetCollection<BoxArt>(BoxArtCollectionName)
+            .FindAll()
+            .ToList();
+        return Task.FromResult(result);
+    }
+
     public Task UpsertBoxArtAsync(BoxArt boxArt, CancellationToken ct = default)
     {
         var collection = _db.GetCollection<BoxArt>(BoxArtCollectionName);
