@@ -106,11 +106,12 @@ Bridge/
 │   ├── Models/
 │   │   ├── Platform.cs
 │   │   ├── Game.cs
-│   │   ├── EmulatorConfig.cs   # not yet consumed — schema only, EmulatorService not built yet
+│   │   ├── EmulatorConfig.cs
 │   │   ├── ScanFolder.cs
 │   │   ├── ScanResult.cs
 │   │   ├── BoxArt.cs
-│   │   └── MetadataFetchResult.cs
+│   │   ├── MetadataFetchResult.cs
+│   │   └── LaunchResult.cs
 │   ├── Resources/
 │   │   └── SeedSystems.json    # EmbeddedResource — 15 built-in platforms
 │   ├── Services/
@@ -119,8 +120,9 @@ Bridge/
 │   │   ├── ISettingsService.cs / SettingsService.cs
 │   │   ├── IImageCacheService.cs / ImageCacheService.cs
 │   │   ├── IMetadataService.cs / MetadataService.cs
-│   │   ├── EmulatorService        # not yet created
-│   │   └── LaunchService          # not yet created
+│   │   ├── IEmulatorService.cs / EmulatorService.cs
+│   │   ├── ArgumentTemplate.cs     # shared {Token} resolver, used by EmulatorService + LaunchService
+│   │   └── ILaunchService.cs / LaunchService.cs
 │   ├── ViewModels/                # not yet created
 │   ├── Views/                     # not yet created
 │   └── Config.cs
@@ -131,9 +133,13 @@ Bridge/
 │       ├── SettingsServiceTests.cs
 │       ├── ImageCacheServiceTests.cs
 │       ├── MetadataServiceTests.cs
+│       ├── ArgumentTemplateTests.cs
+│       ├── EmulatorServiceTests.cs
+│       ├── LaunchServiceTests.cs
 │       ├── FakeLibraryRepository.cs
 │       ├── FakeSettingsService.cs
 │       ├── FakeImageCacheService.cs
+│       ├── FakeEmulatorService.cs
 │       └── FakeHttpMessageHandler.cs
 ├── docs/
 ├── README.md
@@ -159,8 +165,8 @@ Bridge/
 | FR-03 | Each detected ROM is automatically associated with a known system/console | In progress — extension→platform matching + "unknown" fallback implemented and tested, no UI yet |
 | FR-04 | Each detected ROM looks up its box art on SteamGridDB | In progress — `MetadataService` implemented and tested (search + grids, terminal/retryable status split, stop-early on rate-limit/auth failure), no UI yet |
 | FR-05 | Box art is cached locally, resized to the exact size it's displayed at | In progress — `ImageCacheService` implemented and tested (WPF-native decode-time resize, on-disk cache keyed by URL+size), no UI yet |
-| FR-06 | User configures, per system, which emulator (.exe) to use | Not started |
-| FR-07 | Selecting and confirming a ROM launches the emulator with correct arguments | Not started |
+| FR-06 | User configures, per system, which emulator (.exe) to use | In progress — `EmulatorService` implemented and tested (validates exe path, `{RomPath}` token, platform reference), no UI yet |
+| FR-07 | Selecting and confirming a ROM launches the emulator with correct arguments | In progress — `LaunchService` implemented and tested (argument expansion, launch-time re-validation, process tracking), no UI yet |
 | FR-08 | The library persists between sessions (no full re-scan on every launch) | In progress — LiteDB persistence implemented and tested, no UI yet |
 | FR-09 | User can trigger a manual re-scan | In progress — `ScanAsync` is safely re-runnable (dedup + missing-tracking tested), no UI trigger yet |
 

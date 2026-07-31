@@ -15,4 +15,7 @@ public interface ILibraryRepository
 
     Task<BoxArt?> GetBoxArtAsync(Guid gameId, CancellationToken ct = default);
     Task UpsertBoxArtAsync(BoxArt boxArt, CancellationToken ct = default);
+
+    Task<EmulatorConfig?> GetEmulatorConfigByPlatformIdAsync(string platformId, CancellationToken ct = default);
+    Task UpsertEmulatorConfigAsync(EmulatorConfig config, CancellationToken ct = default);
 }

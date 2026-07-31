@@ -9,6 +9,7 @@ internal class FakeLibraryRepository : ILibraryRepository
     public List<ScanFolder> ScanFolders { get; } = [];
     public List<Game> Games { get; } = [];
     public List<BoxArt> BoxArtRecords { get; } = [];
+    public List<EmulatorConfig> EmulatorConfigs { get; } = [];
 
     public Task<IReadOnlyList<Platform>> GetPlatformsAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Platform>>(Platforms.ToList());
@@ -73,6 +74,30 @@ internal class FakeLibraryRepository : ILibraryRepository
             }
 
             BoxArtRecords.Add(boxArt);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<EmulatorConfig?> GetEmulatorConfigByPlatformIdAsync(string platformId, CancellationToken ct = default)
+        => Task.FromResult(EmulatorConfigs.FirstOrDefault(e => e.PlatformId == platformId));
+
+    public Task UpsertEmulatorConfigAsync(EmulatorConfig config, CancellationToken ct = default)
+    {
+        var index = EmulatorConfigs.FindIndex(e => e.PlatformId == config.PlatformId);
+        if (index >= 0)
+        {
+            config.Id = EmulatorConfigs[index].Id;
+            EmulatorConfigs[index] = config;
+        }
+        else
+        {
+            if (config.Id == Guid.Empty)
+            {
+                config.Id = Guid.NewGuid();
+            }
+
+            EmulatorConfigs.Add(config);
         }
 
         return Task.CompletedTask;

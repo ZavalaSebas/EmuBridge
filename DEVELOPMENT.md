@@ -54,11 +54,12 @@ Bridge/
 │   ├── Models/
 │   │   ├── Platform.cs
 │   │   ├── Game.cs
-│   │   ├── EmulatorConfig.cs   # not yet consumed — schema only, EmulatorService not built yet
+│   │   ├── EmulatorConfig.cs
 │   │   ├── ScanFolder.cs
 │   │   ├── ScanResult.cs
 │   │   ├── BoxArt.cs
-│   │   └── MetadataFetchResult.cs
+│   │   ├── MetadataFetchResult.cs
+│   │   └── LaunchResult.cs
 │   ├── Resources/
 │   │   └── SeedSystems.json    # EmbeddedResource — 15 built-in platforms
 │   ├── Services/
@@ -67,8 +68,9 @@ Bridge/
 │   │   ├── ISettingsService.cs / SettingsService.cs
 │   │   ├── IImageCacheService.cs / ImageCacheService.cs
 │   │   ├── IMetadataService.cs / MetadataService.cs
-│   │   ├── EmulatorService        # not yet created
-│   │   └── LaunchService          # not yet created
+│   │   ├── IEmulatorService.cs / EmulatorService.cs
+│   │   ├── ArgumentTemplate.cs     # shared {Token} resolver, used by EmulatorService + LaunchService
+│   │   └── ILaunchService.cs / LaunchService.cs
 │   ├── ViewModels/                # not yet created
 │   ├── Views/                     # not yet created
 │   └── Config.cs
@@ -79,9 +81,13 @@ Bridge/
 │       ├── SettingsServiceTests.cs
 │       ├── ImageCacheServiceTests.cs
 │       ├── MetadataServiceTests.cs
+│       ├── ArgumentTemplateTests.cs
+│       ├── EmulatorServiceTests.cs
+│       ├── LaunchServiceTests.cs
 │       ├── FakeLibraryRepository.cs
 │       ├── FakeSettingsService.cs
 │       ├── FakeImageCacheService.cs
+│       ├── FakeEmulatorService.cs
 │       └── FakeHttpMessageHandler.cs
 ├── docs/
 └── Bridge.slnx
@@ -585,8 +591,9 @@ public static class Config
 | `Bridge/Services/MetadataService.cs` | SteamGridDB search + grids lookup, batch box-art fetch, stop-early on rate-limit/auth failure — implemented, tested (see ADR-8) |
 | `Bridge/Services/ImageCacheService.cs` | Downloads, resizes (WPF-native decode), and caches box art locally at display resolution — implemented, tested |
 | `Bridge/Services/SettingsService.cs` | DPAPI-encrypted SteamGridDB API key storage in `settings.json` — implemented, tested (see ADR-5) |
-| `Bridge/Services/EmulatorService.cs` | Platform→emulator→launch-argument-template mapping, data-driven — not yet created |
-| `Bridge/Services/LaunchService.cs` | Assembles the final command (emulator + args + ROM path) and launches the process — not yet created |
+| `Bridge/Services/EmulatorService.cs` | Validates and persists `EmulatorConfig` (exe exists, `{RomPath}` present, `PlatformId` valid) — implemented, tested (see ADR-9) |
+| `Bridge/Services/ArgumentTemplate.cs` | Shared `{Token}` resolver (`Validate`/`Expand`), used by both `EmulatorService` and `LaunchService` — implemented, tested |
+| `Bridge/Services/LaunchService.cs` | Re-checks ROM/emulator existence, expands arguments, launches the process, exposes exit as a `Task` — implemented, tested (see ADR-9) |
 
 This table is aspirational until the corresponding files exist — update the "not yet created" note to the real purpose/status as each file is implemented.
 

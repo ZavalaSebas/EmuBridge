@@ -12,6 +12,7 @@ public class LibraryRepository : ILibraryRepository, IDisposable
     private const string GamesCollectionName = "games";
     private const string ScanFoldersCollectionName = "scanFolders";
     private const string BoxArtCollectionName = "boxArt";
+    private const string EmulatorConfigsCollectionName = "emulatorConfigs";
 
     private readonly LiteDatabase _db;
     private readonly ILogger<LibraryRepository> _logger;
@@ -43,6 +44,12 @@ public class LibraryRepository : ILibraryRepository, IDisposable
 
         _db.GetCollection<BoxArt>(BoxArtCollectionName)
             .EnsureIndex(b => b.GameId, unique: true);
+
+        // Re-introduced now that EmulatorService actually owns this collection (see ADR-9) —
+        // deliberately removed during the LibraryRepository/RomScannerService pass because
+        // nothing consumed it yet.
+        _db.GetCollection<EmulatorConfig>(EmulatorConfigsCollectionName)
+            .EnsureIndex(e => e.PlatformId, unique: true);
     }
 
     private void SeedPlatformsIfEmpty()
@@ -164,6 +171,30 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         }
 
         collection.Upsert(boxArt);
+        return Task.CompletedTask;
+    }
+
+    public Task<EmulatorConfig?> GetEmulatorConfigByPlatformIdAsync(string platformId, CancellationToken ct = default)
+    {
+        var result = _db.GetCollection<EmulatorConfig>(EmulatorConfigsCollectionName)
+            .FindOne(e => e.PlatformId == platformId);
+        return Task.FromResult<EmulatorConfig?>(result);
+    }
+
+    public Task UpsertEmulatorConfigAsync(EmulatorConfig config, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<EmulatorConfig>(EmulatorConfigsCollectionName);
+        var existing = collection.FindOne(e => e.PlatformId == config.PlatformId);
+        if (existing is not null)
+        {
+            config.Id = existing.Id;
+        }
+        else if (config.Id == Guid.Empty)
+        {
+            config.Id = Guid.NewGuid();
+        }
+
+        collection.Upsert(config);
         return Task.CompletedTask;
     }
 

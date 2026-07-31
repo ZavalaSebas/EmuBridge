@@ -360,6 +360,40 @@ Error handling: a 429 (rate limit) or 401/403 (auth failure) response stops the 
 
 ---
 
+### ADR-9: EmulatorService + LaunchService design
+
+**Status:** Accepted
+
+**Date:** 2026-07-31
+
+**Context:**
+`EmulatorService` needs to validate and persist `EmulatorConfig` (schema from ADR-3), and `LaunchService` needs to actually launch a `Game` through the configured emulator, using the argument resolver already designed in ADR-4 but never implemented until now. The `EmulatorConfig.PlatformId` unique index was deliberately left out of `LibraryRepository` during the first implementation pass (ADR-6) specifically because nothing consumed it yet — this ADR is where it gets added back.
+
+**Decision:**
+A shared static `ArgumentTemplate` class (`Validate`/`Expand`) implements ADR-4's design exactly (single-pass `Regex.Replace`, dictionary lookup, context-aware quoting) and is called from two places: `EmulatorService.SaveEmulatorConfigAsync` (validates at config-save time) and `LaunchService.LaunchAsync` (validates again at launch time, then expands). Two entry points into the same data — a config could in principle be written directly to LiteDB bypassing `EmulatorService`, given the schema is deliberately editable — so both layers check independently rather than trusting the save-time gate alone.
+
+`EmulatorService.SaveEmulatorConfigAsync` validates three things before persisting, throwing `BridgeException` on failure (same category as ADR-4's missing-token case — bad input from an active write, not an expected runtime outcome): the executable exists on disk, the argument template contains `{RomPath}`, and `PlatformId` references a real `Platform`.
+
+`LaunchService.LaunchAsync` returns a `LaunchResult` (never throws for expected failure modes — an outcome of trying to fulfill a reasonable request, not bad input) with one of `Started`/`RomFileNotFound`/`NoEmulatorConfigured`/`ExecutableNotFound`/`LaunchFailed`. A missing `EmulatorConfig` for a platform is a single code path regardless of whether `PlatformId` is the `"unknown"` sentinel or a real, still-unconfigured platform — same unification already established in ADR-3/ADR-6 — only the surfaced message text differs. Both the ROM file and the emulator executable are re-checked with `File.Exists` immediately before launch, not trusted from `Game.IsMissing` or from whatever was true when the `EmulatorConfig` was saved — either can have moved or disappeared since.
+
+`LaunchResult.GameSessionEndedTask` (built from `Process.WaitForExitAsync()`, per ADR-1's Option A) is the only way `LaunchService` exposes "the game ended" — never the raw `Process`. If ADR-1's improvement path (Job Object tracking) is ever implemented, this contract doesn't change, only what builds the `Task` internally does. `CancellationToken` is checked at method entry and again immediately before `Process.Start` — the two file-existence checks and argument expansion in between take real time, so a cancellation landing in that window is still honored instead of launching anyway.
+
+**Consequences:**
+- ✅ A misconfigured `ArgumentTemplate` is caught at config-save time in the common case (via `EmulatorService`), with `LaunchService`'s own check as a backstop for configs written some other way
+- ✅ `NoEmulatorConfigured`'s unified code path means Phase 2's eventual "configure emulator" UI flow is identical whether the trigger was an unrecognized ROM or a recognized-but-unconfigured one
+- ✅ Re-checking file existence at launch time (not trusting stale scan/config-time state) directly prevents a silent failure class: emulator or ROM moved after configuration
+- ✅ The late cancellation check means a caller that cancels mid-`LaunchAsync` never accidentally launches a process it just tried to cancel
+- ❌ Two validation call sites for the same `ArgumentTemplate` rule is minor duplication of *effort* (not logic — both call the same shared method), acceptable given the schema's own editability is what motivates it
+
+**Alternatives considered:**
+
+- **`LaunchService` throws exceptions for `NoEmulatorConfigured`/`ExecutableNotFound`/etc. instead of returning a result type:** rejected — these are expected, state-dependent outcomes of a reasonable request, not invalid input from the caller; matches the `ScanResult`/`MetadataFetchResult` precedent
+- **Expose the raw `Process` from `LaunchResult` instead of a `Task`:** rejected — leaks `TrackingMode` implementation detail into the caller's contract, which ADR-1 already anticipated might change
+- **Trust `EmulatorConfig`/`Game` state as of when they were last saved/scanned, skip the launch-time re-check:** rejected — exactly the silent-failure class this session has consistently avoided (moved emulator, removed ROM)
+- **Only check `ct.ThrowIfCancellationRequested()` once, at method entry:** rejected per explicit review — file checks and argument expansion are real elapsed time, not free
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above
