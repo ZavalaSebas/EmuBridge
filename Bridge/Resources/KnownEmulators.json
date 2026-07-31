@@ -16,6 +16,15 @@
         "ExpectedSizeBytes": 635595,
         "CoreFileName": "fceumm_libretro.dll",
         "CapturedAt": "2026-07-31"
+      },
+      {
+        "Id": "snes9x",
+        "PlatformId": "snes",
+        "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/snes9x_libretro.dll.zip",
+        "Sha256": "3e26cd5cc26d9d2ceb9c35fe91026dd56dd667e3cfab28653421de0c79da4156",
+        "ExpectedSizeBytes": 969800,
+        "CoreFileName": "snes9x_libretro.dll",
+        "CapturedAt": "2026-07-31"
       }
     ]
   }
