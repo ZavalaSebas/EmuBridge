@@ -11,6 +11,7 @@ public class LibraryRepository : ILibraryRepository, IDisposable
     private const string PlatformsCollectionName = "platforms";
     private const string GamesCollectionName = "games";
     private const string ScanFoldersCollectionName = "scanFolders";
+    private const string BoxArtCollectionName = "boxArt";
 
     private readonly LiteDatabase _db;
     private readonly ILogger<LibraryRepository> _logger;
@@ -39,6 +40,9 @@ public class LibraryRepository : ILibraryRepository, IDisposable
     {
         _db.GetCollection<Game>(GamesCollectionName)
             .EnsureIndex(g => g.Path, unique: true);
+
+        _db.GetCollection<BoxArt>(BoxArtCollectionName)
+            .EnsureIndex(b => b.GameId, unique: true);
     }
 
     private void SeedPlatformsIfEmpty()
@@ -136,6 +140,30 @@ public class LibraryRepository : ILibraryRepository, IDisposable
             games.Update(game);
         }
 
+        return Task.CompletedTask;
+    }
+
+    public Task<BoxArt?> GetBoxArtAsync(Guid gameId, CancellationToken ct = default)
+    {
+        var result = _db.GetCollection<BoxArt>(BoxArtCollectionName)
+            .FindOne(b => b.GameId == gameId);
+        return Task.FromResult<BoxArt?>(result);
+    }
+
+    public Task UpsertBoxArtAsync(BoxArt boxArt, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<BoxArt>(BoxArtCollectionName);
+        var existing = collection.FindOne(b => b.GameId == boxArt.GameId);
+        if (existing is not null)
+        {
+            boxArt.Id = existing.Id;
+        }
+        else if (boxArt.Id == Guid.Empty)
+        {
+            boxArt.Id = Guid.NewGuid();
+        }
+
+        collection.Upsert(boxArt);
         return Task.CompletedTask;
     }
 

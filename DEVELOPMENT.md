@@ -56,14 +56,17 @@ Bridge/
 │   │   ├── Game.cs
 │   │   ├── EmulatorConfig.cs   # not yet consumed — schema only, EmulatorService not built yet
 │   │   ├── ScanFolder.cs
-│   │   └── ScanResult.cs
+│   │   ├── ScanResult.cs
+│   │   ├── BoxArt.cs
+│   │   └── MetadataFetchResult.cs
 │   ├── Resources/
 │   │   └── SeedSystems.json    # EmbeddedResource — 15 built-in platforms
 │   ├── Services/
 │   │   ├── ILibraryRepository.cs / LibraryRepository.cs
 │   │   ├── IRomScannerService.cs / RomScannerService.cs
-│   │   ├── MetadataService        # not yet created
-│   │   ├── ImageCacheService      # not yet created
+│   │   ├── ISettingsService.cs / SettingsService.cs
+│   │   ├── IImageCacheService.cs / ImageCacheService.cs
+│   │   ├── IMetadataService.cs / MetadataService.cs
 │   │   ├── EmulatorService        # not yet created
 │   │   └── LaunchService          # not yet created
 │   ├── ViewModels/                # not yet created
@@ -73,7 +76,13 @@ Bridge/
 │   └── Services/
 │       ├── LibraryRepositoryTests.cs
 │       ├── RomScannerServiceTests.cs
-│       └── FakeLibraryRepository.cs
+│       ├── SettingsServiceTests.cs
+│       ├── ImageCacheServiceTests.cs
+│       ├── MetadataServiceTests.cs
+│       ├── FakeLibraryRepository.cs
+│       ├── FakeSettingsService.cs
+│       ├── FakeImageCacheService.cs
+│       └── FakeHttpMessageHandler.cs
 ├── docs/
 └── Bridge.slnx
 ```
@@ -568,13 +577,14 @@ public static class Config
 
 | File | Purpose |
 |------|---------|
-| `Bridge/Config.cs` | Centralized constants: `AppDataPath`, `LibraryDbPath`, `UnknownPlatformId`, seed resource name |
+| `Bridge/Config.cs` | Centralized constants: `AppDataPath`, `LibraryDbPath`, `SettingsPath`, `ImageCachePath`, `UnknownPlatformId`, SteamGridDB base URL, seed resource name |
 | `Bridge/App.xaml.cs` | DI container setup, global exception handler — not yet created |
 | `Bridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to platform, tracks missing ROMs — implemented, tested |
-| `Bridge/Services/LibraryRepository.cs` | LiteDB-backed persistence: platforms (seeded), games, scan folders — implemented, tested |
+| `Bridge/Services/LibraryRepository.cs` | LiteDB-backed persistence: platforms (seeded), games, scan folders, box art — implemented, tested |
 | `Bridge/Resources/SeedSystems.json` | 15 built-in platforms (cartridge/handheld only — see ARCHITECTURE.md → ADR-7), embedded resource |
-| `Bridge/Services/MetadataService.cs` | SteamGridDB wrapper, local caching, rate-limit handling — not yet created |
-| `Bridge/Services/ImageCacheService.cs` | Resizes and caches box art locally at display resolution — not yet created |
+| `Bridge/Services/MetadataService.cs` | SteamGridDB search + grids lookup, batch box-art fetch, stop-early on rate-limit/auth failure — implemented, tested (see ADR-8) |
+| `Bridge/Services/ImageCacheService.cs` | Downloads, resizes (WPF-native decode), and caches box art locally at display resolution — implemented, tested |
+| `Bridge/Services/SettingsService.cs` | DPAPI-encrypted SteamGridDB API key storage in `settings.json` — implemented, tested (see ADR-5) |
 | `Bridge/Services/EmulatorService.cs` | Platform→emulator→launch-argument-template mapping, data-driven — not yet created |
 | `Bridge/Services/LaunchService.cs` | Assembles the final command (emulator + args + ROM path) and launches the process — not yet created |
 
@@ -587,6 +597,8 @@ This table is aspirational until the corresponding files exist — update the "n
 | Limitation | Reason | Workaround |
 |------------|--------|------------|
 | `LaunchService`'s Phase 1 exit detection does not correctly detect when the emulator has closed if the launched process is a wrapper/launcher that spawns the real emulator process and exits itself (e.g. an updater shim, a single-instance relaunch, or a `.bat`/`.cmd` wrapper) — Bridge would return control to the launcher while the actual emulator is still running. | Phase 1 tracks the process handle returned directly by `Process.Start()` (see PLAN.md → Open Decisions #5, ARCHITECTURE.md → ADR-1), chosen deliberately over Windows Job Object process-tree tracking to avoid P/Invoke complexity before the wrapper/launcher problem is confirmed to occur frequently in practice. Directly related to the process-exit-detection bug class found in OrbSpoofer. | If this proves frequent for real emulators being configured, implement process-tree tracking via Windows Job Objects (`CreateJobObject`/`AssignProcessToJobObject`) — see ARCHITECTURE.md → ADR-1 for the noted improvement path. |
+| `RomScannerService`'s per-file permission-denied handling (`UnauthorizedAccessException`/`IOException` caught on an individual file during scanning — see ARCHITECTURE.md → ADR-6) is implemented but not covered by an automated test. | Reliably simulating a permission-denied file in a portable, fast unit test requires manipulating Windows ACLs, which is fragile and slow — not worth the cost for Phase 1. The other error-handling cases (missing folder, empty file) are covered; this one specifically isn't. | Verify manually if this code path changes (create a file, deny read access via `icacls`, run a scan, confirm it's skipped and logged) rather than relying on the automated suite for this specific path. Revisit with a filesystem abstraction (e.g. `IFileSystem`) if untestable-I/O-error coverage becomes a recurring need beyond this one case. |
+| `MetadataService` has no "safe to retry at" timestamp for a SteamGridDB rate-limit (429) stop — it can only say "stopped early, remaining games pending for the next batch run, whenever that is." | Confirmed by checking the actual `Retry-After`-style handling in three independent sources — the official Node.js wrapper's source code (`SteamGridDB/node-steamgriddb`), the community .NET wrapper (`craftersmine/SteamGridDB.NET`), and general web search — none document or read a rate-limit-retry header from SteamGridDB. Not assumed; actively looked for and not found. Fabricating an arbitrary wait time was explicitly rejected in favor of documenting this as a real gap. | If SteamGridDB ever adds a documented rate-limit header, or if inspecting real 429 responses at runtime turns up an undocumented one, wire it into `MetadataFetchResult` then. Until confirmed, don't guess a backoff duration. |
 
 Populate further rows as additional limitations are discovered during development.
 

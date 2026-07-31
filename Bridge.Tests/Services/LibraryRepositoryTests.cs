@@ -119,4 +119,38 @@ public class LibraryRepositoryTests : IDisposable
         var stored = Assert.Single(all);
         Assert.Equal(folder.Path, stored.Path);
     }
+
+    [Fact]
+    public async Task GetBoxArtAsync_NoRecordForGame_ReturnsNull()
+    {
+        var boxArt = await _repository.GetBoxArtAsync(Guid.NewGuid());
+
+        Assert.Null(boxArt);
+    }
+
+    [Fact]
+    public async Task UpsertBoxArtAsync_NewRecord_IsAdded()
+    {
+        var gameId = Guid.NewGuid();
+        var boxArt = new BoxArt { GameId = gameId, Status = BoxArtStatus.Cached, LocalPath = @"C:\cache\a.png" };
+
+        await _repository.UpsertBoxArtAsync(boxArt);
+        var stored = await _repository.GetBoxArtAsync(gameId);
+
+        Assert.NotNull(stored);
+        Assert.Equal(BoxArtStatus.Cached, stored.Status);
+        Assert.Equal(@"C:\cache\a.png", stored.LocalPath);
+    }
+
+    [Fact]
+    public async Task UpsertBoxArtAsync_ExistingGameId_UpdatesWithoutDuplicating()
+    {
+        var gameId = Guid.NewGuid();
+        await _repository.UpsertBoxArtAsync(new BoxArt { GameId = gameId, Status = BoxArtStatus.FetchFailed });
+
+        await _repository.UpsertBoxArtAsync(new BoxArt { GameId = gameId, Status = BoxArtStatus.Cached, LocalPath = @"C:\cache\a.png" });
+
+        var stored = await _repository.GetBoxArtAsync(gameId);
+        Assert.Equal(BoxArtStatus.Cached, stored!.Status);
+    }
 }

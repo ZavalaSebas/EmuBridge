@@ -8,6 +8,7 @@ internal class FakeLibraryRepository : ILibraryRepository
     public List<Platform> Platforms { get; } = [];
     public List<ScanFolder> ScanFolders { get; } = [];
     public List<Game> Games { get; } = [];
+    public List<BoxArt> BoxArtRecords { get; } = [];
 
     public Task<IReadOnlyList<Platform>> GetPlatformsAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Platform>>(Platforms.ToList());
@@ -48,6 +49,30 @@ internal class FakeLibraryRepository : ILibraryRepository
             {
                 game.IsMissing = true;
             }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<BoxArt?> GetBoxArtAsync(Guid gameId, CancellationToken ct = default)
+        => Task.FromResult(BoxArtRecords.FirstOrDefault(b => b.GameId == gameId));
+
+    public Task UpsertBoxArtAsync(BoxArt boxArt, CancellationToken ct = default)
+    {
+        var index = BoxArtRecords.FindIndex(b => b.GameId == boxArt.GameId);
+        if (index >= 0)
+        {
+            boxArt.Id = BoxArtRecords[index].Id;
+            BoxArtRecords[index] = boxArt;
+        }
+        else
+        {
+            if (boxArt.Id == Guid.Empty)
+            {
+                boxArt.Id = Guid.NewGuid();
+            }
+
+            BoxArtRecords.Add(boxArt);
         }
 
         return Task.CompletedTask;

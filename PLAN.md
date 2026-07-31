@@ -108,14 +108,17 @@ Bridge/
 │   │   ├── Game.cs
 │   │   ├── EmulatorConfig.cs   # not yet consumed — schema only, EmulatorService not built yet
 │   │   ├── ScanFolder.cs
-│   │   └── ScanResult.cs
+│   │   ├── ScanResult.cs
+│   │   ├── BoxArt.cs
+│   │   └── MetadataFetchResult.cs
 │   ├── Resources/
 │   │   └── SeedSystems.json    # EmbeddedResource — 15 built-in platforms
 │   ├── Services/
 │   │   ├── ILibraryRepository.cs / LibraryRepository.cs
 │   │   ├── IRomScannerService.cs / RomScannerService.cs
-│   │   ├── MetadataService        # not yet created
-│   │   ├── ImageCacheService      # not yet created
+│   │   ├── ISettingsService.cs / SettingsService.cs
+│   │   ├── IImageCacheService.cs / ImageCacheService.cs
+│   │   ├── IMetadataService.cs / MetadataService.cs
 │   │   ├── EmulatorService        # not yet created
 │   │   └── LaunchService          # not yet created
 │   ├── ViewModels/                # not yet created
@@ -125,7 +128,13 @@ Bridge/
 │   └── Services/
 │       ├── LibraryRepositoryTests.cs
 │       ├── RomScannerServiceTests.cs
-│       └── FakeLibraryRepository.cs
+│       ├── SettingsServiceTests.cs
+│       ├── ImageCacheServiceTests.cs
+│       ├── MetadataServiceTests.cs
+│       ├── FakeLibraryRepository.cs
+│       ├── FakeSettingsService.cs
+│       ├── FakeImageCacheService.cs
+│       └── FakeHttpMessageHandler.cs
 ├── docs/
 ├── README.md
 ├── PLAN.md
@@ -148,8 +157,8 @@ Bridge/
 | FR-01 | User can add one or more root ROM folders | In progress — persistence ready (`LibraryRepository.AddScanFolderAsync`), no UI yet |
 | FR-02 | System recursively scans and detects valid ROM files | In progress — `RomScannerService` implemented and tested, no UI yet |
 | FR-03 | Each detected ROM is automatically associated with a known system/console | In progress — extension→platform matching + "unknown" fallback implemented and tested, no UI yet |
-| FR-04 | Each detected ROM looks up its box art on SteamGridDB | Not started |
-| FR-05 | Box art is cached locally, resized to the exact size it's displayed at | Not started |
+| FR-04 | Each detected ROM looks up its box art on SteamGridDB | In progress — `MetadataService` implemented and tested (search + grids, terminal/retryable status split, stop-early on rate-limit/auth failure), no UI yet |
+| FR-05 | Box art is cached locally, resized to the exact size it's displayed at | In progress — `ImageCacheService` implemented and tested (WPF-native decode-time resize, on-disk cache keyed by URL+size), no UI yet |
 | FR-06 | User configures, per system, which emulator (.exe) to use | Not started |
 | FR-07 | Selecting and confirming a ROM launches the emulator with correct arguments | Not started |
 | FR-08 | The library persists between sessions (no full re-scan on every launch) | In progress — LiteDB persistence implemented and tested, no UI yet |

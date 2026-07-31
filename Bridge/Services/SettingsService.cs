@@ -1,0 +1,99 @@
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+
+namespace Bridge.Services;
+
+public class SettingsService : ISettingsService
+{
+    private readonly string _settingsPath;
+    private readonly ILogger<SettingsService> _logger;
+
+    public SettingsService(ILogger<SettingsService> logger)
+        : this(Config.SettingsPath, logger)
+    {
+    }
+
+    public SettingsService(string settingsPath, ILogger<SettingsService> logger)
+    {
+        _settingsPath = settingsPath;
+        _logger = logger;
+    }
+
+    public async Task<string?> GetSteamGridDbApiKeyAsync(CancellationToken ct = default)
+    {
+        var settings = await ReadSettingsAsync(ct);
+        if (string.IsNullOrEmpty(settings?.EncryptedSteamGridDbApiKey))
+        {
+            return null;
+        }
+
+        try
+        {
+            var encryptedBytes = Convert.FromBase64String(settings.EncryptedSteamGridDbApiKey);
+            var decryptedBytes = ProtectedData.Unprotect(encryptedBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(decryptedBytes);
+        }
+        catch (CryptographicException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Could not decrypt the stored SteamGridDB API key — it may have been created under a different Windows account. Treating as not configured.");
+            return null;
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogWarning(ex, "Stored SteamGridDB API key is not valid base64; treating as not configured.");
+            return null;
+        }
+    }
+
+    public async Task SetSteamGridDbApiKeyAsync(string apiKey, CancellationToken ct = default)
+    {
+        var plainBytes = Encoding.UTF8.GetBytes(apiKey);
+        var encryptedBytes = ProtectedData.Protect(plainBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
+
+        var settings = await ReadSettingsAsync(ct) ?? new SettingsFile();
+        settings.EncryptedSteamGridDbApiKey = Convert.ToBase64String(encryptedBytes);
+
+        await WriteSettingsAsync(settings, ct);
+    }
+
+    private async Task<SettingsFile?> ReadSettingsAsync(CancellationToken ct)
+    {
+        if (!File.Exists(_settingsPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(_settingsPath);
+            return await JsonSerializer.DeserializeAsync<SettingsFile>(stream, cancellationToken: ct);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to parse {SettingsPath}; treating settings as empty.", _settingsPath);
+            return null;
+        }
+    }
+
+    private async Task WriteSettingsAsync(SettingsFile settings, CancellationToken ct)
+    {
+        var directory = Path.GetDirectoryName(_settingsPath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await using var stream = File.Create(_settingsPath);
+        await JsonSerializer.SerializeAsync(stream, settings, cancellationToken: ct);
+    }
+
+    private class SettingsFile
+    {
+        public string? EncryptedSteamGridDbApiKey { get; set; }
+    }
+}

@@ -326,6 +326,40 @@ Disc-based platforms (PS1, PS2, Saturn, Dreamcast, GameCube, Wii, PSP, and simil
 
 ---
 
+### ADR-8: MetadataService + ImageCacheService design
+
+**Status:** Accepted
+
+**Date:** 2026-07-30
+
+**Context:**
+`MetadataService` needs to resolve box art for a `Game` via SteamGridDB (FR-04) and `ImageCacheService` needs to cache it locally, resized to the exact display size (FR-05), per the API key handling already decided in ADR-5. The actual SteamGridDB endpoints were confirmed from the official Node.js wrapper's source (`SteamGridDB/node-steamgriddb`, `src/index.ts`), not assumed: base URL `https://www.steamgriddb.com/api/v2`, `Authorization: Bearer {key}`, `GET /search/autocomplete/{query}` returning `{ success, data: [{ id, name, ... }], errors }`, `GET /grids/game/{id}` returning `{ success, data: [{ id, url, ... }], errors }`.
+
+**Decision:**
+New `BoxArt` entity (`Id`, `GameId` FK with unique index, `LocalPath`, `Status`, `LastAttemptUtc`), kept separate from `Game` for the same reason `EmulatorConfig` was kept separate from `Platform` in ADR-3 — Phase 2's detail-panel metadata (description, release year, screenshots) is purely additive to this new entity, never touching `Game`. `BoxArtStatus` has two terminal states (`Cached`, `NotFoundOnProvider` — never auto-retried) and one retry-worthy state (`FetchFailed`, covering missing key/invalid key/rate limit/network error uniformly — the specific reason lives in logs, not the persisted record, per ADR-5's own note that this distinction was deferred here).
+
+`MetadataService.FetchMissingBoxArtAsync` is a single batch method (mirroring `RomScannerService.ScanAsync`'s shape), not a per-game call driven from outside. Game names are normalized before searching — common No-Intro/Redump parenthetical/bracketed tags (region, revision, etc.) are stripped via a simple regex, not fuzzy matching. The first search result and the first grid result are used with no scoring (approved as-is for Phase 1).
+
+Error handling: a 429 (rate limit) or 401/403 (auth failure) response stops the rest of the batch immediately — both conditions predict every subsequent call will fail the same way, so continuing would just waste time; a network/parse error on a single game does not stop the batch, since it doesn't predict the next game will fail too. `MetadataFetchResult.StoppedEarlyDueToRateLimit` flags the rate-limit case specifically, per the explicit ask to surface it; auth-failure stopping early is visible via the `Failed` count plus a `LogError` (ADR-5's "persistent visible status" is a higher-level UI concern, not built here).
+
+`ImageCacheService` is Game-agnostic (URL + target size → local path only), cache-keyed by `SHA256(url)[..16]_{width}x{height}.png` under `%LocalAppData%\Bridge\ImageCache\`, using WPF's native `BitmapImage` with `DecodePixelWidth`/`DecodePixelHeight` set before `EndInit()` — no new imaging library. Both dimensions are fixed to the exact target (a source with a different aspect ratio is stretched, not cropped) — matches the already-stated "resize to the exact display pixel size" principle without the extra complexity of aspect-preserving cropping, which no current requirement asks for. This deliberately does **not** replicate Playnite's decode-time-only resizing (rejected back when Playnite was first researched) — Bridge writes the resized bitmap to disk once, since box art here comes over the network, not from a local import.
+
+**Consequences:**
+- ✅ `BoxArt`'s terminal/retryable split means a confirmed "not found" is never retried forever, while a transient failure (no key yet, rate limit, network blip) naturally gets picked up again on a future batch run with zero extra bookkeeping
+- ✅ Stopping early on rate-limit/auth-failure avoids burning through an entire library's worth of doomed API calls in one batch
+- ✅ `ImageCacheService`'s Game-agnostic design is independently testable and reusable if Phase 2 needs differently-sized thumbnails for the same source image
+- ❌ Name normalization is a simple tag-strip, not real fuzzy matching — a title with unusual formatting may still search poorly; acceptable for Phase 1, no FR asks for more
+- ❌ Fixed-dimension resize can visually stretch box art with an unusual aspect ratio; acceptable simplification, revisit only if it proves to look bad in practice
+
+**Alternatives considered:**
+
+- **Embed box art fields directly on `Game`:** rejected — blocks Phase 2's larger metadata set without a redesign, same reasoning as `EmulatorConfig` vs `Platform` in ADR-3
+- **Keep retrying rate-limited/auth-failed games one by one through the rest of the batch:** rejected — both failure modes predict repeat failures, so continuing wastes time without benefit
+- **Replicate Playnite's decode-time image resizing (no disk cache of resized bitmaps):** rejected — Bridge's box art is fetched over the network, unlike Playnite's local imports, so re-decoding on every display wastes the original download; already the conclusion from the Playnite research pass
+- **Full fuzzy/scored search matching:** rejected for Phase 1 — no FR requires it, and "first result" is an explicitly approved simplification
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above
