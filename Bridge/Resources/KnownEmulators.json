@@ -9,12 +9,13 @@
     "ExecutableRelativePath": "retroarch.exe",
     "Cores": [
       {
-        "Id": "nestopia",
+        "Id": "fceumm",
         "PlatformId": "nes",
-        "DownloadUrl": "PLACEHOLDER_NOT_VERIFIED",
-        "Sha256": "PLACEHOLDER_NOT_VERIFIED",
-        "ExpectedSizeBytes": 0,
-        "CoreFileName": "nestopia_libretro.dll"
+        "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/fceumm_libretro.dll.zip",
+        "Sha256": "9382bc1bb33eaf6a2b5d18320fa7312fcca95874bd26539654e5296b84260020",
+        "ExpectedSizeBytes": 635595,
+        "CoreFileName": "fceumm_libretro.dll",
+        "CapturedAt": "2026-07-31"
       }
     ]
   }

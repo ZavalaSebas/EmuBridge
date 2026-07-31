@@ -1,6 +1,6 @@
 # Bridge - Project Plan
 
-> **Status:** Phase 1 (MVP) shipped as tagged release `v0.1.0`. **Not yet manually run/verified in a real window** — see `DEVELOPMENT.md` → Current Status. Phase 2 has started: `Emulator`/`EmulatorProfile` split + verified-download mechanism (`DownloadVerificationService`, `KnownEmulators.json` catalog) implemented and tested (96 tests in Debug; 1 additional Release-only guard test intentionally fails until the manifest's placeholder core data is replaced with verified real data — see ARCHITECTURE.md → ADR-11, DEVELOPMENT.md → Known Limitations). Archive extraction/install orchestration and the real per-platform core catalog are not yet built. See `## Timeline` below for the exact handoff state.
+> **Status:** Phase 1 (MVP) shipped as tagged release `v0.1.0`. **Not yet manually run/verified in a real window** — see `DEVELOPMENT.md` → Current Status. Phase 2 has started: `Emulator`/`EmulatorProfile` split + verified-download mechanism (`DownloadVerificationService`, `KnownEmulators.json` catalog) implemented and tested — 97 tests pass in both Debug and Release. 1 of 15 seed platforms (`nes` → FCEUmm) has a fully verified core; the other 14 have no catalog entry yet, and archive-extraction/install orchestration isn't built — see ARCHITECTURE.md → ADR-11, DEVELOPMENT.md → Known Limitations. See `## Timeline` below for the exact handoff state.
 >
 > **Last updated:** 2026-07-31
 
@@ -248,15 +248,16 @@ No fixed dates yet. Progress so far, and the exact handoff state for whoever (or
 10. ~~Cut `v0.1.0` as a tagged GitHub Release (Phase 1 MVP restore point)~~ — done; release job's version-change gate didn't fire (genesis version, no real bump) so the tag/release were created manually — see DEVELOPMENT.md → Release Process
 11. ~~Phase 2 inventory: automatic emulator detection/download — what it implies, RetroArch as the first candidate (covers all 15 seed platforms via cores), what the Playnite catalog research now applies to~~ — done, discussed and approved before any code
 12. ~~`Emulator`/`EmulatorProfile` schema split + `DownloadVerificationService` (pinned-hash + exact-size verified downloads) + `KnownEmulators.json` catalog~~ — done, ADR-11; RetroArch 1.22.2 entry independently verified (downloaded + hashed by hand from the official buildbot), core catalog left as an explicit, Release-build-gated placeholder
+13. ~~First real `KnownEmulatorCore` entry: `nes` → FCEUmm~~ — done, ADR-11; confirmed cores have no "stable" channel at all (`buildbot.libretro.com/nightly/.../latest/` is the real one, per an official RetroArch repo issue), navigated the real index to get the exact filename, hashed by hand (`sha256sum` + `certutil`, matching), and confirmed the internal DLL filename by actually extracting the `.zip`. 97 tests pass in both Debug and Release now — the Release guard no longer fails, because the one entry present is fully real, not because verification is complete
 
-**Phase 1's 9 FRs are wired end-to-end in code and covered by unit tests; `v0.1.0` shipped as a tagged release.** Phase 2's emulator auto-detect/download groundwork (schema + verified-download mechanism) is implemented and tested — the install/extraction orchestration that consumes it, and the real per-platform core catalog, are not yet built.
+**Phase 1's 9 FRs are wired end-to-end in code and covered by unit tests; `v0.1.0` shipped as a tagged release.** Phase 2's emulator auto-detect/download groundwork (schema + verified-download mechanism) is implemented and tested, with 1 of 15 seed platforms' cores fully verified — the install/extraction orchestration that consumes it, and cores for the other 14 platforms, are not yet built.
 
 **Next, in order:**
 
-13. **Manually run the app and actually look at it** — nothing in this repo has confirmed the UI *renders* correctly or behaves as designed; `dotnet build`/`dotnet test` passing is necessary but not sufficient. Still open from Phase 1, not superseded by the Phase 2 work above.
-14. Whatever the manual run in step 13 surfaces — expect UI bugs on first real render (untested XAML bindings, layout issues) that unit tests structurally can't catch.
-15. Source and hash-verify a real per-platform core catalog (one core per seed platform, from the official libretro buildbot) — replaces the one placeholder `KnownEmulatorCore` entry.
-16. Build the archive-extraction/install orchestration that turns a verified `DownloadResult` into a registered `Emulator` + generated `EmulatorProfile` rows (the `{CorePath}` token discussed during design isn't wired into `ArgumentTemplate` yet).
+14. **Manually run the app and actually look at it** — nothing in this repo has confirmed the UI *renders* correctly or behaves as designed; `dotnet build`/`dotnet test` passing is necessary but not sufficient. Still open from Phase 1, not superseded by the Phase 2 work above.
+15. Whatever the manual run in step 14 surfaces — expect UI bugs on first real render (untested XAML bindings, layout issues) that unit tests structurally can't catch.
+16. Source and hash-verify the remaining 14 seed platforms' cores, the same process now proven for `nes` (navigate the real nightly index, download, double-hash, extract to confirm the internal filename).
+17. Build the archive-extraction/install orchestration that turns a verified `DownloadResult` into a registered `Emulator` + generated `EmulatorProfile` rows (the `{CorePath}` token discussed during design isn't wired into `ArgumentTemplate` yet).
 
 ---
 

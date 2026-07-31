@@ -10,11 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `Emulator`/`EmulatorProfile` split, replacing the 1:1 `EmulatorConfig` — one physical emulator install can now back many per-platform launch configs; existing `EmulatorConfig` data migrates automatically on first open (see ARCHITECTURE.md → ADR-11)
 - `DownloadVerificationService` — downloads to a staging path, verifies exact size (`Content-Length` pre-check + streaming cutoff, no unbounded downloads even without a reported size) and SHA256 before a file is ever treated as installed; deletes and reports specifically (not generically) on any mismatch
-- `KnownEmulators.json` catalog (embedded resource) — RetroArch 1.22.2 entry independently verified (downloaded and hashed by hand from the official libretro buildbot); core catalog is an explicit placeholder, guarded by a Release-build-only test that fails until real data replaces it
-- 13 new unit tests (`EmulatorServiceTests`, `LibraryRepositoryTests`, `DownloadVerificationServiceTests`, `KnownEmulatorsManifestTests`) — 96 total in Debug
+- `KnownEmulators.json` catalog (embedded resource) — RetroArch 1.22.2 entry and 1 of 15 platform cores (`nes` → FCEUmm) independently verified: downloaded from the official source, hashed by hand with two independent methods (`sha256sum` + `certutil -hashfile`), and — for the core — the internal DLL filename confirmed by actually extracting the archive
+- Release-build-only guard test (`KnownEmulatorsManifestTests`) rejecting any unverified placeholder value in the manifest
+- 14 new unit tests (`EmulatorServiceTests`, `LibraryRepositoryTests`, `DownloadVerificationServiceTests`, `KnownEmulatorsManifestTests`) — 97 total, passing in both Debug and Release
 
 ### Known Issues
-- `KnownEmulators.json`'s core catalog and `ExecutableRelativePath` are unverified placeholders — `dotnet test -c Release` intentionally fails until real data replaces them (see DEVELOPMENT.md → Known Limitations)
+- 14 of 15 seed platforms have no `KnownEmulatorCore` entry yet — Phase 2's auto-detect/download isn't functionally usable end-to-end (see DEVELOPMENT.md → Known Limitations)
 - Archive-extraction/install orchestration that would consume `DownloadVerificationService`'s output isn't built yet
 
 ## [0.1.0] - 2026-07-31
