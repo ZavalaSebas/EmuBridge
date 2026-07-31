@@ -124,6 +124,70 @@ public class RomScannerServiceTests : IDisposable
         Assert.Single(result.SkippedFiles);
     }
 
+    [Theory]
+    [InlineData("mario.sav")]
+    [InlineData("mario.srm")]
+    public async Task ScanAsync_KnownCompanionExtension_IsExcludedNotPersisted(string fileName)
+    {
+        CreateFile(fileName);
+        _repository.ScanFolders.Add(new ScanFolder { Id = Guid.NewGuid(), Path = _tempRoot });
+
+        var result = await _scanner.ScanAsync();
+
+        Assert.Empty(_repository.Games);
+        Assert.Single(result.SkippedFiles);
+        Assert.Equal(0, result.GamesAdded);
+    }
+
+    [Theory]
+    [InlineData("mario.state")]
+    [InlineData("mario.state1")]
+    [InlineData("mario.ss3")]
+    public async Task ScanAsync_NumberedSaveStateExtension_IsExcludedNotPersisted(string fileName)
+    {
+        CreateFile(fileName);
+        _repository.ScanFolders.Add(new ScanFolder { Id = Guid.NewGuid(), Path = _tempRoot });
+
+        var result = await _scanner.ScanAsync();
+
+        Assert.Empty(_repository.Games);
+        Assert.Single(result.SkippedFiles);
+    }
+
+    [Fact]
+    public async Task ScanAsync_BareSsWithNoDigit_IsNotTreatedAsCompanionFile()
+    {
+        // Deliberate asymmetry with .state: no confirmed evidence a bare ".ss" (no digit) is a
+        // real companion file for any emulator relevant today, so it isn't excluded — falls back
+        // to Config.UnknownPlatformId like any other unrecognized extension. See ADR-13.
+        CreateFile("mario.ss");
+        _repository.ScanFolders.Add(new ScanFolder { Id = Guid.NewGuid(), Path = _tempRoot });
+
+        var result = await _scanner.ScanAsync();
+
+        var game = Assert.Single(_repository.Games);
+        Assert.Equal(Config.UnknownPlatformId, game.PlatformId);
+        Assert.Empty(result.SkippedFiles);
+    }
+
+    [Fact]
+    public async Task ScanAsync_PreExistingBogusCompanionFileGame_GetsMarkedMissingOnNextScan()
+    {
+        // Simulates a Game row that was incorrectly persisted for a .sav file before this fix
+        // existed. No migration code was written for this — the existing mark-missing sweep
+        // (ADR-6) is expected to clean it up on its own, since the fixed scanner never re-sees
+        // it as "found this scan".
+        var bogusGame = new Game { Id = Guid.NewGuid(), Path = Path.Combine(_tempRoot, "mario.sav"), Name = "mario", PlatformId = Config.UnknownPlatformId };
+        _repository.Games.Add(bogusGame);
+        CreateFile("mario.sav");
+        _repository.ScanFolders.Add(new ScanFolder { Id = Guid.NewGuid(), Path = _tempRoot });
+
+        var result = await _scanner.ScanAsync();
+
+        Assert.True(_repository.Games.Single().IsMissing);
+        Assert.Equal(1, result.GamesMarkedMissing);
+    }
+
     [Fact]
     public async Task ScanAsync_ConfiguredFolderDoesNotExist_SkipsItAndContinuesOthers()
     {

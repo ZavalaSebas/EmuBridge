@@ -257,7 +257,7 @@ Identity/dedup is by normalized file `Path`, not content hash — hashing every 
 
 Scan algorithm: single pass, no per-file DB round-trips — `LibraryRepository.GetAllGamesAsync()`/`GetPlatformsAsync()` load everything into memory once at scan start (dictionaries keyed by `Path` and by extension), each file is matched against these, and `Game`s not seen during the pass are marked `IsMissing = true` in one batch call at the end (never deleted — see Consequences).
 
-Error handling: a missing/inaccessible root folder or an unreadable individual file is caught per-item, logged (`LogWarning`), and skipped — never aborts the whole scan. A recognized-extension file with 0 bytes is excluded from being persisted as a `Game` (`LogWarning`) since it cannot be a valid ROM. Deeper content corruption is explicitly out of scope — `RomScannerService` only validates what's cheap to check from the filesystem (existence, extension, non-zero size); a corrupt-but-nonzero-size ROM is scanned normally and fails at launch time instead, which is `LaunchService`'s/the emulator's problem to surface. `ScanAsync` returns a structured `ScanResult` (counts added/updated/marked-missing, plus skipped-folders/skipped-files with reasons) so the caller can show a real status, not just a log line nobody reads — same "log AND surface visibly" standard as ADR-5.
+Error handling: a missing/inaccessible root folder or an unreadable individual file is caught per-item, logged (`LogWarning`), and skipped — never aborts the whole scan. A recognized-extension file with 0 bytes is excluded from being persisted as a `Game` (`LogWarning`) since it cannot be a valid ROM. **The `unknown` platform fallback below is for extensions not yet recognized — a file that might genuinely be a ROM for an unsupported system. It was never intended to catch emulator companion files (saves, save states) that are confidently *not* ROMs at all; that distinction wasn't drawn until a real bug surfaced it — see ADR-13 for the fix (a known-companion-extension check that excludes those files entirely, before the `unknown` fallback is ever reached).** Deeper content corruption is explicitly out of scope — `RomScannerService` only validates what's cheap to check from the filesystem (existence, extension, non-zero size); a corrupt-but-nonzero-size ROM is scanned normally and fails at launch time instead, which is `LaunchService`'s/the emulator's problem to surface. `ScanAsync` returns a structured `ScanResult` (counts added/updated/marked-missing, plus skipped-folders/skipped-files with reasons) so the caller can show a real status, not just a log line nobody reads — same "log AND surface visibly" standard as ADR-5.
 
 **Consequences:**
 - ✅ Single in-memory pass scales cleanly to "thousands of ROMs" without N individual DB round-trips per file
@@ -506,6 +506,43 @@ Fix confirmed with the same reproduction method that found the bug, not assumed 
 
 - **Distribute the whole publish folder (zip) instead of a bare `.exe`:** rejected — abandons the single-file, double-click-to-run distribution goal that motivated `PublishSingleFile` in the first place; the bug was an incomplete implementation of that goal, not a reason to give up on it
 - **Manually attach the five native DLLs alongside `Bridge.exe` on the release page, no `.csproj` change:** rejected — fixes this one release asset without fixing the underlying publish command, so the same mistake (checking the `.exe`'s size, not the folder's contents) would silently reproduce on every future release unless the checklist also changes; `IncludeNativeLibrariesForSelfExtract` fixes the artifact itself, not just this one upload
+
+---
+
+### ADR-13: Exclude known emulator companion files (saves/save states) from scanning
+
+**Status:** Accepted
+
+**Date:** 2026-08-02
+
+**Context:**
+Found through real use (see `PLAN.md` → FR-01/02/03/06/07/09 interactive confirmation): a ROM folder containing `.sav` files (created by mGBA next to the ROM, same base filename) had each `.sav` scanned and persisted as its own `Game`, landing on the `unknown` platform sentinel — a working entry for the real ROM and a broken, unlaunchable second entry for its save file. `ADR-6`'s `unknown` fallback was never designed for this case: that decision covers "extension not yet recognized, might genuinely be a ROM for an unsupported system" — a save file is not an unrecognized ROM, it's confidently *not* a ROM at all. `RomScannerService.ProcessFileAsync` had no concept of a third category between "known ROM extension" and "unknown, could be anything."
+
+**Decision:** A new check, `IsKnownCompanionExtension`, runs immediately after extension extraction and before the platform lookup. Files matching it are excluded entirely — not persisted as a `Game` under any `PlatformId`, unknown or otherwise — and recorded in `ScanResult.SkippedFiles` with an explicit reason, the same mechanism already used for empty/inaccessible files.
+
+Extensions were confirmed against the two emulators actually relevant to Bridge today — mGBA (configured and used in the interactive test above) and RetroArch (Phase 2's install target) — not assumed or carried over from the user's initial guess unverified:
+- `sav`, `srm` — battery/SRAM save files. Confirmed for both RetroArch and mGBA.
+- `state` with an **optional** numeric suffix (`state`, `state1`, `state2`, ...) — RetroArch save states; RetroArch's own numbered-slot convention omits any separator between "state" and the slot number, and the unnumbered form (slot 0 / quick save) is bare `.state`.
+- `ss` with a **required** numeric suffix (`ss0`, `ss1`, ...; bare `.ss` does *not* match) — mGBA's own save-state convention. Confirmed examples were always numbered; no evidence found of an unnumbered form, so none is matched — a deliberate asymmetry with `.state`, not an oversight or a "should be consistent" simplification.
+- `rtc` was considered (the user's own suggestion) and explicitly **rejected** — checked directly against mGBA's actual behavior and found that RTC data is appended *inside* the `.sav` file (last 16 bytes) rather than written to a separate file. No standalone `.rtc` file exists for any emulator relevant to Bridge today. Matches the project's standing rule against including unverified data (same standard as the RetroArch/FCEUmm hash verification in ADR-11) — an extension nobody could confirm doesn't go in the list on the theory that it "probably" exists somewhere.
+
+Matching a numeric suffix uses a manual prefix-then-all-digits check (`extension[5..].All(char.IsDigit)` for `state`, `extension[2..].All(char.IsDigit)` for `ss`), not a closed enumeration like `.ss0`...`.ss9` — a fixed list silently stops matching past whatever number was hardcoded (e.g. `.ss10`), where a suffix-shape check has no upper bound to outgrow. Checked for collisions against all 21 of the 15 seed platforms' extensions (`nes, sfc, smc, n64, z64, v64, gb, gbc, gba, nds, md, gen, smd, sms, gg, a26, a78, pce, lnx, ws, wsc`) character-by-character — none start with `sav`, `srm`, `state`, or `ss`, so no legitimate ROM extension is ever misclassified as a companion file.
+
+The check deliberately does not touch `gamesByPath`/`unseenGameIds` — it returns before either is updated. This has a useful side effect, not separately engineered: a `Game` row already incorrectly persisted for a `.sav` file before this fix existed simply stops being "seen" on the next scan and falls into `ADR-6`'s existing mark-missing (not delete) sweep automatically. No migration code was needed or written.
+
+**Consequences:**
+- ✅ Save/save-state files no longer create bogus unlaunchable library entries
+- ✅ A genuinely unrecognized extension still falls back to `unknown` exactly as before — `ADR-6`'s original intent (don't silently drop a possible ROM for an unsupported system) is untouched, only sharpened with a real third category
+- ✅ Pre-existing bad data from before this fix self-heals via the existing mark-missing mechanism, no migration script needed
+- ✅ Every included extension is backed by a checked source (RetroArch's/mGBA's actual documented behavior); `.rtc` was checked and excluded on the same standard, not included speculatively
+- ❌ Scoped only to RetroArch's and mGBA's conventions — a future emulator with its own save-file naming scheme (e.g. a standalone core added in Phase 2) will need this list extended; not data-driven/user-editable the way `Platform.Extensions` is, since this list isn't expected to grow per-platform the way ROM extensions do
+
+**Alternatives considered:**
+
+- **Treat `.sav`/`.state`/etc. as just another "unknown" file (status quo):** rejected — this is the bug; `unknown` is supposed to mean "might be a real ROM for an unsupported system," and a save file is never that
+- **Closed enumeration of exact save-state filenames (`.ss0` through `.ss9`, `.state1` through `.state9`):** rejected — silently stops working past whatever ceiling was hardcoded; a suffix-shape check has no such ceiling
+- **Make the companion-extension list data-driven (embedded JSON, like `SeedSystems.json`/`KnownEmulators.json`):** rejected for now — this list isn't user-facing library data and isn't expected to grow with each new platform the way ROM extensions do; revisit if Phase 2's broader emulator catalog makes per-emulator companion extensions a real recurring need
+- **Include `.rtc` on the user's original suggestion, without independent confirmation:** rejected — checked mGBA's actual behavior directly and found no standalone `.rtc` file exists; would have been exactly the kind of unverified data this project's standing rule already rejects elsewhere
 
 ---
 

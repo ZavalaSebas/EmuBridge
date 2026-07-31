@@ -122,6 +122,19 @@ public class RomScannerService : IRomScannerService
         }
 
         var extension = Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant();
+
+        if (IsKnownCompanionExtension(extension))
+        {
+            // Known-not-a-ROM (save/save-state), not merely unrecognized — see ARCHITECTURE.md ->
+            // ADR-13. Deliberately does not touch gamesByPath/unseenGameIds: a pre-existing bogus
+            // Game row from before this fix existed just falls out of "seen this scan" naturally
+            // and gets marked missing by the existing sweep at the end of ScanAsync, no separate
+            // cleanup/migration code needed.
+            _logger.LogInformation("Skipping known companion file (not a ROM): {File}", filePath);
+            result.SkippedFiles.Add(new SkippedFile(filePath, "Companion file (save/state), not a ROM"));
+            return;
+        }
+
         var platformId = extensionToPlatformId.GetValueOrDefault(extension, Config.UnknownPlatformId);
 
         if (gamesByPath.TryGetValue(filePath, out var existingGame))
@@ -189,6 +202,16 @@ public class RomScannerService : IRomScannerService
             }
         }
     }
+
+    // Extensions emulators are confirmed to create alongside a ROM's own filename — never a ROM
+    // themselves, distinct from a genuinely unrecognized extension (which still falls back to
+    // Config.UnknownPlatformId, unchanged). Confirmed against RetroArch's and mGBA's actual
+    // documented behavior, not assumed — see ARCHITECTURE.md -> ADR-13, including why ".rtc" was
+    // considered and deliberately left out (no confirmed evidence it's a real standalone file).
+    private static bool IsKnownCompanionExtension(string extension) =>
+        extension is "sav" or "srm"
+        || (extension.StartsWith("state", StringComparison.Ordinal) && extension[5..].All(char.IsDigit))
+        || (extension.StartsWith("ss", StringComparison.Ordinal) && extension.Length > 2 && extension[2..].All(char.IsDigit));
 
     private static Dictionary<string, string> BuildExtensionMap(IReadOnlyList<Platform> platforms)
     {
