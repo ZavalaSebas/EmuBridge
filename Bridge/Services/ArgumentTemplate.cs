@@ -3,7 +3,7 @@ using Bridge.Exceptions;
 
 namespace Bridge.Services;
 
-// {Token} resolver for EmulatorConfig.ArgumentTemplate — see Decision #3 / ADR-4 for the full
+// {Token} resolver for EmulatorProfile.ArgumentTemplate — see Decision #3 / ADR-4 for the full
 // rationale (single-pass, not chained .Replace(), context-aware quoting). Shared between
 // EmulatorService (validates at config save time) and LaunchService (validates again at launch
 // time, and does the actual expansion) — two entry points into the same data, one validator.

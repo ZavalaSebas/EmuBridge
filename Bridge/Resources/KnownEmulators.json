@@ -1,0 +1,21 @@
+[
+  {
+    "Id": "retroarch",
+    "Name": "RetroArch",
+    "Version": "1.22.2",
+    "DownloadUrl": "https://buildbot.libretro.com/stable/1.22.2/windows/x86_64/RetroArch.7z",
+    "Sha256": "b2139b1d0f9d4526dc6b5ce23cbb3efdc766096fa6f2c3df016818b486ac6372",
+    "ExpectedSizeBytes": 202509078,
+    "ExecutableRelativePath": "retroarch.exe",
+    "Cores": [
+      {
+        "Id": "nestopia",
+        "PlatformId": "nes",
+        "DownloadUrl": "PLACEHOLDER_NOT_VERIFIED",
+        "Sha256": "PLACEHOLDER_NOT_VERIFIED",
+        "ExpectedSizeBytes": 0,
+        "CoreFileName": "nestopia_libretro.dll"
+      }
+    ]
+  }
+]

@@ -16,28 +16,67 @@ public class EmulatorService : IEmulatorService
         _logger = logger;
     }
 
-    public async Task SaveEmulatorConfigAsync(EmulatorConfig config, CancellationToken ct = default)
+    public async Task SaveProfileAsync(string platformId, string emulatorName, string executablePath, string argumentTemplate, CancellationToken ct = default)
     {
-        if (!File.Exists(config.ExecutablePath))
+        if (!File.Exists(executablePath))
         {
-            throw new BridgeException($"Emulator executable not found at '{config.ExecutablePath}'.");
+            throw new BridgeException($"Emulator executable not found at '{executablePath}'.");
         }
 
-        ArgumentTemplate.Validate(config.ArgumentTemplate);
+        ArgumentTemplate.Validate(argumentTemplate);
 
         var platforms = await _repository.GetPlatformsAsync(ct);
-        if (platforms.All(p => p.Id != config.PlatformId))
+        if (platforms.All(p => p.Id != platformId))
         {
-            throw new BridgeException($"Unknown platform id '{config.PlatformId}' — no matching Platform exists.");
+            throw new BridgeException($"Unknown platform id '{platformId}' — no matching Platform exists.");
         }
 
-        await _repository.UpsertEmulatorConfigAsync(config, ct);
+        // Find-or-create by ExecutablePath (ADR-11): two platforms pointed at the same physical
+        // install (e.g. RetroArch configured for both nes and snes) share one Emulator row and
+        // get separate EmulatorProfile rows, rather than duplicating the Emulator.
+        var emulator = await _repository.UpsertEmulatorAsync(new Emulator
+        {
+            Name = emulatorName,
+            ExecutablePath = executablePath,
+            InstallSource = InstallSource.UserProvided
+        }, ct);
+
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile
+        {
+            EmulatorId = emulator.Id,
+            PlatformId = platformId,
+            ArgumentTemplate = argumentTemplate
+        }, ct);
+
         _logger.LogInformation(
-            "Saved emulator config for platform {PlatformId}: {ExecutablePath}",
-            config.PlatformId,
-            config.ExecutablePath);
+            "Saved emulator profile for platform {PlatformId}: {ExecutablePath}",
+            platformId,
+            executablePath);
     }
 
-    public Task<EmulatorConfig?> GetEmulatorConfigForPlatformAsync(string platformId, CancellationToken ct = default)
-        => _repository.GetEmulatorConfigByPlatformIdAsync(platformId, ct);
+    public async Task<ResolvedEmulatorProfile?> GetProfileForPlatformAsync(string platformId, CancellationToken ct = default)
+    {
+        var profile = await _repository.GetEmulatorProfileByPlatformIdAsync(platformId, ct);
+        if (profile is null)
+        {
+            return null;
+        }
+
+        var emulator = await _repository.GetEmulatorByIdAsync(profile.EmulatorId, ct);
+        if (emulator is null)
+        {
+            _logger.LogError(
+                "EmulatorProfile for platform {PlatformId} references missing Emulator {EmulatorId}.",
+                platformId,
+                profile.EmulatorId);
+            return null;
+        }
+
+        return new ResolvedEmulatorProfile
+        {
+            PlatformId = platformId,
+            ExecutablePath = emulator.ExecutablePath,
+            ArgumentTemplate = profile.ArgumentTemplate
+        };
+    }
 }

@@ -74,10 +74,9 @@ public class LaunchServiceTests : IDisposable
     public async Task LaunchAsync_ConfiguredExecutableMissing_ReturnsExecutableNotFound()
     {
         var game = MakeGame("nes");
-        _emulatorService.ConfigsByPlatformId["nes"] = new EmulatorConfig
+        _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
         {
             PlatformId = "nes",
-            Name = "Ghost Emulator",
             ExecutablePath = @"C:\moved\or\uninstalled.exe",
             ArgumentTemplate = "\"{RomPath}\""
         };
@@ -92,10 +91,9 @@ public class LaunchServiceTests : IDisposable
     {
         var game = MakeGame("nes");
         var cmdExePath = Path.Combine(Environment.SystemDirectory, "cmd.exe");
-        _emulatorService.ConfigsByPlatformId["nes"] = new EmulatorConfig
+        _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
         {
             PlatformId = "nes",
-            Name = "cmd",
             ExecutablePath = cmdExePath,
             ArgumentTemplate = "/c echo {RomPath}"
         };

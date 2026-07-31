@@ -39,7 +39,7 @@
                     <TextBlock Text="Must include {RomPath}. Example: &quot;{RomPath}&quot; -fullscreen"
                                Foreground="Gray" FontSize="11" Margin="0,0,0,12" />
 
-                    <Button Content="Save Emulator Config" Command="{Binding SaveEmulatorConfigCommand}"
+                    <Button Content="Save Emulator Config" Command="{Binding SaveEmulatorProfileCommand}"
                             HorizontalAlignment="Left" Padding="10,4" />
                 </StackPanel>
             </Grid>

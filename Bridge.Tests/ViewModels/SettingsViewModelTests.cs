@@ -45,7 +45,7 @@ public class SettingsViewModelTests
     [Fact]
     public async Task InitializeAsync_PlatformWithExistingConfig_IsConfiguredTrue()
     {
-        _emulatorService.ConfigsByPlatformId["nes"] = new EmulatorConfig
+        _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
         {
             PlatformId = "nes",
             ExecutablePath = @"C:\emu\nes.exe",
@@ -70,7 +70,7 @@ public class SettingsViewModelTests
     [Fact]
     public async Task SelectingPlatform_PrefillsExecutablePathAndArgumentTemplate()
     {
-        _emulatorService.ConfigsByPlatformId["nes"] = new EmulatorConfig
+        _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
         {
             PlatformId = "nes",
             ExecutablePath = @"C:\emu\nes.exe",
@@ -85,19 +85,19 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task SaveEmulatorConfigCommand_NoPlatformSelected_DoesNothing()
+    public async Task SaveEmulatorProfileCommand_NoPlatformSelected_DoesNothing()
     {
         await _viewModel.InitializeAsync();
         _viewModel.SelectedPlatform = null;
         _viewModel.ExecutablePath = @"C:\emu\nes.exe";
 
-        await _viewModel.SaveEmulatorConfigCommand.ExecuteAsync(null);
+        await _viewModel.SaveEmulatorProfileCommand.ExecuteAsync(null);
 
-        Assert.Empty(_emulatorService.ConfigsByPlatformId);
+        Assert.Empty(_emulatorService.ProfilesByPlatformId);
     }
 
     [Fact]
-    public async Task SaveEmulatorConfigCommand_ServiceThrowsBridgeException_ShowsMessage()
+    public async Task SaveEmulatorProfileCommand_ServiceThrowsBridgeException_ShowsMessage()
     {
         await _viewModel.InitializeAsync();
         _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
@@ -105,21 +105,21 @@ public class SettingsViewModelTests
         _viewModel.ArgumentTemplate = "\"{RomPath}\"";
         _emulatorService.ThrowOnSave = new BridgeException("Emulator executable not found.");
 
-        await _viewModel.SaveEmulatorConfigCommand.ExecuteAsync(null);
+        await _viewModel.SaveEmulatorProfileCommand.ExecuteAsync(null);
 
         Assert.True(_messageBox.ShowCalled);
         Assert.Equal(string.Empty, _viewModel.StatusMessage);
     }
 
     [Fact]
-    public async Task SaveEmulatorConfigCommand_Success_SetsStatusMessageAndRefreshesList()
+    public async Task SaveEmulatorProfileCommand_Success_SetsStatusMessageAndRefreshesList()
     {
         await _viewModel.InitializeAsync();
         _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
         _viewModel.ExecutablePath = @"C:\emu\nes.exe";
         _viewModel.ArgumentTemplate = "\"{RomPath}\"";
 
-        await _viewModel.SaveEmulatorConfigCommand.ExecuteAsync(null);
+        await _viewModel.SaveEmulatorProfileCommand.ExecuteAsync(null);
 
         Assert.Equal("Saved.", _viewModel.StatusMessage);
         Assert.True(_viewModel.Platforms.Single(p => p.PlatformId == "nes").IsConfigured);

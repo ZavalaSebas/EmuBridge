@@ -17,7 +17,7 @@ public class RomScannerService : IRomScannerService
     }
 
     // Validation lives here, not in LibraryRepository — same layering as
-    // EmulatorService.SaveEmulatorConfigAsync (repository stays pure storage; the domain-aware
+    // EmulatorService.SaveProfileAsync (repository stays pure storage; the domain-aware
     // service in front of it validates and fails early). Throws, doesn't fail silently, matching
     // that same precedent: a bad folder path is caller input, not an expected runtime outcome.
     public async Task AddScanFolderAsync(ScanFolder folder, CancellationToken ct = default)

@@ -72,24 +72,20 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task SaveEmulatorConfigAsync()
+    private async Task SaveEmulatorProfileAsync()
     {
         if (SelectedPlatform is null)
         {
             return;
         }
 
-        var config = new EmulatorConfig
-        {
-            PlatformId = SelectedPlatform.PlatformId,
-            Name = $"{SelectedPlatform.PlatformName} Emulator",
-            ExecutablePath = ExecutablePath,
-            ArgumentTemplate = ArgumentTemplate
-        };
-
         try
         {
-            await _emulatorService.SaveEmulatorConfigAsync(config);
+            await _emulatorService.SaveProfileAsync(
+                SelectedPlatform.PlatformId,
+                $"{SelectedPlatform.PlatformName} Emulator",
+                ExecutablePath,
+                ArgumentTemplate);
         }
         catch (BridgeException ex)
         {
@@ -124,14 +120,14 @@ public partial class SettingsViewModel : ObservableObject
         var items = new List<PlatformConfigItem>();
         foreach (var platform in platforms.Where(p => p.Id != Config.UnknownPlatformId))
         {
-            var config = await _emulatorService.GetEmulatorConfigForPlatformAsync(platform.Id, ct);
+            var profile = await _emulatorService.GetProfileForPlatformAsync(platform.Id, ct);
             items.Add(new PlatformConfigItem
             {
                 PlatformId = platform.Id,
                 PlatformName = platform.Name,
-                IsConfigured = config is not null,
-                ExecutablePath = config?.ExecutablePath,
-                ArgumentTemplate = config?.ArgumentTemplate
+                IsConfigured = profile is not null,
+                ExecutablePath = profile?.ExecutablePath,
+                ArgumentTemplate = profile?.ArgumentTemplate
             });
         }
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Emulator`/`EmulatorProfile` split, replacing the 1:1 `EmulatorConfig` — one physical emulator install can now back many per-platform launch configs; existing `EmulatorConfig` data migrates automatically on first open (see ARCHITECTURE.md → ADR-11)
+- `DownloadVerificationService` — downloads to a staging path, verifies exact size (`Content-Length` pre-check + streaming cutoff, no unbounded downloads even without a reported size) and SHA256 before a file is ever treated as installed; deletes and reports specifically (not generically) on any mismatch
+- `KnownEmulators.json` catalog (embedded resource) — RetroArch 1.22.2 entry independently verified (downloaded and hashed by hand from the official libretro buildbot); core catalog is an explicit placeholder, guarded by a Release-build-only test that fails until real data replaces it
+- 13 new unit tests (`EmulatorServiceTests`, `LibraryRepositoryTests`, `DownloadVerificationServiceTests`, `KnownEmulatorsManifestTests`) — 96 total in Debug
+
+### Known Issues
+- `KnownEmulators.json`'s core catalog and `ExecutableRelativePath` are unverified placeholders — `dotnet test -c Release` intentionally fails until real data replaces them (see DEVELOPMENT.md → Known Limitations)
+- Archive-extraction/install orchestration that would consume `DownloadVerificationService`'s output isn't built yet
+
 ## [0.1.0] - 2026-07-31
 
 Phase 1 MVP: a functional, minimal library manager covering all 9 FR milestones — scan, catalog, fetch box art, configure emulators, launch games — backed by 3 core services and a composition-root-wired WPF UI. 83 unit tests.

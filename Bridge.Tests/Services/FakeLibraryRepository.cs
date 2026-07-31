@@ -9,7 +9,8 @@ internal class FakeLibraryRepository : ILibraryRepository
     public List<ScanFolder> ScanFolders { get; } = [];
     public List<Game> Games { get; } = [];
     public List<BoxArt> BoxArtRecords { get; } = [];
-    public List<EmulatorConfig> EmulatorConfigs { get; } = [];
+    public List<Emulator> Emulators { get; } = [];
+    public List<EmulatorProfile> EmulatorProfiles { get; } = [];
 
     public Task<IReadOnlyList<Platform>> GetPlatformsAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Platform>>(Platforms.ToList());
@@ -82,25 +83,52 @@ internal class FakeLibraryRepository : ILibraryRepository
         return Task.CompletedTask;
     }
 
-    public Task<EmulatorConfig?> GetEmulatorConfigByPlatformIdAsync(string platformId, CancellationToken ct = default)
-        => Task.FromResult(EmulatorConfigs.FirstOrDefault(e => e.PlatformId == platformId));
+    public Task<Emulator?> GetEmulatorByIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(Emulators.FirstOrDefault(e => e.Id == id));
 
-    public Task UpsertEmulatorConfigAsync(EmulatorConfig config, CancellationToken ct = default)
+    public Task<Emulator?> GetEmulatorByExecutablePathAsync(string executablePath, CancellationToken ct = default)
+        => Task.FromResult(Emulators.FirstOrDefault(e => e.ExecutablePath.Equals(executablePath, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<Emulator> UpsertEmulatorAsync(Emulator emulator, CancellationToken ct = default)
     {
-        var index = EmulatorConfigs.FindIndex(e => e.PlatformId == config.PlatformId);
+        var index = Emulators.FindIndex(e => e.ExecutablePath.Equals(emulator.ExecutablePath, StringComparison.OrdinalIgnoreCase));
         if (index >= 0)
         {
-            config.Id = EmulatorConfigs[index].Id;
-            EmulatorConfigs[index] = config;
+            emulator.Id = Emulators[index].Id;
+            Emulators[index] = emulator;
         }
         else
         {
-            if (config.Id == Guid.Empty)
+            if (emulator.Id == Guid.Empty)
             {
-                config.Id = Guid.NewGuid();
+                emulator.Id = Guid.NewGuid();
             }
 
-            EmulatorConfigs.Add(config);
+            Emulators.Add(emulator);
+        }
+
+        return Task.FromResult(emulator);
+    }
+
+    public Task<EmulatorProfile?> GetEmulatorProfileByPlatformIdAsync(string platformId, CancellationToken ct = default)
+        => Task.FromResult(EmulatorProfiles.FirstOrDefault(p => p.PlatformId == platformId));
+
+    public Task UpsertEmulatorProfileAsync(EmulatorProfile profile, CancellationToken ct = default)
+    {
+        var index = EmulatorProfiles.FindIndex(p => p.PlatformId == profile.PlatformId);
+        if (index >= 0)
+        {
+            profile.Id = EmulatorProfiles[index].Id;
+            EmulatorProfiles[index] = profile;
+        }
+        else
+        {
+            if (profile.Id == Guid.Empty)
+            {
+                profile.Id = Guid.NewGuid();
+            }
+
+            EmulatorProfiles.Add(profile);
         }
 
         return Task.CompletedTask;

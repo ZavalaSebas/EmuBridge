@@ -5,20 +5,25 @@ namespace Bridge.Tests.Services;
 
 internal class FakeEmulatorService : IEmulatorService
 {
-    public Dictionary<string, EmulatorConfig> ConfigsByPlatformId { get; } = [];
+    public Dictionary<string, ResolvedEmulatorProfile> ProfilesByPlatformId { get; } = [];
     public Exception? ThrowOnSave { get; set; }
 
-    public Task SaveEmulatorConfigAsync(EmulatorConfig config, CancellationToken ct = default)
+    public Task SaveProfileAsync(string platformId, string emulatorName, string executablePath, string argumentTemplate, CancellationToken ct = default)
     {
         if (ThrowOnSave is not null)
         {
             throw ThrowOnSave;
         }
 
-        ConfigsByPlatformId[config.PlatformId] = config;
+        ProfilesByPlatformId[platformId] = new ResolvedEmulatorProfile
+        {
+            PlatformId = platformId,
+            ExecutablePath = executablePath,
+            ArgumentTemplate = argumentTemplate
+        };
         return Task.CompletedTask;
     }
 
-    public Task<EmulatorConfig?> GetEmulatorConfigForPlatformAsync(string platformId, CancellationToken ct = default)
-        => Task.FromResult(ConfigsByPlatformId.GetValueOrDefault(platformId));
+    public Task<ResolvedEmulatorProfile?> GetProfileForPlatformAsync(string platformId, CancellationToken ct = default)
+        => Task.FromResult(ProfilesByPlatformId.GetValueOrDefault(platformId));
 }

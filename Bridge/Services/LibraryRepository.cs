@@ -12,7 +12,12 @@ public class LibraryRepository : ILibraryRepository, IDisposable
     private const string GamesCollectionName = "games";
     private const string ScanFoldersCollectionName = "scanFolders";
     private const string BoxArtCollectionName = "boxArt";
-    private const string EmulatorConfigsCollectionName = "emulatorConfigs";
+    private const string EmulatorsCollectionName = "emulators";
+    private const string EmulatorProfilesCollectionName = "emulatorProfiles";
+
+    // Legacy collection name from the pre-ADR-11 1:1 EmulatorConfig shape. Only ever read once,
+    // during MigrateLegacyEmulatorConfigsIfNeeded(), then dropped.
+    private const string LegacyEmulatorConfigsCollectionName = "emulatorConfigs";
 
     private readonly LiteDatabase _db;
     private readonly ILogger<LibraryRepository> _logger;
@@ -35,6 +40,7 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         _db = new LiteDatabase(dbPath);
         EnsureIndexes();
         SeedPlatformsIfEmpty();
+        MigrateLegacyEmulatorConfigsIfNeeded();
     }
 
     private void EnsureIndexes()
@@ -45,11 +51,16 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         _db.GetCollection<BoxArt>(BoxArtCollectionName)
             .EnsureIndex(b => b.GameId, unique: true);
 
-        // Re-introduced now that EmulatorService actually owns this collection (see ADR-9) —
-        // deliberately removed during the LibraryRepository/RomScannerService pass because
-        // nothing consumed it yet.
-        _db.GetCollection<EmulatorConfig>(EmulatorConfigsCollectionName)
-            .EnsureIndex(e => e.PlatformId, unique: true);
+        // Dedup key for "same physical install reused across platforms" (ADR-11). Defense in
+        // depth backing EmulatorService's find-by-path-then-upsert logic — mirrors the existing
+        // Game.Path / BoxArt.GameId unique-index pattern in this repository.
+        _db.GetCollection<Emulator>(EmulatorsCollectionName)
+            .EnsureIndex(e => e.ExecutablePath, unique: true);
+
+        // No unique index on EmulatorProfile.PlatformId — deliberate loosening from the old
+        // EmulatorConfig.PlatformId constraint (ADR-11). "One active profile per platform" is
+        // still enforced, but at the EmulatorService layer via find-then-replace, not by the
+        // schema — so a future many-profiles-per-platform UI doesn't need another migration.
     }
 
     private void SeedPlatformsIfEmpty()
@@ -182,28 +193,124 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         return Task.CompletedTask;
     }
 
-    public Task<EmulatorConfig?> GetEmulatorConfigByPlatformIdAsync(string platformId, CancellationToken ct = default)
+    public Task<Emulator?> GetEmulatorByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var result = _db.GetCollection<EmulatorConfig>(EmulatorConfigsCollectionName)
-            .FindOne(e => e.PlatformId == platformId);
-        return Task.FromResult<EmulatorConfig?>(result);
+        var result = _db.GetCollection<Emulator>(EmulatorsCollectionName).FindById(id);
+        return Task.FromResult<Emulator?>(result);
     }
 
-    public Task UpsertEmulatorConfigAsync(EmulatorConfig config, CancellationToken ct = default)
+    public Task<Emulator?> GetEmulatorByExecutablePathAsync(string executablePath, CancellationToken ct = default)
     {
-        var collection = _db.GetCollection<EmulatorConfig>(EmulatorConfigsCollectionName);
-        var existing = collection.FindOne(e => e.PlatformId == config.PlatformId);
+        var result = _db.GetCollection<Emulator>(EmulatorsCollectionName)
+            .FindOne(e => e.ExecutablePath.Equals(executablePath, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult<Emulator?>(result);
+    }
+
+    public Task<Emulator> UpsertEmulatorAsync(Emulator emulator, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<Emulator>(EmulatorsCollectionName);
+        var existing = collection.FindOne(e => e.ExecutablePath.Equals(emulator.ExecutablePath, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
-            config.Id = existing.Id;
+            emulator.Id = existing.Id;
         }
-        else if (config.Id == Guid.Empty)
+        else if (emulator.Id == Guid.Empty)
         {
-            config.Id = Guid.NewGuid();
+            emulator.Id = Guid.NewGuid();
         }
 
-        collection.Upsert(config);
+        collection.Upsert(emulator);
+        return Task.FromResult(emulator);
+    }
+
+    public Task<EmulatorProfile?> GetEmulatorProfileByPlatformIdAsync(string platformId, CancellationToken ct = default)
+    {
+        var result = _db.GetCollection<EmulatorProfile>(EmulatorProfilesCollectionName)
+            .FindOne(p => p.PlatformId == platformId);
+        return Task.FromResult<EmulatorProfile?>(result);
+    }
+
+    public Task UpsertEmulatorProfileAsync(EmulatorProfile profile, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<EmulatorProfile>(EmulatorProfilesCollectionName);
+        var existing = collection.FindOne(p => p.PlatformId == profile.PlatformId);
+        if (existing is not null)
+        {
+            profile.Id = existing.Id;
+        }
+        else if (profile.Id == Guid.Empty)
+        {
+            profile.Id = Guid.NewGuid();
+        }
+
+        collection.Upsert(profile);
         return Task.CompletedTask;
+    }
+
+    // One-time migration off the pre-ADR-11 1:1 EmulatorConfig shape. Only runs if the new
+    // collections are both still empty and the legacy collection actually has data — safe to
+    // call unconditionally on every startup. Dedupes by ExecutablePath exactly like
+    // UpsertEmulatorAsync does going forward, so two legacy rows that happened to point at the
+    // same .exe collapse into one Emulator with two EmulatorProfile rows, not two Emulators.
+    private void MigrateLegacyEmulatorConfigsIfNeeded()
+    {
+        var emulators = _db.GetCollection<Emulator>(EmulatorsCollectionName);
+        var profiles = _db.GetCollection<EmulatorProfile>(EmulatorProfilesCollectionName);
+        if (emulators.Count() > 0 || profiles.Count() > 0 || !_db.CollectionExists(LegacyEmulatorConfigsCollectionName))
+        {
+            return;
+        }
+
+        var legacyConfigs = _db.GetCollection<LegacyEmulatorConfig>(LegacyEmulatorConfigsCollectionName).FindAll().ToList();
+        if (legacyConfigs.Count == 0)
+        {
+            return;
+        }
+
+        var emulatorIdByPath = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        foreach (var legacy in legacyConfigs)
+        {
+            if (!emulatorIdByPath.TryGetValue(legacy.ExecutablePath, out var emulatorId))
+            {
+                emulatorId = Guid.NewGuid();
+                emulators.Insert(new Emulator
+                {
+                    Id = emulatorId,
+                    KnownEmulatorId = null,
+                    Name = legacy.Name,
+                    ExecutablePath = legacy.ExecutablePath,
+                    InstallSource = InstallSource.UserProvided,
+                    InstalledSha256 = null
+                });
+                emulatorIdByPath[legacy.ExecutablePath] = emulatorId;
+            }
+
+            profiles.Insert(new EmulatorProfile
+            {
+                Id = Guid.NewGuid(),
+                EmulatorId = emulatorId,
+                PlatformId = legacy.PlatformId,
+                ArgumentTemplate = legacy.ArgumentTemplate
+            });
+        }
+
+        _db.DropCollection(LegacyEmulatorConfigsCollectionName);
+        _logger.LogInformation(
+            "Migrated {ConfigCount} legacy EmulatorConfig row(s) into {EmulatorCount} Emulator(s) and {ProfileCount} EmulatorProfile(s).",
+            legacyConfigs.Count,
+            emulatorIdByPath.Count,
+            legacyConfigs.Count);
+    }
+
+    // Shape-only mirror of the deleted Models/EmulatorConfig.cs, scoped to this one migration —
+    // not exposed outside LibraryRepository.
+    private class LegacyEmulatorConfig
+    {
+        public Guid Id { get; set; }
+        public string PlatformId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string ExecutablePath { get; set; } = string.Empty;
+        public string ArgumentTemplate { get; set; } = string.Empty;
     }
 
     public void Dispose()

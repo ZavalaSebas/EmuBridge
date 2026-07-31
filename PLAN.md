@@ -1,6 +1,6 @@
 # Bridge - Project Plan
 
-> **Status:** Phase 1 (MVP) — backend services + composition root (with global exception handling) + minimal UI all implemented and tested (9/9 FRs wired end-to-end in code, 83 unit tests, 10 ADRs). **Not yet manually run/verified in a real window** — see `DEVELOPMENT.md` → Current Status. See `## Timeline` below for the exact handoff state.
+> **Status:** Phase 1 (MVP) shipped as tagged release `v0.1.0`. **Not yet manually run/verified in a real window** — see `DEVELOPMENT.md` → Current Status. Phase 2 has started: `Emulator`/`EmulatorProfile` split + verified-download mechanism (`DownloadVerificationService`, `KnownEmulators.json` catalog) implemented and tested (96 tests in Debug; 1 additional Release-only guard test intentionally fails until the manifest's placeholder core data is replaced with verified real data — see ARCHITECTURE.md → ADR-11, DEVELOPMENT.md → Known Limitations). Archive extraction/install orchestration and the real per-platform core catalog are not yet built. See `## Timeline` below for the exact handoff state.
 >
 > **Last updated:** 2026-07-31
 
@@ -245,13 +245,18 @@ No fixed dates yet. Progress so far, and the exact handoff state for whoever (or
 7. ~~Composition root (`App.xaml.cs` DI wiring, lifetimes justified field-by-field)~~ — done
 8. ~~Phase 1 minimal UI — `MainWindow`/`MainViewModel` (grid, empty state, progress, toolbar) and `SettingsWindow`/`SettingsViewModel` (emulator config, API key)~~ — done, ADR-10
 9. ~~Global unhandled-exception handler (`DispatcherUnhandledException`) in `App.xaml.cs`~~ — done, closed in the same session it was found rather than left as a Known Limitation (the code genuinely didn't exist yet, unlike the two remaining Known Limitations rows, which are both "code exists and is correct, just untested")
+10. ~~Cut `v0.1.0` as a tagged GitHub Release (Phase 1 MVP restore point)~~ — done; release job's version-change gate didn't fire (genesis version, no real bump) so the tag/release were created manually — see DEVELOPMENT.md → Release Process
+11. ~~Phase 2 inventory: automatic emulator detection/download — what it implies, RetroArch as the first candidate (covers all 15 seed platforms via cores), what the Playnite catalog research now applies to~~ — done, discussed and approved before any code
+12. ~~`Emulator`/`EmulatorProfile` schema split + `DownloadVerificationService` (pinned-hash + exact-size verified downloads) + `KnownEmulators.json` catalog~~ — done, ADR-11; RetroArch 1.22.2 entry independently verified (downloaded + hashed by hand from the official buildbot), core catalog left as an explicit, Release-build-gated placeholder
 
-**All of Phase 1's 9 FRs are wired end-to-end in code — services, composition root (with global exception handling), and UI — and covered by 83 unit tests (`dotnet test` green).** All 5 original Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-10).
+**Phase 1's 9 FRs are wired end-to-end in code and covered by unit tests; `v0.1.0` shipped as a tagged release.** Phase 2's emulator auto-detect/download groundwork (schema + verified-download mechanism) is implemented and tested — the install/extraction orchestration that consumes it, and the real per-platform core catalog, are not yet built.
 
 **Next, in order:**
 
-10. **Manually run the app and actually look at it** — nothing in this repo has confirmed the UI *renders* correctly or behaves as designed; `dotnet build`/`dotnet test` passing is necessary but not sufficient. This is the first real gate before Phase 1 can be called done.
-11. Whatever the manual run in step 10 surfaces — expect UI bugs on first real render (untested XAML bindings, layout issues) that unit tests structurally can't catch.
+13. **Manually run the app and actually look at it** — nothing in this repo has confirmed the UI *renders* correctly or behaves as designed; `dotnet build`/`dotnet test` passing is necessary but not sufficient. Still open from Phase 1, not superseded by the Phase 2 work above.
+14. Whatever the manual run in step 13 surfaces — expect UI bugs on first real render (untested XAML bindings, layout issues) that unit tests structurally can't catch.
+15. Source and hash-verify a real per-platform core catalog (one core per seed platform, from the official libretro buildbot) — replaces the one placeholder `KnownEmulatorCore` entry.
+16. Build the archive-extraction/install orchestration that turns a verified `DownloadResult` into a registered `Emulator` + generated `EmulatorProfile` rows (the `{CorePath}` token discussed during design isn't wired into `ArgumentTemplate` yet).
 
 ---
 

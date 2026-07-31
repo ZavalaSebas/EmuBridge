@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\SeedSystems.json" />
+    <EmbeddedResource Include="Resources\KnownEmulators.json" />
   </ItemGroup>
 
 </Project>

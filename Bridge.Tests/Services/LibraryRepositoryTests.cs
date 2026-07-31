@@ -153,4 +153,81 @@ public class LibraryRepositoryTests : IDisposable
         var stored = await _repository.GetBoxArtAsync(gameId);
         Assert.Equal(BoxArtStatus.Cached, stored!.Status);
     }
+
+    [Fact]
+    public async Task UpsertEmulatorAsync_NewExecutablePath_IsAdded()
+    {
+        var emulator = new Emulator { Name = "RetroArch", ExecutablePath = @"C:\emu\retroarch.exe", InstallSource = InstallSource.UserProvided };
+
+        var stored = await _repository.UpsertEmulatorAsync(emulator);
+
+        Assert.NotEqual(Guid.Empty, stored.Id);
+        var fetched = await _repository.GetEmulatorByExecutablePathAsync(@"C:\emu\retroarch.exe");
+        Assert.NotNull(fetched);
+        Assert.Equal(stored.Id, fetched!.Id);
+    }
+
+    [Fact]
+    public async Task UpsertEmulatorAsync_SameExecutablePathTwice_ReusesSameId()
+    {
+        var first = await _repository.UpsertEmulatorAsync(new Emulator { Name = "RetroArch", ExecutablePath = @"C:\emu\retroarch.exe", InstallSource = InstallSource.UserProvided });
+        var second = await _repository.UpsertEmulatorAsync(new Emulator { Name = "RetroArch Updated", ExecutablePath = @"C:\emu\retroarch.exe", InstallSource = InstallSource.UserProvided });
+
+        Assert.Equal(first.Id, second.Id);
+        var fetched = await _repository.GetEmulatorByExecutablePathAsync(@"C:\emu\retroarch.exe");
+        Assert.Equal("RetroArch Updated", fetched!.Name);
+    }
+
+    [Fact]
+    public async Task UpsertEmulatorProfileAsync_ExistingPlatformId_UpdatesWithoutDuplicating()
+    {
+        var emulator = await _repository.UpsertEmulatorAsync(new Emulator { Name = "RetroArch", ExecutablePath = @"C:\emu\retroarch.exe", InstallSource = InstallSource.UserProvided });
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "nes", ArgumentTemplate = "\"{RomPath}\"" });
+
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "nes", ArgumentTemplate = "-L nestopia.dll \"{RomPath}\"" });
+
+        var profile = await _repository.GetEmulatorProfileByPlatformIdAsync("nes");
+        Assert.Equal("-L nestopia.dll \"{RomPath}\"", profile!.ArgumentTemplate);
+    }
+
+    // The whole point of ADR-11's migration: existing Phase 1 EmulatorConfig data must survive
+    // the upgrade to Emulator/EmulatorProfile without the user having to reconfigure anything.
+    [Fact]
+    public async Task Constructor_LegacyEmulatorConfigsPresent_MigratesToEmulatorAndProfile()
+    {
+        _repository.Dispose();
+
+        using (var db = new LiteDatabase(_dbPath))
+        {
+            db.GetCollection<LegacyEmulatorConfigForTest>("emulatorConfigs").Insert(new LegacyEmulatorConfigForTest
+            {
+                Id = Guid.NewGuid(),
+                PlatformId = "nes",
+                Name = "Old NES Emulator",
+                ExecutablePath = @"C:\emu\nes.exe",
+                ArgumentTemplate = "\"{RomPath}\""
+            });
+        }
+
+        var migrated = new LibraryRepository(_dbPath, NullLogger<LibraryRepository>.Instance);
+
+        var profile = await migrated.GetEmulatorProfileByPlatformIdAsync("nes");
+        Assert.NotNull(profile);
+
+        var emulator = await migrated.GetEmulatorByIdAsync(profile!.EmulatorId);
+        Assert.NotNull(emulator);
+        Assert.Equal(@"C:\emu\nes.exe", emulator!.ExecutablePath);
+        Assert.Equal(InstallSource.UserProvided, emulator.InstallSource);
+
+        _repository = migrated;
+    }
+
+    private class LegacyEmulatorConfigForTest
+    {
+        public Guid Id { get; set; }
+        public string PlatformId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string ExecutablePath { get; set; } = string.Empty;
+        public string ArgumentTemplate { get; set; } = string.Empty;
+    }
 }

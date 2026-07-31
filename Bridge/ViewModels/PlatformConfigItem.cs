@@ -1,6 +1,6 @@
 namespace Bridge.ViewModels;
 
-// Display DTO for the Settings platform list — Platform joined with its EmulatorConfig (if any).
+// Display DTO for the Settings platform list — Platform joined with its resolved EmulatorProfile (if any).
 public class PlatformConfigItem
 {
     public string PlatformId { get; init; } = string.Empty;

@@ -6,11 +6,11 @@ This document serves as a guide to this specific project AND as a reference for 
 
 ## Current Status (as of 2026-07-31)
 
-All Phase 1 backend services are implemented and tested (`LibraryRepository`, `RomScannerService`, `MetadataService`, `ImageCacheService`, `SettingsService`, `EmulatorService`, `LaunchService`), and the Phase 1 minimal UI is now built on top of them: composition root (`App.xaml.cs`, no `StartupUri`), `MainWindow`/`MainViewModel` (cover grid, empty state, scan/box-art progress, toolbar), `SettingsWindow`/`SettingsViewModel` (emulator config, SteamGridDB API key). 83 unit tests, all green. All 5 Open Decisions plus the TrackingMode addition are resolved (ADR-1 through ADR-10 in `ARCHITECTURE.md`). Full detail and commit-by-commit history: `PLAN.md` → `## Timeline`.
+Phase 1 (v0.1.0) shipped as a tagged GitHub Release. Phase 2 work has started: `EmulatorConfig` was replaced by an `Emulator`/`EmulatorProfile` split (one physical install can now back many per-platform launch configs — see ARCHITECTURE.md → ADR-11) plus a `DownloadVerificationService` (pinned-hash + exact-size verified downloads, staging-then-verify, never-fail-silently on mismatch) and a `KnownEmulators.json` catalog. Existing legacy `EmulatorConfig` data migrates automatically on first open. 96 unit tests pass in Debug; Release additionally runs a guard test that intentionally fails while `KnownEmulators.json` still carries unverified placeholder data (see Known Limitations).
 
-**Known, honestly-tracked gap:** the UI has never actually been run/observed — `dotnet build`/`dotnet test` pass, but no WPF window has been launched and watched from this environment. First real verification is a manual "does it run" pass.
+**Known, honestly-tracked gap (Phase 1, still open):** the UI has never actually been run/observed — `dotnet build`/`dotnet test` pass, but no WPF window has been launched and watched from this environment. First real verification is a manual "does it run" pass.
 
-`App.xaml.cs` now has a `DispatcherUnhandledException` handler (logs, shows the user a Yes/No dialog, shuts down cleanly on No) — this was tracked as a gap earlier in this same session and closed before commit, not left as a Known Limitation, since the fix was cheap and the file was already open. Nothing else is pending at the service/logic layer.
+**Phase 2 is not functionally usable yet: 0 of N `KnownEmulatorCore` entries are verified** — the catalog has a real frontend (RetroArch, hand-verified) and zero real cores, so there's no complete, verified download-to-launch path for any platform. Also not yet built: the archive-extraction/install orchestration that would consume `DownloadVerificationService`'s output. See ARCHITECTURE.md → ADR-11 → Consequences, DEVELOPMENT.md → Known Limitations.
 
 ---
 
@@ -67,14 +67,17 @@ Bridge/
 │   ├── Models/
 │   │   ├── Platform.cs
 │   │   ├── Game.cs
-│   │   ├── EmulatorConfig.cs
+│   │   ├── Emulator.cs / EmulatorProfile.cs / InstallSource.cs / ResolvedEmulatorProfile.cs
+│   │   ├── KnownEmulator.cs / KnownEmulatorCore.cs
+│   │   ├── DownloadOutcome.cs / DownloadResult.cs
 │   │   ├── ScanFolder.cs
 │   │   ├── ScanResult.cs
 │   │   ├── BoxArt.cs
 │   │   ├── MetadataFetchResult.cs
 │   │   └── LaunchResult.cs
 │   ├── Resources/
-│   │   └── SeedSystems.json    # EmbeddedResource — 15 built-in platforms
+│   │   ├── SeedSystems.json      # EmbeddedResource — 15 built-in platforms
+│   │   └── KnownEmulators.json   # EmbeddedResource — curated emulator/core catalog (see ADR-11)
 │   ├── Services/
 │   │   ├── ILibraryRepository.cs / LibraryRepository.cs
 │   │   ├── IRomScannerService.cs / RomScannerService.cs
@@ -84,6 +87,7 @@ Bridge/
 │   │   ├── IEmulatorService.cs / EmulatorService.cs
 │   │   ├── ArgumentTemplate.cs     # shared {Token} resolver, used by EmulatorService + LaunchService
 │   │   ├── ILaunchService.cs / LaunchService.cs
+│   │   ├── IDownloadVerificationService.cs / DownloadVerificationService.cs
 │   │   ├── MessageBoxService.cs      # IMessageBoxService/MessageBoxService
 │   │   ├── FolderPickerService.cs    # IFolderPickerService/FolderPickerService
 │   │   └── FilePickerService.cs      # IFilePickerService/FilePickerService
@@ -109,6 +113,8 @@ Bridge/
 │       ├── ArgumentTemplateTests.cs
 │       ├── EmulatorServiceTests.cs
 │       ├── LaunchServiceTests.cs
+│       ├── DownloadVerificationServiceTests.cs
+│       ├── KnownEmulatorsManifestTests.cs   # #if RELEASE guard — see ADR-11
 │       ├── FakeLibraryRepository.cs
 │       ├── FakeSettingsService.cs
 │       ├── FakeImageCacheService.cs
@@ -626,9 +632,11 @@ public static class Config
 | `Bridge/Services/MetadataService.cs` | SteamGridDB search + grids lookup, batch box-art fetch, stop-early on rate-limit/auth failure — implemented, tested (see ADR-8) |
 | `Bridge/Services/ImageCacheService.cs` | Downloads, resizes (WPF-native decode), and caches box art locally at display resolution — implemented, tested |
 | `Bridge/Services/SettingsService.cs` | DPAPI-encrypted SteamGridDB API key storage in `settings.json` — implemented, tested (see ADR-5) |
-| `Bridge/Services/EmulatorService.cs` | Validates and persists `EmulatorConfig` (exe exists, `{RomPath}` present, `PlatformId` valid) — implemented, tested (see ADR-9) |
+| `Bridge/Services/EmulatorService.cs` | Validates and persists an `EmulatorProfile` against its `Emulator` (exe exists, `{RomPath}` present, `PlatformId` valid); resolves the join for callers — implemented, tested (see ADR-9, ADR-11) |
 | `Bridge/Services/ArgumentTemplate.cs` | Shared `{Token}` resolver (`Validate`/`Expand`), used by both `EmulatorService` and `LaunchService` — implemented, tested |
 | `Bridge/Services/LaunchService.cs` | Re-checks ROM/emulator existence, expands arguments, launches the process, exposes exit as a `Task` — implemented, tested (see ADR-9) |
+| `Bridge/Services/DownloadVerificationService.cs` | Downloads to a staging path, verifies exact size (pre-check + streaming cutoff) and SHA256 before treating a file as installed; deletes and reports specifically on any mismatch — implemented, tested (see ADR-11) |
+| `Bridge/Resources/KnownEmulators.json` | Curated, hand-verified emulator/core catalog (RetroArch entry verified; core entries placeholder) — see ADR-11 |
 
 This table is aspirational until the corresponding files exist — update the "not yet created" note to the real purpose/status as each file is implemented.
 
@@ -642,6 +650,8 @@ This table is aspirational until the corresponding files exist — update the "n
 | `RomScannerService`'s per-file permission-denied handling (`UnauthorizedAccessException`/`IOException` caught on an individual file during scanning — see ARCHITECTURE.md → ADR-6) is implemented but not covered by an automated test. | Reliably simulating a permission-denied file in a portable, fast unit test requires manipulating Windows ACLs, which is fragile and slow — not worth the cost for Phase 1. The other error-handling cases (missing folder, empty file) are covered; this one specifically isn't. | Verify manually if this code path changes (create a file, deny read access via `icacls`, run a scan, confirm it's skipped and logged) rather than relying on the automated suite for this specific path. Revisit with a filesystem abstraction (e.g. `IFileSystem`) if untestable-I/O-error coverage becomes a recurring need beyond this one case. |
 | `MetadataService` has no "safe to retry at" timestamp for a SteamGridDB rate-limit (429) stop — it can only say "stopped early, remaining games pending for the next batch run, whenever that is." | Confirmed by checking the actual `Retry-After`-style handling in three independent sources — the official Node.js wrapper's source code (`SteamGridDB/node-steamgriddb`), the community .NET wrapper (`craftersmine/SteamGridDB.NET`), and general web search — none document or read a rate-limit-retry header from SteamGridDB. Not assumed; actively looked for and not found. Fabricating an arbitrary wait time was explicitly rejected in favor of documenting this as a real gap. | If SteamGridDB ever adds a documented rate-limit header, or if inspecting real 429 responses at runtime turns up an undocumented one, wire it into `MetadataFetchResult` then. Until confirmed, don't guess a backoff duration. |
 | The only manual run of Bridge so far was via Visual Studio (F5, `dotnet build` output under `Bridge/bin/Debug/...`), not the self-contained single-file `.exe` (`dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`) attached to the `v0.1.0` GitHub Release. These are different build/packaging paths — the F5 run doesn't confirm the published `.exe` itself launches or behaves the same way. | The F5 run was the fastest way to eyeball the UI during development; publishing and running the packaged `.exe` end-to-end hasn't been done yet. | Before relying on a release `.exe` as "confirmed working," actually download and run that specific artifact once, separately from any F5/IDE run. |
+| **0 of N `KnownEmulatorCore` entries in `KnownEmulators.json` are verified — Phase 2's emulator auto-detect/download is not functionally usable yet.** The catalog has one real, hand-verified frontend (RetroArch 1.22.2) and zero real cores; there is no complete, verified download-to-launch path for any platform. This is a genuine, currently-shipping gap, not a hypothetical: `dotnet test Bridge.slnx -c Release` fails on `KnownEmulatorsManifestTests.KnownEmulators_NoUnverifiedPlaceholdersInReleaseBuild` right now, by design. | Per-platform core selection and verification (official source, download, independent hash — the same process already applied to RetroArch) hasn't been done for any of the 15 seed platforms yet — see ARCHITECTURE.md → ADR-11. | Source and hash-verify at least one real core (official libretro buildbot, same process as the RetroArch entry) before treating Phase 2's install feature as usable, and before any Release ships. |
+| `KnownEmulator.ExecutableRelativePath` (`"retroarch.exe"`) rests on consistent third-party documentation (libretro community forums, dependent-project wikis) agreeing the portable `.7z` extracts flat — not on direct inspection of the archive Bridge actually downloaded. A materially weaker evidence tier than the hand-verified `Sha256`/`DownloadUrl`/`ExpectedSizeBytes` on the same entry. | No `.7z`-capable extraction tool was available in this environment to inspect the real downloaded archive — see ARCHITECTURE.md → ADR-11. | Confirm by actually extracting `RetroArch.7z` once a `.7z`-capable tool is available, rather than continuing to rely on third-party corroboration. |
 
 Populate further rows as additional limitations are discovered during development.
 

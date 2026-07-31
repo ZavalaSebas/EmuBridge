@@ -19,6 +19,7 @@ public class EmulatorServiceTests : IDisposable
 
         _repository = new FakeLibraryRepository();
         _repository.Platforms.Add(new Platform { Id = "nes", Name = "NES", Extensions = ["nes"] });
+        _repository.Platforms.Add(new Platform { Id = "snes", Name = "SNES", Extensions = ["sfc"] });
 
         _service = new EmulatorService(_repository, NullLogger<EmulatorService>.Instance);
     }
@@ -31,69 +32,73 @@ public class EmulatorServiceTests : IDisposable
         }
     }
 
-    private EmulatorConfig ValidConfig() => new()
-    {
-        PlatformId = "nes",
-        Name = "Test Emulator",
-        ExecutablePath = _fakeExecutablePath,
-        ArgumentTemplate = "\"{RomPath}\""
-    };
-
     [Fact]
-    public async Task SaveEmulatorConfigAsync_ValidConfig_Persists()
+    public async Task SaveProfileAsync_ValidInput_Persists()
     {
-        await _service.SaveEmulatorConfigAsync(ValidConfig());
+        await _service.SaveProfileAsync("nes", "Test Emulator", _fakeExecutablePath, "\"{RomPath}\"");
 
-        var stored = await _service.GetEmulatorConfigForPlatformAsync("nes");
+        var stored = await _service.GetProfileForPlatformAsync("nes");
         Assert.NotNull(stored);
         Assert.Equal(_fakeExecutablePath, stored.ExecutablePath);
     }
 
     [Fact]
-    public async Task SaveEmulatorConfigAsync_ExecutablePathDoesNotExist_ThrowsBridgeException()
+    public async Task SaveProfileAsync_ExecutablePathDoesNotExist_ThrowsBridgeException()
     {
-        var config = ValidConfig();
-        config.ExecutablePath = @"C:\does\not\exist.exe";
-
-        await Assert.ThrowsAsync<BridgeException>(() => _service.SaveEmulatorConfigAsync(config));
+        await Assert.ThrowsAsync<BridgeException>(
+            () => _service.SaveProfileAsync("nes", "Test Emulator", @"C:\does\not\exist.exe", "\"{RomPath}\""));
     }
 
     [Fact]
-    public async Task SaveEmulatorConfigAsync_ArgumentTemplateMissingRomPath_ThrowsBridgeException()
+    public async Task SaveProfileAsync_ArgumentTemplateMissingRomPath_ThrowsBridgeException()
     {
-        var config = ValidConfig();
-        config.ArgumentTemplate = "-fullscreen";
-
-        await Assert.ThrowsAsync<BridgeException>(() => _service.SaveEmulatorConfigAsync(config));
+        await Assert.ThrowsAsync<BridgeException>(
+            () => _service.SaveProfileAsync("nes", "Test Emulator", _fakeExecutablePath, "-fullscreen"));
     }
 
     [Fact]
-    public async Task SaveEmulatorConfigAsync_UnknownPlatformId_ThrowsBridgeException()
+    public async Task SaveProfileAsync_UnknownPlatformId_ThrowsBridgeException()
     {
-        var config = ValidConfig();
-        config.PlatformId = "does-not-exist";
-
-        await Assert.ThrowsAsync<BridgeException>(() => _service.SaveEmulatorConfigAsync(config));
+        await Assert.ThrowsAsync<BridgeException>(
+            () => _service.SaveProfileAsync("does-not-exist", "Test Emulator", _fakeExecutablePath, "\"{RomPath}\""));
     }
 
     [Fact]
-    public async Task GetEmulatorConfigForPlatformAsync_NoConfigForPlatform_ReturnsNull()
+    public async Task GetProfileForPlatformAsync_NoProfileForPlatform_ReturnsNull()
     {
-        var result = await _service.GetEmulatorConfigForPlatformAsync("nes");
+        var result = await _service.GetProfileForPlatformAsync("nes");
 
         Assert.Null(result);
     }
 
     [Fact]
-    public async Task SaveEmulatorConfigAsync_SamePlatformTwice_UpdatesWithoutDuplicating()
+    public async Task SaveProfileAsync_SamePlatformTwice_UpdatesWithoutDuplicating()
     {
-        await _service.SaveEmulatorConfigAsync(ValidConfig());
+        await _service.SaveProfileAsync("nes", "Test Emulator", _fakeExecutablePath, "\"{RomPath}\"");
+        await _service.SaveProfileAsync("nes", "Updated Name", _fakeExecutablePath, "\"{RomPath}\" -fs");
 
-        var updated = ValidConfig();
-        updated.Name = "Updated Name";
-        await _service.SaveEmulatorConfigAsync(updated);
+        Assert.Single(_repository.Emulators);
+        Assert.Single(_repository.EmulatorProfiles);
+        Assert.Equal("Updated Name", _repository.Emulators[0].Name);
+        Assert.Equal("\"{RomPath}\" -fs", _repository.EmulatorProfiles[0].ArgumentTemplate);
+    }
 
-        Assert.Single(_repository.EmulatorConfigs);
-        Assert.Equal("Updated Name", _repository.EmulatorConfigs[0].Name);
+    // The actual reason for the Emulator/EmulatorProfile split (ADR-11): one physical install
+    // (e.g. RetroArch) backing multiple platforms shares a single Emulator row instead of
+    // duplicating it per platform, the way the old 1:1 EmulatorConfig would have.
+    [Fact]
+    public async Task SaveProfileAsync_SameExecutablePathDifferentPlatforms_SharesOneEmulatorRow()
+    {
+        await _service.SaveProfileAsync("nes", "RetroArch", _fakeExecutablePath, "-L cores\\nestopia.dll \"{RomPath}\"");
+        await _service.SaveProfileAsync("snes", "RetroArch", _fakeExecutablePath, "-L cores\\snes9x.dll \"{RomPath}\"");
+
+        Assert.Single(_repository.Emulators);
+        Assert.Equal(2, _repository.EmulatorProfiles.Count);
+
+        var nesProfile = await _service.GetProfileForPlatformAsync("nes");
+        var snesProfile = await _service.GetProfileForPlatformAsync("snes");
+        Assert.Equal(_fakeExecutablePath, nesProfile!.ExecutablePath);
+        Assert.Equal(_fakeExecutablePath, snesProfile!.ExecutablePath);
+        Assert.NotEqual(nesProfile.ArgumentTemplate, snesProfile.ArgumentTemplate);
     }
 }
