@@ -23,6 +23,10 @@ public interface ILibraryRepository
     // instance backing many EmulatorProfile rows). Case-insensitive — Windows paths.
     Task<Emulator?> GetEmulatorByExecutablePathAsync(string executablePath, CancellationToken ct = default);
 
+    // Dedup key for the auto-install path (ADR-14) — looked up before the ExecutablePath is even
+    // known (that path only exists after extraction), so it can't reuse GetEmulatorByExecutablePathAsync.
+    Task<Emulator?> GetEmulatorByKnownEmulatorIdAsync(string knownEmulatorId, CancellationToken ct = default);
+
     // Resolves emulator.Id (existing row for this ExecutablePath, or a new Guid) and returns the
     // stored emulator so the caller can build an EmulatorProfile against the right EmulatorId
     // without a separate round trip.

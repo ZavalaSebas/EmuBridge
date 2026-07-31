@@ -12,9 +12,12 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly ILibraryRepository _libraryRepository;
     private readonly IEmulatorService _emulatorService;
+    private readonly IEmulatorInstallerService _installerService;
     private readonly ISettingsService _settingsService;
     private readonly IFilePickerService _filePickerService;
     private readonly IMessageBoxService _messageBoxService;
+
+    private CancellationTokenSource? _installCts;
 
     [ObservableProperty]
     private ObservableCollection<PlatformConfigItem> _platforms = new();
@@ -34,15 +37,20 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = string.Empty;
 
+    [ObservableProperty]
+    private bool _isBusy;
+
     public SettingsViewModel(
         ILibraryRepository libraryRepository,
         IEmulatorService emulatorService,
+        IEmulatorInstallerService installerService,
         ISettingsService settingsService,
         IFilePickerService filePickerService,
         IMessageBoxService messageBoxService)
     {
         _libraryRepository = libraryRepository;
         _emulatorService = emulatorService;
+        _installerService = installerService;
         _settingsService = settingsService;
         _filePickerService = filePickerService;
         _messageBoxService = messageBoxService;
@@ -98,6 +106,65 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task AutoInstallAsync()
+    {
+        if (SelectedPlatform is null || IsBusy)
+        {
+            return;
+        }
+
+        var confirmed = _messageBoxService.Show(
+            $"This will download and install an emulator for {SelectedPlatform.PlatformName} automatically. It may take a while depending on your connection. Continue?",
+            "Auto-Install Emulator",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirmed != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        _installCts = new CancellationTokenSource();
+
+        try
+        {
+            var progress = new Progress<string>(message => StatusMessage = message);
+            var result = await _installerService.InstallAsync(SelectedPlatform.PlatformId, progress, _installCts.Token);
+
+            if (result.Outcome != InstallOutcome.Success)
+            {
+                _messageBoxService.Show(
+                    result.ErrorMessage ?? "Install failed.",
+                    "Couldn't Auto-Install",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                StatusMessage = string.Empty;
+                return;
+            }
+
+            StatusMessage = "Installed.";
+            await LoadPlatformsAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Cancelled.";
+        }
+        finally
+        {
+            IsBusy = false;
+            _installCts?.Dispose();
+            _installCts = null;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelInstall()
+    {
+        _installCts?.Cancel();
+    }
+
+    [RelayCommand]
     private async Task SaveApiKeyAsync()
     {
         if (string.IsNullOrWhiteSpace(SteamGridDbApiKey))
@@ -121,13 +188,15 @@ public partial class SettingsViewModel : ObservableObject
         foreach (var platform in platforms.Where(p => p.Id != Config.UnknownPlatformId))
         {
             var profile = await _emulatorService.GetProfileForPlatformAsync(platform.Id, ct);
+            var hasKnownInstallOption = await _installerService.HasKnownInstallOptionAsync(platform.Id, ct);
             items.Add(new PlatformConfigItem
             {
                 PlatformId = platform.Id,
                 PlatformName = platform.Name,
                 IsConfigured = profile is not null,
                 ExecutablePath = profile?.ExecutablePath,
-                ArgumentTemplate = profile?.ArgumentTemplate
+                ArgumentTemplate = profile?.ArgumentTemplate,
+                HasKnownInstallOption = hasKnownInstallOption
             });
         }
 

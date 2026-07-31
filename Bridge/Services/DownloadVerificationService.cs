@@ -37,6 +37,7 @@ public class DownloadVerificationService : IDownloadVerificationService
         string destinationFileName,
         string expectedSha256,
         long expectedSizeBytes,
+        IProgress<long>? progress = null,
         CancellationToken ct = default)
     {
         Directory.CreateDirectory(_downloadDirectory);
@@ -73,7 +74,7 @@ public class DownloadVerificationService : IDownloadVerificationService
                 return SizeMismatchResult(destinationFileName, "reported an unexpected size and was rejected before downloading");
             }
 
-            var streamFailure = await StreamToStagingFileAsync(response, stagingPath, destinationFileName, expectedSizeBytes, sourceUrl, ct);
+            var streamFailure = await StreamToStagingFileAsync(response, stagingPath, destinationFileName, expectedSizeBytes, sourceUrl, progress, ct);
             if (streamFailure is not null)
             {
                 return streamFailure;
@@ -107,6 +108,7 @@ public class DownloadVerificationService : IDownloadVerificationService
         string destinationFileName,
         long expectedSizeBytes,
         string sourceUrl,
+        IProgress<long>? progress,
         CancellationToken ct)
     {
         long totalRead = 0;
@@ -126,6 +128,7 @@ public class DownloadVerificationService : IDownloadVerificationService
                     }
 
                     await destinationStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                    progress?.Report(totalRead);
                 }
             }
         }

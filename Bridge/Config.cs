@@ -36,4 +36,8 @@ public static class Config
     // here; anything that fails hash/size verification is deleted before it ever gets this far
     // as a non-".download"-suffixed name.
     public static string EmulatorDownloadsPath => Path.Combine(AppDataPath, "Downloads");
+
+    // Extracted, ready-to-run emulator installs (ADR-14) — distinct from EmulatorDownloadsPath,
+    // which only holds the raw downloaded archives before/after verification.
+    public static string EmulatorInstallPath => Path.Combine(AppDataPath, "Emulators");
 }

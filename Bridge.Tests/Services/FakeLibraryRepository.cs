@@ -89,6 +89,9 @@ internal class FakeLibraryRepository : ILibraryRepository
     public Task<Emulator?> GetEmulatorByExecutablePathAsync(string executablePath, CancellationToken ct = default)
         => Task.FromResult(Emulators.FirstOrDefault(e => e.ExecutablePath.Equals(executablePath, StringComparison.OrdinalIgnoreCase)));
 
+    public Task<Emulator?> GetEmulatorByKnownEmulatorIdAsync(string knownEmulatorId, CancellationToken ct = default)
+        => Task.FromResult(Emulators.FirstOrDefault(e => e.KnownEmulatorId == knownEmulatorId));
+
     public Task<Emulator> UpsertEmulatorAsync(Emulator emulator, CancellationToken ct = default)
     {
         var index = Emulators.FindIndex(e => e.ExecutablePath.Equals(emulator.ExecutablePath, StringComparison.OrdinalIgnoreCase));

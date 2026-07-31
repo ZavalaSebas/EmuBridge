@@ -101,4 +101,38 @@ public class EmulatorServiceTests : IDisposable
         Assert.Equal(_fakeExecutablePath, snesProfile!.ExecutablePath);
         Assert.NotEqual(nesProfile.ArgumentTemplate, snesProfile.ArgumentTemplate);
     }
+
+    [Fact]
+    public async Task GetInstalledKnownEmulatorAsync_NotInstalled_ReturnsNull()
+    {
+        var result = await _service.GetInstalledKnownEmulatorAsync("retroarch");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task RegisterInstalledEmulatorAsync_PersistsAndIsFindableByKnownEmulatorId()
+    {
+        var registered = await _service.RegisterInstalledEmulatorAsync("retroarch", "RetroArch", _fakeExecutablePath, "abc123");
+
+        Assert.Equal(InstallSource.BridgeManaged, registered.InstallSource);
+        var found = await _service.GetInstalledKnownEmulatorAsync("retroarch");
+        Assert.NotNull(found);
+        Assert.Equal(registered.Id, found!.Id);
+        Assert.Equal("abc123", found.InstalledSha256);
+    }
+
+    [Fact]
+    public async Task RegisterCoreProfileAsync_PersistsCorePathOnResolvedProfile()
+    {
+        var emulator = await _service.RegisterInstalledEmulatorAsync("retroarch", "RetroArch", _fakeExecutablePath, "abc123");
+        var corePath = Path.Combine(Path.GetTempPath(), "fceumm_libretro.dll");
+
+        await _service.RegisterCoreProfileAsync("nes", emulator.Id, corePath, "-L {CorePath} {RomPath}");
+
+        var profile = await _service.GetProfileForPlatformAsync("nes");
+        Assert.NotNull(profile);
+        Assert.Equal(corePath, profile.CorePath);
+        Assert.Equal(_fakeExecutablePath, profile.ExecutablePath);
+    }
 }

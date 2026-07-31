@@ -179,6 +179,31 @@ public class LibraryRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task GetEmulatorByKnownEmulatorIdAsync_NoMatch_ReturnsNull()
+    {
+        var result = await _repository.GetEmulatorByKnownEmulatorIdAsync("retroarch");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetEmulatorByKnownEmulatorIdAsync_MatchExists_ReturnsIt()
+    {
+        var stored = await _repository.UpsertEmulatorAsync(new Emulator
+        {
+            KnownEmulatorId = "retroarch",
+            Name = "RetroArch",
+            ExecutablePath = @"C:\emu\retroarch.exe",
+            InstallSource = InstallSource.BridgeManaged
+        });
+
+        var fetched = await _repository.GetEmulatorByKnownEmulatorIdAsync("retroarch");
+
+        Assert.NotNull(fetched);
+        Assert.Equal(stored.Id, fetched!.Id);
+    }
+
+    [Fact]
     public async Task UpsertEmulatorProfileAsync_ExistingPlatformId_UpdatesWithoutDuplicating()
     {
         var emulator = await _repository.UpsertEmulatorAsync(new Emulator { Name = "RetroArch", ExecutablePath = @"C:\emu\retroarch.exe", InstallSource = InstallSource.UserProvided });

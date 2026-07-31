@@ -10,4 +10,8 @@ public class EmulatorProfile
     public Guid EmulatorId { get; set; }
     public string PlatformId { get; set; } = string.Empty;
     public string ArgumentTemplate { get; set; } = string.Empty;
+
+    // Non-null only for auto-installed core-based profiles (ADR-14) — resolved to {CorePath} at
+    // launch time, alongside {RomPath}. Null for manually-configured profiles.
+    public string? CorePath { get; set; }
 }

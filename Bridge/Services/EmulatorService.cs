@@ -76,7 +76,39 @@ public class EmulatorService : IEmulatorService
         {
             PlatformId = platformId,
             ExecutablePath = emulator.ExecutablePath,
-            ArgumentTemplate = profile.ArgumentTemplate
+            ArgumentTemplate = profile.ArgumentTemplate,
+            CorePath = profile.CorePath
         };
+    }
+
+    public Task<Emulator?> GetInstalledKnownEmulatorAsync(string knownEmulatorId, CancellationToken ct = default)
+        => _repository.GetEmulatorByKnownEmulatorIdAsync(knownEmulatorId, ct);
+
+    public async Task<Emulator> RegisterInstalledEmulatorAsync(string knownEmulatorId, string name, string executablePath, string installedSha256, CancellationToken ct = default)
+    {
+        var emulator = await _repository.UpsertEmulatorAsync(new Emulator
+        {
+            KnownEmulatorId = knownEmulatorId,
+            Name = name,
+            ExecutablePath = executablePath,
+            InstallSource = InstallSource.BridgeManaged,
+            InstalledSha256 = installedSha256
+        }, ct);
+
+        _logger.LogInformation("Registered auto-installed emulator {KnownEmulatorId} at {ExecutablePath}.", knownEmulatorId, executablePath);
+        return emulator;
+    }
+
+    public async Task RegisterCoreProfileAsync(string platformId, Guid emulatorId, string corePath, string argumentTemplate, CancellationToken ct = default)
+    {
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile
+        {
+            EmulatorId = emulatorId,
+            PlatformId = platformId,
+            ArgumentTemplate = argumentTemplate,
+            CorePath = corePath
+        }, ct);
+
+        _logger.LogInformation("Registered auto-installed core profile for platform {PlatformId}: {CorePath}", platformId, corePath);
     }
 }

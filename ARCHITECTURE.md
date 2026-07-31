@@ -546,7 +546,40 @@ The check deliberately does not touch `gamesByPath`/`unseenGameIds` — it retur
 
 ---
 
-## Creating a New ADR
+### ADR-14: Emulator install orchestration (`EmulatorInstallerService`)
+
+**Status:** Accepted
+
+**Date:** 2026-08-02
+
+**Context:**
+ADR-11 built the mechanism (verified downloads, `Emulator`/`EmulatorProfile` split, `KnownEmulators.json` catalog) but not the orchestration that turns a catalog entry into a working, launchable emulator. With exactly one verified catalog pair (RetroArch + FCEUmm/`nes`), this pass builds and proves the orchestration end-to-end against that one pair — deliberately not adding more cores first, so a design gap in the orchestration itself would surface against a single known-good case rather than being masked or multiplied across many untested cores.
+
+**Decision — extraction library:** `SharpCompress` (NuGet, MIT, pure managed, confirmed compatible with .NET 10, reads both `.7z` and `.zip` through one API) — chosen specifically to avoid repeating ADR-12's mistake of a native dependency sneaking into the single-file build. The real API differs from initial assumptions and was confirmed by reflecting on the installed assembly, not guessed: archives open via `ArchiveFactory.OpenArchive(path)` (not `.Open`), and `IArchiveExtensions.WriteToDirectory(IArchive, path, ExtractionOptions)` / `IArchiveEntryExtensions.WriteToDirectory(IArchiveEntry, path, ExtractionOptions)` extension methods do the actual extraction. Verified against real fixtures, not just compiled: `EmulatorInstallerServiceTests` builds genuine small `.zip` files with `System.IO.Compression.ZipFile` and extracts them through the real `SharpCompress` code path — not mocked.
+
+**Decision — trigger location:** a "Auto-Install" button in `SettingsWindow`, next to manual configuration, visible only when `IEmulatorInstallerService.HasKnownInstallOptionAsync` confirms a fully-verified catalog entry exists for the selected platform (`PlatformConfigItem.HasKnownInstallOption`). Not offered inline on `LaunchService`'s `NoEmulatorConfigured` result — conflating "does the install mechanism work" with "is this the right UX moment to offer it" would make failures harder to isolate to one cause, which matters most while only one core has ever been exercised through this path.
+
+**Decision — `{CorePath}` as a real resolver token, not a baked literal:** `EmulatorProfile`/`ResolvedEmulatorProfile` gained a nullable `CorePath`; `ArgumentTemplate.Expand` gained an optional `corePath` parameter and a `CorePathToken` constant. `LaunchService` now validates `File.Exists(profile.CorePath)` at launch time exactly like it already validates the emulator executable — a new `LaunchOutcome.CoreNotFound`. Baking the core's path as literal text into the stored `ArgumentTemplate` at install time was the simpler alternative, but it would lose that re-validation, the same never-fail-silently standard already applied to the executable path.
+
+**Decision — dedup key for reused installs:** `IEmulatorService.GetInstalledKnownEmulatorAsync`/`RegisterInstalledEmulatorAsync` key by `KnownEmulatorId` (new `ILibraryRepository.GetEmulatorByKnownEmulatorIdAsync`), not `ExecutablePath` the way the manual-entry path (`SaveProfileAsync`) already does — the auto-install path doesn't know the eventual `ExecutablePath` until *after* extraction, so it needs to decide "already installed or not" *before* downloading anything. `EmulatorInstallerService` still re-validates `File.Exists` on the found row before trusting it (a DB row surviving a manually-deleted install folder shouldn't silently short-circuit a real re-install). Both new `IEmulatorService` methods stay the only way `EmulatorInstallerService` touches this data — it never calls `ILibraryRepository` directly, preserving ADR-11's "`EmulatorService` is the sole consumer" invariant.
+
+**Decision — two-level failure handling, matching ADR-11's checksum design exactly:** extraction failure for the *frontend* deletes the entire partial install directory before returning — never leaves an ambiguous half-installed state a later attempt could mistake for real. Extraction failure for the *core*, after the frontend already installed successfully, does **not** roll back the frontend — a working frontend install is a valid, reusable state on its own (the actual reason the `Emulator`/`EmulatorProfile` split exists), so only the core's own partial file is cleaned up. Verified with real tests (`InstallAsync_FrontendExtractionFails_CleansUpPartialDirectory`, `InstallAsync_CoreDownloadFails_DoesNotRollBackAlreadyInstalledFrontend`), not just asserted in prose.
+
+**Decision — progress:** `DownloadVerificationService.DownloadAndVerifyAsync` gained an optional `IProgress<long>?` reporting cumulative bytes — cheap to add, confirmed by reading the existing streaming loop (`totalRead` was already being accumulated per chunk; this is one added line, not a restructure). `EmulatorInstallerService` translates that into short staged status strings ("Downloading RetroArch... 45 / 193 MB") via a plain `IProgress<string>`, consumed by `SettingsViewModel` through the same `IsBusy`/`StatusMessage`/indeterminate-`ProgressBar` pattern `MainViewModel.RefreshLibraryCommand` already established, including a real Cancel button wired to a `CancellationTokenSource`, the same shape as `CancelScanCommand`.
+
+**Consequences:**
+- ✅ The install path is proven end-to-end against a real, verified catalog pair — not just designed on paper. `EmulatorInstallerServiceTests` extracts real archives, confirms the two-level failure/cleanup behavior, confirms the reuse-existing-install path skips a redundant download, confirms cancellation propagates, and confirms progress messages are actually reported at each stage.
+- ✅ `ArgumentTemplate`'s token system absorbed a second token (`{CorePath}`) with a one-line dictionary addition and an optional parameter — exactly the extensibility ADR-4 designed it for, not a rework.
+- ✅ DI resolution of `EmulatorInstallerService`'s two constructors (one for production, loading the embedded catalog; one for tests, accepting an injected catalog) was confirmed against a real `ServiceCollection`/`ServiceProvider`, not assumed from `LibraryRepository`'s similar-looking precedent — a genuinely new combination (skipping a `string` *and* an `IReadOnlyList<KnownEmulator>` parameter together) that hadn't been exercised in this exact shape before.
+- ❌ Only one of 15 seed platforms can actually be auto-installed today (`nes`) — this ADR proves the mechanism works, it doesn't populate the catalog; that's still `PLAN.md` → Timeline's next step.
+- ❌ No visual/interactive confirmation that the "Auto-Install" button actually renders and behaves correctly in a real running window — covered by ViewModel-level tests (confirmation dialog, busy state, cancel, error display) and by the orchestration's own extensive tests, not by watching it on screen. Same category of gap as `PLAN.md`'s still-open interactive click-through pass.
+
+**Alternatives considered:**
+
+- **Offer auto-install inline when `LaunchService` returns `NoEmulatorConfigured`:** rejected for this pass — see trigger-location decision above; worth revisiting once the mechanism has more than one proven core behind it
+- **Bake the resolved core path as literal text into `ArgumentTemplate` at install time (no `{CorePath}` token):** rejected — loses launch-time re-validation of the core file's existence, the exact protection already given to the executable path
+- **Confirm dialog stating the exact download size:** rejected for this pass — would need `IEmulatorInstallerService` to expose size info just for that one UX nicety; the confirmation dialog is generic ("this may take a while") instead, not worth a new interface method yet
+- **Roll back the frontend install if the core step fails:** rejected — directly contradicts the reason the `Emulator`/`EmulatorProfile` split exists; a working frontend is valuable on its own even without this one platform's core
 
 1. Copy the ADR format block from the section above
 2. Assign the next sequential number (e.g., `ADR-1`, `ADR-2`, …)

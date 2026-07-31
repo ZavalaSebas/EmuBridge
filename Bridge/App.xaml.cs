@@ -106,6 +106,7 @@ public partial class App : Application
         services.AddSingleton<IEmulatorService, EmulatorService>();
         services.AddSingleton<ILaunchService, LaunchService>();
         services.AddSingleton<IDownloadVerificationService, DownloadVerificationService>();
+        services.AddSingleton<IEmulatorInstallerService, EmulatorInstallerService>();
         services.AddSingleton<IMessageBoxService, MessageBoxService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
         services.AddSingleton<IFilePickerService, FilePickerService>();

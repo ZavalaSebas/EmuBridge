@@ -52,10 +52,20 @@ public class LaunchService : ILaunchService
             };
         }
 
+        if (profile.CorePath is not null && !File.Exists(profile.CorePath))
+        {
+            _logger.LogWarning("Configured core not found at {CorePath}.", profile.CorePath);
+            return new LaunchResult
+            {
+                Outcome = LaunchOutcome.CoreNotFound,
+                ErrorMessage = $"The configured emulator core can't be found at '{profile.CorePath}' — it may have been moved or uninstalled. Re-install it in Settings."
+            };
+        }
+
         string expandedArguments;
         try
         {
-            expandedArguments = ArgumentTemplate.Expand(profile.ArgumentTemplate, game.Path);
+            expandedArguments = ArgumentTemplate.Expand(profile.ArgumentTemplate, game.Path, profile.CorePath);
         }
         catch (BridgeException ex)
         {

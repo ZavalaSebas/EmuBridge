@@ -87,6 +87,57 @@ public class LaunchServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LaunchAsync_ConfiguredCoreMissing_ReturnsCoreNotFound()
+    {
+        var game = MakeGame("nes");
+        var cmdExePath = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
+        {
+            PlatformId = "nes",
+            ExecutablePath = cmdExePath,
+            ArgumentTemplate = "-L {CorePath} {RomPath}",
+            CorePath = @"C:\moved\or\uninstalled\core.dll"
+        };
+
+        var result = await _launchService.LaunchAsync(game);
+
+        Assert.Equal(LaunchOutcome.CoreNotFound, result.Outcome);
+        Assert.NotNull(result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task LaunchAsync_ValidConfigWithCorePath_LaunchesProcessAndReturnsSessionEndedTask()
+    {
+        var game = MakeGame("nes");
+        var cmdExePath = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        var corePath = Path.Combine(Path.GetTempPath(), $"bridge_test_core_{Guid.NewGuid()}.dll");
+        File.WriteAllBytes(corePath, [1]);
+
+        try
+        {
+            _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
+            {
+                PlatformId = "nes",
+                ExecutablePath = cmdExePath,
+                ArgumentTemplate = "/c echo -L {CorePath} {RomPath}",
+                CorePath = corePath
+            };
+
+            var result = await _launchService.LaunchAsync(game);
+
+            Assert.Equal(LaunchOutcome.Started, result.Outcome);
+            Assert.NotNull(result.GameSessionEndedTask);
+
+            var completed = await Task.WhenAny(result.GameSessionEndedTask, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(result.GameSessionEndedTask, completed);
+        }
+        finally
+        {
+            File.Delete(corePath);
+        }
+    }
+
+    [Fact]
     public async Task LaunchAsync_ValidConfig_LaunchesProcessAndReturnsSessionEndedTask()
     {
         var game = MakeGame("nes");

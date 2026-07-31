@@ -1,3 +1,4 @@
+using System.Windows;
 using Bridge.Exceptions;
 using Bridge.Models;
 using Bridge.Tests.Services;
@@ -9,6 +10,7 @@ public class SettingsViewModelTests
 {
     private readonly FakeLibraryRepository _repository = new();
     private readonly FakeEmulatorService _emulatorService = new();
+    private readonly FakeEmulatorInstallerService _installerService = new();
     private readonly FakeSettingsService _settingsService = new();
     private readonly FakeFilePickerService _filePicker = new();
     private readonly FakeMessageBoxService _messageBox = new();
@@ -20,7 +22,7 @@ public class SettingsViewModelTests
         _repository.Platforms.Add(new Platform { Id = "nes", Name = "NES", Extensions = ["nes"] });
         _repository.Platforms.Add(new Platform { Id = "snes", Name = "SNES", Extensions = ["sfc"] });
 
-        _viewModel = new SettingsViewModel(_repository, _emulatorService, _settingsService, _filePicker, _messageBox);
+        _viewModel = new SettingsViewModel(_repository, _emulatorService, _installerService, _settingsService, _filePicker, _messageBox);
     }
 
     [Fact]
@@ -165,5 +167,85 @@ public class SettingsViewModelTests
         _viewModel.BrowseExecutableCommand.Execute(null);
 
         Assert.Equal(@"C:\existing.exe", _viewModel.ExecutablePath);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_PlatformWithKnownInstallOption_HasKnownInstallOptionTrue()
+    {
+        _installerService.PlatformsWithKnownInstallOption.Add("nes");
+
+        await _viewModel.InitializeAsync();
+
+        Assert.True(_viewModel.Platforms.Single(p => p.PlatformId == "nes").HasKnownInstallOption);
+        Assert.False(_viewModel.Platforms.Single(p => p.PlatformId == "snes").HasKnownInstallOption);
+    }
+
+    [Fact]
+    public async Task AutoInstallCommand_NoPlatformSelected_DoesNothing()
+    {
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedPlatform = null;
+
+        await _viewModel.AutoInstallCommand.ExecuteAsync(null);
+
+        Assert.False(_messageBox.ShowCalled);
+        Assert.Empty(_installerService.InstalledPlatformIds);
+    }
+
+    [Fact]
+    public async Task AutoInstallCommand_UserDeclinesConfirmation_DoesNotInstall()
+    {
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
+        _messageBox.NextResult = MessageBoxResult.No;
+
+        await _viewModel.AutoInstallCommand.ExecuteAsync(null);
+
+        Assert.Empty(_installerService.InstalledPlatformIds);
+    }
+
+    [Fact]
+    public async Task AutoInstallCommand_UserConfirms_Success_SetsStatusMessageAndRefreshesList()
+    {
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
+        _messageBox.NextResult = MessageBoxResult.Yes;
+        _installerService.NextResult = new InstallResult { Outcome = InstallOutcome.Success };
+
+        await _viewModel.AutoInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal("Installed.", _viewModel.StatusMessage);
+        Assert.Contains("nes", _installerService.InstalledPlatformIds);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task AutoInstallCommand_UserConfirms_Failure_ShowsSpecificErrorMessage()
+    {
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
+        _messageBox.NextResult = MessageBoxResult.Yes;
+        _installerService.NextResult = new InstallResult { Outcome = InstallOutcome.DownloadFailed, ErrorMessage = "The download failed. Specific reason." };
+
+        await _viewModel.AutoInstallCommand.ExecuteAsync(null);
+
+        Assert.Equal("The download failed. Specific reason.", _messageBox.LastMessage);
+        Assert.Equal(string.Empty, _viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task CancelInstallCommand_DuringInstall_CancelsAndSetsStatusMessage()
+    {
+        await _viewModel.InitializeAsync();
+        _viewModel.SelectedPlatform = _viewModel.Platforms.Single(p => p.PlatformId == "nes");
+        _messageBox.NextResult = MessageBoxResult.Yes;
+        _installerService.InstallGate = new TaskCompletionSource<InstallResult>();
+
+        var installTask = _viewModel.AutoInstallCommand.ExecuteAsync(null);
+        _viewModel.CancelInstallCommand.Execute(null);
+        await installTask;
+
+        Assert.Equal("Cancelled.", _viewModel.StatusMessage);
+        Assert.False(_viewModel.IsBusy);
     }
 }

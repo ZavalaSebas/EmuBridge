@@ -6,6 +6,7 @@ public enum LaunchOutcome
     RomFileNotFound,
     NoEmulatorConfigured,
     ExecutableNotFound,
+    CoreNotFound,
     LaunchFailed
 }
 

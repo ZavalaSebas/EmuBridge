@@ -124,6 +124,25 @@ public class DownloadVerificationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadAndVerifyAsync_ReportsGrowingByteProgressAcrossMultipleChunks()
+    {
+        // Larger than the service's internal read buffer (80KB) so the streaming loop actually
+        // runs multiple iterations — a single-chunk payload wouldn't exercise "progress over time".
+        var bytes = new byte[200_000];
+        new Random(42).NextBytes(bytes);
+        var handler = new FakeHttpMessageHandler(_ => OkResponse(bytes));
+        var service = CreateService(handler);
+        var progress = new SynchronousProgress<long>();
+
+        var result = await service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", Sha256Hex(bytes), bytes.Length, progress);
+
+        Assert.Equal(DownloadOutcome.Success, result.Outcome);
+        Assert.True(progress.Reports.Count >= 2, "Expected multiple progress reports for a payload spanning several read buffers.");
+        Assert.Equal(bytes.Length, progress.Reports[^1]);
+        Assert.Equal(progress.Reports, progress.Reports.OrderBy(x => x));
+    }
+
+    [Fact]
     public async Task DownloadAndVerifyAsync_TokenAlreadyCancelled_ThrowsOperationCanceledException()
     {
         var handler = new FakeHttpMessageHandler(_ => OkResponse([1, 2, 3]));
@@ -132,6 +151,6 @@ public class DownloadVerificationServiceTests : IDisposable
         await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", new string('0', 64), 3, cts.Token));
+            () => service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", new string('0', 64), 3, ct: cts.Token));
     }
 }

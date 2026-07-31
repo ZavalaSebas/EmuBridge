@@ -8,4 +8,5 @@ public class ResolvedEmulatorProfile
     public string PlatformId { get; set; } = string.Empty;
     public string ExecutablePath { get; set; } = string.Empty;
     public string ArgumentTemplate { get; set; } = string.Empty;
+    public string? CorePath { get; set; }
 }

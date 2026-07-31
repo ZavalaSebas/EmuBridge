@@ -206,6 +206,13 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         return Task.FromResult<Emulator?>(result);
     }
 
+    public Task<Emulator?> GetEmulatorByKnownEmulatorIdAsync(string knownEmulatorId, CancellationToken ct = default)
+    {
+        var result = _db.GetCollection<Emulator>(EmulatorsCollectionName)
+            .FindOne(e => e.KnownEmulatorId == knownEmulatorId);
+        return Task.FromResult<Emulator?>(result);
+    }
+
     public Task<Emulator> UpsertEmulatorAsync(Emulator emulator, CancellationToken ct = default)
     {
         var collection = _db.GetCollection<Emulator>(EmulatorsCollectionName);

@@ -10,6 +10,7 @@ namespace Bridge.Services;
 public static class ArgumentTemplate
 {
     public const string RomPathToken = "RomPath";
+    public const string CorePathToken = "CorePath";
 
     private static readonly Regex TokenPattern = new(@"\{(\w+)\}", RegexOptions.Compiled);
 
@@ -23,11 +24,19 @@ public static class ArgumentTemplate
         }
     }
 
-    public static string Expand(string template, string romPath)
+    // corePath is optional — null for manually-configured profiles (ArgumentTemplate.CorePathToken
+    // never appears in those templates). A template that references {CorePath} with no corePath
+    // supplied still throws via the "unknown token" check below, same as any other undefined
+    // token — not silently left as literal "{CorePath}" text in the launch arguments.
+    public static string Expand(string template, string romPath, string? corePath = null)
     {
         Validate(template);
 
         var tokens = new Dictionary<string, string> { [RomPathToken] = romPath };
+        if (corePath is not null)
+        {
+            tokens[CorePathToken] = corePath;
+        }
 
         return TokenPattern.Replace(template, match =>
         {

@@ -62,4 +62,26 @@ public class ArgumentTemplateTests
     {
         Assert.Throws<BridgeException>(() => ArgumentTemplate.Expand("-fullscreen", @"C:\roms\mario.nes"));
     }
+
+    [Fact]
+    public void Expand_CorePathSupplied_ReplacesCorePathToken()
+    {
+        var result = ArgumentTemplate.Expand("-L {CorePath} {RomPath}", @"C:\roms\mario.nes", @"C:\emu\cores\core.dll");
+
+        Assert.Equal(@"-L C:\emu\cores\core.dll C:\roms\mario.nes", result);
+    }
+
+    [Fact]
+    public void Expand_CorePathNotSupplied_TemplateWithoutCorePathToken_Unaffected()
+    {
+        var result = ArgumentTemplate.Expand("{RomPath}", @"C:\roms\mario.nes");
+
+        Assert.Equal(@"C:\roms\mario.nes", result);
+    }
+
+    [Fact]
+    public void Expand_CorePathTokenInTemplateButNoCorePathSupplied_ThrowsBridgeException()
+    {
+        Assert.Throws<BridgeException>(() => ArgumentTemplate.Expand("-L {CorePath} {RomPath}", @"C:\roms\mario.nes"));
+    }
 }
