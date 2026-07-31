@@ -1,6 +1,6 @@
 # Bridge - Project Plan
 
-> **Status:** Phase 1 (MVP) shipped as tagged release `v0.1.0`. **Not yet manually run/verified in a real window** — see `DEVELOPMENT.md` → Current Status. Phase 2 has started: `Emulator`/`EmulatorProfile` split + verified-download mechanism (`DownloadVerificationService`, `KnownEmulators.json` catalog) implemented and tested — 97 tests pass in both Debug and Release. 1 of 15 seed platforms (`nes` → FCEUmm) has a fully verified core; the other 14 have no catalog entry yet, and archive-extraction/install orchestration isn't built — see ARCHITECTURE.md → ADR-11, DEVELOPMENT.md → Known Limitations. See `## Timeline` below for the exact handoff state.
+> **Status:** Phase 1 (MVP) shipped as tagged release `v0.1.0`. **The app has been launched, fixed, and interactively used end-to-end** — launch itself confirmed during the ADR-12 investigation (which found and fixed a real release-breaking packaging bug: `v0.1.0`'s published `.exe` didn't open at all, fixed in place, same tag), and separately, per the user's own direct report on their real machine: add folder → Pokémon Emerald detected → mGBA configured → rescan → launched successfully (FR-01/02/03/06/07/09). Still open: FR-04/FR-05 (box art) and FR-08 (cross-session persistence) haven't been part of an interactive pass yet. Phase 2 has started: `Emulator`/`EmulatorProfile` split + verified-download mechanism (`DownloadVerificationService`, `KnownEmulators.json` catalog) implemented and tested — 97 tests pass in both Debug and Release. 1 of 15 seed platforms (`nes` → FCEUmm) has a fully verified core; the other 14 have no catalog entry yet, and archive-extraction/install orchestration isn't built — see ARCHITECTURE.md → ADR-11, DEVELOPMENT.md → Known Limitations. See `## Timeline` below for the exact handoff state.
 >
 > **Last updated:** 2026-07-31
 
@@ -181,15 +181,15 @@ Bridge/
 
 | Milestone | Description | Status |
 |-----------|-------------|--------|
-| FR-01 | User can add one or more root ROM folders | UI wired — "Add Folder" button (`MainWindow`) → `OpenFolderDialog` → `RomScannerService.AddScanFolderAsync`. Not yet manually verified running (no way to launch a real WPF window from this environment — see PLAN.md → Timeline) |
-| FR-02 | System recursively scans and detects valid ROM files | UI wired — "Rescan" button / triggered automatically after "Add Folder". Same unverified-running caveat as FR-01 |
-| FR-03 | Each detected ROM is automatically associated with a known system/console | Implemented and tested at the service layer; surfaced in the grid via `GameTile`/`IsMissing`. Same unverified-running caveat |
-| FR-04 | Each detected ROM looks up its box art on SteamGridDB | UI wired — `RefreshLibraryCommand` calls `FetchMissingBoxArtAsync` after every scan. Same unverified-running caveat |
-| FR-05 | Box art is cached locally, resized to the exact size it's displayed at | UI wired — grid tiles bind to `GameTile.CoverImagePath` (`Config.CoverWidth`/`CoverHeight` placeholder values, not a final UI decision). Same unverified-running caveat |
-| FR-06 | User configures, per system, which emulator (.exe) to use | UI wired — `SettingsWindow`, platform list + executable/argument form. Same unverified-running caveat |
-| FR-07 | Selecting and confirming a ROM launches the emulator with correct arguments | UI wired — clicking a grid tile calls `LaunchGameCommand` directly, no confirmation step (see UI design notes). Same unverified-running caveat |
-| FR-08 | The library persists between sessions (no full re-scan on every launch) | Implemented and tested at the service layer (LiteDB) |
-| FR-09 | User can trigger a manual re-scan | UI wired — "Rescan" button, disabled while a scan is already running. Same unverified-running caveat |
+| FR-01 | User can add one or more root ROM folders | **Interactively confirmed** — user added a ROM folder via "Add Folder" on their real machine |
+| FR-02 | System recursively scans and detects valid ROM files | **Interactively confirmed** — rescan performed, ROM picked up |
+| FR-03 | Each detected ROM is automatically associated with a known system/console | **Interactively confirmed** — Pokémon Emerald correctly detected as GBA |
+| FR-04 | Each detected ROM looks up its box art on SteamGridDB | Implemented and unit-tested; not part of the interactive pass that confirmed FR-01/02/03/06/07/09 (no SteamGridDB API key was configured in that test) — still not interactively confirmed |
+| FR-05 | Box art is cached locally, resized to the exact size it's displayed at | Implemented and unit-tested; same not-yet-interactively-confirmed caveat as FR-04 |
+| FR-06 | User configures, per system, which emulator (.exe) to use | **Interactively confirmed** — mGBA configured for GBA in `SettingsWindow` with `ArgumentTemplate = "{RomPath}"` |
+| FR-07 | Selecting and confirming a ROM launches the emulator with correct arguments | **Interactively confirmed** — Pokémon Emerald launched successfully via mGBA |
+| FR-08 | The library persists between sessions (no full re-scan on every launch) | Implemented and tested at the service layer (LiteDB); not itself part of the interactive pass (would need closing and reopening the app to confirm end-to-end) |
+| FR-09 | User can trigger a manual re-scan | **Interactively confirmed** — rescan triggered before launch |
 
 **Deliverables:**
 
@@ -249,15 +249,17 @@ No fixed dates yet. Progress so far, and the exact handoff state for whoever (or
 11. ~~Phase 2 inventory: automatic emulator detection/download — what it implies, RetroArch as the first candidate (covers all 15 seed platforms via cores), what the Playnite catalog research now applies to~~ — done, discussed and approved before any code
 12. ~~`Emulator`/`EmulatorProfile` schema split + `DownloadVerificationService` (pinned-hash + exact-size verified downloads) + `KnownEmulators.json` catalog~~ — done, ADR-11; RetroArch 1.22.2 entry independently verified (downloaded + hashed by hand from the official buildbot), core catalog left as an explicit, Release-build-gated placeholder
 13. ~~First real `KnownEmulatorCore` entry: `nes` → FCEUmm~~ — done, ADR-11; confirmed cores have no "stable" channel at all (`buildbot.libretro.com/nightly/.../latest/` is the real one, per an official RetroArch repo issue), navigated the real index to get the exact filename, hashed by hand (`sha256sum` + `certutil`, matching), and confirmed the internal DLL filename by actually extracting the `.zip`. 97 tests pass in both Debug and Release now — the Release guard no longer fails, because the one entry present is fully real, not because verification is complete
+14. ~~Manually run the app and actually look at it~~ — done, and not a clean pass: the `v0.1.0` published `.exe` didn't open at all. Root-caused with the Bug Investigation Process (one hypothesis tested and ruled out with real evidence before the actual cause was found), fixed (`IncludeNativeLibrariesForSelfExtract=true`), confirmed with the same isolated-folder reproduction that found the bug, and the already-published `v0.1.0` release asset was replaced in place. See ARCHITECTURE.md → ADR-12, DEVELOPMENT.md → Current Status/Release Checklist. This is a stronger outcome than "confirmed the UI renders" would have been — it caught a bug that would have hit every single person who downloaded `v0.1.0`.
 
-**Phase 1's 9 FRs are wired end-to-end in code and covered by unit tests; `v0.1.0` shipped as a tagged release.** Phase 2's emulator auto-detect/download groundwork (schema + verified-download mechanism) is implemented and tested, with 1 of 15 seed platforms' cores fully verified — the install/extraction orchestration that consumes it, and cores for the other 14 platforms, are not yet built.
+15. ~~Interactive click-through/visual pass — actually use Add Folder/Rescan/Settings and watch the grid populate~~ — done, per the user's own direct report (performed on their real machine, independent of the ADR-12 investigation, not reproduced by Claude): added a ROM folder, Pokémon Emerald was correctly detected, configured mGBA in Settings with `"{RomPath}"`, ran a rescan, launched the game successfully. Covers FR-01 (add folder), FR-02/FR-03 (scan + detection), FR-06 (emulator config), FR-07 (launch), FR-09 (rescan) with real interactive use, not just code review.
+
+**Phase 1's 9 FRs are wired end-to-end in code, covered by unit tests, launch-verified, and now interactively confirmed working end-to-end (add folder → detect → configure emulator → rescan → launch); `v0.1.0` shipped as a tagged release, and the release asset itself has been launch-verified and fixed.** Phase 2's emulator auto-detect/download groundwork (schema + verified-download mechanism) is implemented and tested, with 1 of 15 seed platforms' cores fully verified — the install/extraction orchestration that consumes it, and cores for the other 14 platforms, are not yet built.
 
 **Next, in order:**
 
-14. **Manually run the app and actually look at it** — nothing in this repo has confirmed the UI *renders* correctly or behaves as designed; `dotnet build`/`dotnet test` passing is necessary but not sufficient. Still open from Phase 1, not superseded by the Phase 2 work above.
-15. Whatever the manual run in step 14 surfaces — expect UI bugs on first real render (untested XAML bindings, layout issues) that unit tests structurally can't catch.
 16. Source and hash-verify the remaining 14 seed platforms' cores, the same process now proven for `nes` (navigate the real nightly index, download, double-hash, extract to confirm the internal filename).
 17. Build the archive-extraction/install orchestration that turns a verified `DownloadResult` into a registered `Emulator` + generated `EmulatorProfile` rows (the `{CorePath}` token discussed during design isn't wired into `ArgumentTemplate` yet).
+18. FR-04/FR-05 (SteamGridDB box art lookup + caching) and FR-08 (persistence across sessions) haven't been part of an interactive pass yet — the Pokémon Emerald test above didn't require box art to be configured/fetched. Worth confirming directly, not assumed covered by the above.
 
 ---
 
