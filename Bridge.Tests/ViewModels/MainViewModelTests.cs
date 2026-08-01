@@ -14,6 +14,7 @@ public class MainViewModelTests
     private readonly FakeMetadataService _metadataService = new();
     private readonly FakeImageCacheService _imageCacheService = new();
     private readonly FakeLaunchService _launchService = new();
+    private readonly FakeEmulatorInstallerService _installerService = new();
     private readonly FakeFolderPickerService _folderPicker = new();
     private readonly FakeMessageBoxService _messageBox = new();
     private readonly MainViewModel _viewModel;
@@ -26,6 +27,7 @@ public class MainViewModelTests
             _metadataService,
             _imageCacheService,
             _launchService,
+            _installerService,
             _folderPicker,
             _messageBox,
             NullLogger<MainViewModel>.Instance);
@@ -114,7 +116,7 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task CancelScanCommand_DuringScan_CancelsAndSetsStatusMessage()
+    public async Task CancelCommand_DuringScan_CancelsAndSetsStatusMessage()
     {
         var gate = new TaskCompletionSource<ScanResult>();
         _romScanner.ScanGate = gate;
@@ -122,10 +124,33 @@ public class MainViewModelTests
         var refreshTask = _viewModel.RefreshLibraryCommand.ExecuteAsync(null);
         Assert.True(_viewModel.IsBusy);
 
-        _viewModel.CancelScanCommand.Execute(null);
+        _viewModel.CancelCommand.Execute(null);
         await refreshTask;
 
         Assert.Equal("Cancelled.", _viewModel.StatusMessage);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task RefreshLibraryCommand_WhileInstallInProgress_DoesNotStartScan()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "no emu" };
+        _installerService.PlatformsWithKnownInstallOption.Add("nes");
+        _messageBox.NextResult = MessageBoxResult.Yes;
+        var installGate = new TaskCompletionSource<InstallResult>();
+        _installerService.InstallGate = installGate;
+
+        var launchTask = _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+        Assert.True(_viewModel.IsBusy);
+
+        await _viewModel.RefreshLibraryCommand.ExecuteAsync(null);
+        Assert.Equal(0, _romScanner.ScanAsyncCallCount);
+
+        installGate.SetResult(new InstallResult { Outcome = InstallOutcome.Success });
+        await launchTask;
         Assert.False(_viewModel.IsBusy);
     }
 
@@ -200,6 +225,155 @@ public class MainViewModelTests
 
         Assert.True(_messageBox.ShowCalled);
         Assert.Equal("Set one up in Settings.", _messageBox.LastMessage);
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_WhileBusy_DoesNotLaunch()
+    {
+        var gate = new TaskCompletionSource<ScanResult>();
+        _romScanner.ScanGate = gate;
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        var scanTask = _viewModel.RefreshLibraryCommand.ExecuteAsync(null);
+        Assert.True(_viewModel.IsBusy);
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Null(_launchService.LastLaunchedGame);
+
+        gate.SetResult(new ScanResult());
+        await scanTask;
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_NoEmulatorUnknownPlatform_NeverOffersInstall()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mystery.xyz", Name = "mystery", PlatformId = Config.UnknownPlatformId };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "unknown system" };
+        _installerService.PlatformsWithKnownInstallOption.Add(Config.UnknownPlatformId);
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Empty(_installerService.InstalledPlatformIds);
+        Assert.Equal("unknown system", _messageBox.LastMessage);
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_NoEmulatorNoKnownInstallOption_ShowsGenericMessageNotInstallOffer()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "Set one up in Settings." };
+        // _installerService.PlatformsWithKnownInstallOption deliberately left empty.
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Empty(_installerService.InstalledPlatformIds);
+        Assert.Equal("Set one up in Settings.", _messageBox.LastMessage);
+        Assert.Equal("Couldn't Launch Game", _messageBox.LastCaption);
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_UserDeclinesInstallOffer_DoesNothingFurther()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "no emu" };
+        _installerService.PlatformsWithKnownInstallOption.Add("nes");
+        _messageBox.NextResult = MessageBoxResult.No;
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Equal(1, _messageBox.ShowCallCount);
+        Assert.Empty(_installerService.InstalledPlatformIds);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_UserAcceptsInstallOffer_InstallSucceeds_RelaunchesGameAutomatically()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.ResultQueue.Enqueue(new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "no emu" });
+        _launchService.ResultQueue.Enqueue(new LaunchResult { Outcome = LaunchOutcome.Started, GameSessionEndedTask = Task.CompletedTask });
+        _installerService.PlatformsWithKnownInstallOption.Add("nes");
+        _installerService.NextResult = new InstallResult { Outcome = InstallOutcome.Success };
+        _messageBox.NextResult = MessageBoxResult.Yes;
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Contains("nes", _installerService.InstalledPlatformIds);
+        Assert.Equal(2, _launchService.LaunchAsyncCallCount);
+        Assert.Equal(1, _messageBox.ShowCallCount); // only the Yes/No confirm — no error dialog
+        Assert.False(_viewModel.IsBusy);
+        Assert.Equal(string.Empty, _viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_UserAcceptsInstallOffer_InstallFails_ShowsInstallErrorMessage()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "no emu" };
+        _installerService.PlatformsWithKnownInstallOption.Add("nes");
+        _installerService.NextResult = new InstallResult { Outcome = InstallOutcome.DownloadFailed, ErrorMessage = "Download verification failed." };
+        _messageBox.NextResult = MessageBoxResult.Yes;
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Equal(1, _launchService.LaunchAsyncCallCount); // no relaunch attempt after a failed install
+        Assert.Equal("Download verification failed.", _messageBox.LastMessage);
+        Assert.Equal("Couldn't Auto-Install", _messageBox.LastCaption);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_InstallSucceedsButRelaunchStillFails_ShowsLaunchErrorMessage()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.ResultQueue.Enqueue(new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "no emu" });
+        _launchService.ResultQueue.Enqueue(new LaunchResult { Outcome = LaunchOutcome.CoreNotFound, ErrorMessage = "Core missing." });
+        _installerService.PlatformsWithKnownInstallOption.Add("nes");
+        _installerService.NextResult = new InstallResult { Outcome = InstallOutcome.Success };
+        _messageBox.NextResult = MessageBoxResult.Yes;
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Equal(2, _launchService.LaunchAsyncCallCount);
+        Assert.Equal("Core missing.", _messageBox.LastMessage);
+        Assert.Equal("Couldn't Launch Game", _messageBox.LastCaption);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task CancelCommand_DuringInlineInstall_CancelsAndSetsStatusMessage()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "no emu" };
+        _installerService.PlatformsWithKnownInstallOption.Add("nes");
+        _messageBox.NextResult = MessageBoxResult.Yes;
+        var installGate = new TaskCompletionSource<InstallResult>();
+        _installerService.InstallGate = installGate;
+
+        var launchTask = _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+        Assert.True(_viewModel.IsBusy);
+
+        _viewModel.CancelCommand.Execute(null);
+        await launchTask;
+
+        Assert.Equal("Cancelled.", _viewModel.StatusMessage);
+        Assert.False(_viewModel.IsBusy);
     }
 
     [Fact]

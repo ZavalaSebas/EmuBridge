@@ -718,6 +718,41 @@ Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, 
 
 ---
 
+### ADR-18: Inline Auto-Install offer from the launch flow; core picker deferred
+
+**Status:** Accepted
+
+**Date:** 2026-08-06
+
+**Context:**
+`v0.3.0`'s two confirmed Roadmap items (`PLAN.md` → Roadmap) were a core picker UI (for platforms with more than one known-good `KnownEmulatorCore` candidate) and offering Auto-Install inline when `LaunchService` returns `NoEmulatorConfigured`, not just from Settings — both deliberately deferred during Phase 2's build-out (ADR-14) until the mechanism had more proven ground behind it. Investigated before designing either: `KnownEmulators.json` has exactly one `KnownEmulatorCore` per platform, for all 15 seed platforms, confirmed by inspecting the manifest directly — every platform's core was already narrowed to a single best choice during ADR-11's curation (e.g. Snes9x over bsnes-mercury for `snes`). The core picker's premise — a platform with more than one real candidate — doesn't exist anywhere in Bridge's data today.
+
+**Decision — core picker deferred, not built:** Building a selector UI with no real multi-core case to exercise it against would mean testing it only against a synthetic fixture, never a real one — the same standard this project has held every catalog entry to since ADR-11 (independently verified data, not assumed). Removed from `v0.3.0`'s scope rather than forced in; `v0.3.0` ships as a single item, following the same precedent `v0.1.0`/`v0.2.0` already set that a version cut doesn't need a fixed size. Returns to the Roadmap once a real second core is added to some platform's catalog entry, or when disc-based systems (v2.0's named focus) plausibly introduce genuine multi-core choices.
+
+**Decision — inline Auto-Install offer:** `MainViewModel.LaunchGameAsync`, on `LaunchOutcome.NoEmulatorConfigured`, now distinguishes the two cases that outcome already covers (differentiated only by `ErrorMessage` text, confirmed by reading `LaunchService.LaunchAsync` directly — no new `LaunchOutcome` value needed): if `game.PlatformId == Config.UnknownPlatformId`, behavior is unchanged (an unidentified system has nothing installable to offer); if it's a real, recognized platform and `IEmulatorInstallerService.HasKnownInstallOptionAsync` confirms a verified catalog entry exists, a Yes/No dialog offers to install automatically. Reuses `EmulatorInstallerService`/`IProgress<string>` exactly as `SettingsViewModel.AutoInstallAsync` already does — no new install logic. **On success, the game relaunches automatically** (`LaunchService.LaunchAsync` called a second time) rather than requiring a second click — the entire reason to offer this inline instead of only from Settings is collapsing "install, then separately relaunch" into one motion. A relaunch failure (e.g. `CoreNotFound`) surfaces through the same non-`Started` handling as any other launch attempt, with no retry loop.
+
+**Decision — `IsBusy` becomes shared between scan and inline install, not accidental:** `RefreshLibraryAsync` was previously the only long-running `IsBusy`-gated operation in `MainViewModel`; `LaunchGameAsync` had no `IsBusy` guard at all. Adding a second long-running operation (install) without addressing this would let a scan and an install race each other against the same `LibraryRepository`/filesystem — a real latent bug, not specific to this feature. Both commands now guard on the same `IsBusy` flag and share one `CancellationTokenSource` field (renamed `_scanCts` → `_busyCts`, since it's no longer scan-specific), with one Cancel button in `MainWindow`'s existing status bar cancelling whichever operation is currently running. `CancelScanCommand` renamed to `CancelCommand` to match — a UI-facing rename justified by the same sharing, not a cosmetic one.
+
+**Decision — no new progress UI:** `MainWindow`'s status bar (`ProgressBar` + `StatusMessage` + Cancel, `Grid.Row="2"`) was already bound to `IsBusy` generically for the scan flow; because install now shares `IsBusy`/`StatusMessage`/the cancellation pattern, it shows automatically during an inline install with zero new XAML — the existing pattern is reused exactly, not duplicated.
+
+**Consequences:**
+- ✅ `v0.3.0`'s scope is now real work with a real design behind it, not a placeholder for an unbuildable UI
+- ✅ The unknown-vs-real-platform distinction for `NoEmulatorConfigured` — previously only encoded in `ErrorMessage` text — is now also a real branch point in `MainViewModel`, without needing to change `LaunchService`'s contract
+- ✅ The latent scan/install race is closed generally, not just avoided for this one feature — `RefreshLibraryCommand_WhileInstallInProgress_DoesNotStartScan` and `LaunchGameCommand_WhileBusy_DoesNotLaunch` lock in both directions
+- ✅ Auto-relaunch after a successful inline install is covered by a real two-call `FakeLaunchService` sequence (`ResultQueue`), not just asserted in prose
+- ❌ Core picker remains genuinely undesigned — deferring it doesn't reduce `EmulatorInstallerService.FindKnownCore`'s existing silent-first-match behavior if a second core is ever added without the picker also landing; still only a logged warning (`EmulatorInstallerService.cs:230`)
+- ❌ No visual/interactive confirmation yet that the inline offer dialog and the shared progress bar actually render and behave correctly in a real running window — same category of gap already noted for ADR-14/ADR-15 before their first real click; covered here by `MainViewModelTests` at the ViewModel level, not by watching it on screen
+
+**Alternatives considered:**
+
+- **Build the core picker now against a synthetic multi-core test fixture:** rejected — would ship a UI element with zero real data ever exercising it, the same unverified-data risk this project's audit work has repeatedly caught and corrected today
+- **Fill `v0.3.0`'s "empty" slot with a different Phase 2 item instead of shipping one item alone:** rejected — `v0.1.0`/`v0.2.0` already established that a version cut is whatever coherent, verified chunk is ready, not a fixed size
+- **Show a confirmation dialog after install instead of auto-relaunching:** rejected — reintroduces the exact "click again" friction that offering Auto-Install inline (instead of only from Settings) was meant to remove in the first place
+- **Add a new `LaunchOutcome` value to distinguish unknown-vs-real platform instead of checking `game.PlatformId` in the ViewModel:** rejected — `MainViewModel` already has `game` and the same `Config.UnknownPlatformId` constant `LaunchService` uses internally; changing `LaunchService`'s public contract for information the caller can already derive would be unnecessary surface area
+- **Separate `CancellationTokenSource` fields for scan vs. install, two Cancel buttons:** rejected — `IsBusy` is already exclusive between the two operations (only one can run at a time), so two separate fields/buttons would just be two names for "the currently running operation," with no real independent state to justify the duplication
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above
