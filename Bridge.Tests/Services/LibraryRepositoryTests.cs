@@ -109,6 +109,47 @@ public class LibraryRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteGameAsync_ExistingGame_RemovesIt()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        await _repository.UpsertGameAsync(game);
+
+        await _repository.DeleteGameAsync(game.Id);
+
+        Assert.Empty(await _repository.GetAllGamesAsync());
+    }
+
+    [Fact]
+    public async Task DeleteGameAsync_NonexistentId_NoOp()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        await _repository.UpsertGameAsync(game);
+
+        await _repository.DeleteGameAsync(Guid.NewGuid());
+
+        Assert.Single(await _repository.GetAllGamesAsync());
+    }
+
+    [Fact]
+    public async Task DeleteBoxArtAsync_ExistingBoxArt_RemovesIt()
+    {
+        var gameId = Guid.NewGuid();
+        await _repository.UpsertBoxArtAsync(new BoxArt { GameId = gameId, Status = BoxArtStatus.Cached, LocalPath = @"C:\cache\a.png" });
+
+        await _repository.DeleteBoxArtAsync(gameId);
+
+        Assert.Null(await _repository.GetBoxArtAsync(gameId));
+    }
+
+    [Fact]
+    public async Task DeleteBoxArtAsync_NoBoxArtForGame_NoOp()
+    {
+        // Should not throw when there's nothing to delete — same silent-skip idiom as
+        // MarkGamesMissingAsync/DeleteGameAsync for an unmatched id.
+        await _repository.DeleteBoxArtAsync(Guid.NewGuid());
+    }
+
+    [Fact]
     public async Task AddScanFolderAsync_PersistsFolder()
     {
         var folder = new ScanFolder { Id = Guid.NewGuid(), Path = @"C:\roms" };

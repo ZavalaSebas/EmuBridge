@@ -14,6 +14,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IRomScannerService _romScannerService;
     private readonly ILibraryRepository _libraryRepository;
     private readonly IMetadataService _metadataService;
+    private readonly IImageCacheService _imageCacheService;
     private readonly ILaunchService _launchService;
     private readonly IFolderPickerService _folderPickerService;
     private readonly IMessageBoxService _messageBoxService;
@@ -43,6 +44,7 @@ public partial class MainViewModel : ObservableObject
         IRomScannerService romScannerService,
         ILibraryRepository libraryRepository,
         IMetadataService metadataService,
+        IImageCacheService imageCacheService,
         ILaunchService launchService,
         IFolderPickerService folderPickerService,
         IMessageBoxService messageBoxService,
@@ -51,6 +53,7 @@ public partial class MainViewModel : ObservableObject
         _romScannerService = romScannerService;
         _libraryRepository = libraryRepository;
         _metadataService = metadataService;
+        _imageCacheService = imageCacheService;
         _launchService = launchService;
         _folderPickerService = folderPickerService;
         _messageBoxService = messageBoxService;
@@ -161,6 +164,51 @@ public partial class MainViewModel : ObservableObject
 
         _logger.LogInformation("Launched {GameName}.", game.Name);
         _ = TrackSessionEndAsync(game.Name, result.GameSessionEndedTask!);
+    }
+
+    [RelayCommand]
+    private async Task DeleteGameAsync(GameTile? tile)
+    {
+        // Defense in depth: MainWindow.xaml only shows the "Remove from Library" context menu item
+        // for IsMissing tiles (avoids the re-scan-reappearance confusion for present games, ADR-15),
+        // but re-check here too in case a future binding regression exposes the command incorrectly.
+        if (tile is null || !_gamesById.TryGetValue(tile.GameId, out var game) || !game.IsMissing)
+        {
+            return;
+        }
+
+        var confirmed = _messageBoxService.Show(
+            $"Remove \"{game.Name}\" from your library? This can't be undone.",
+            "Remove Game",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirmed != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var boxArt = await _libraryRepository.GetBoxArtAsync(game.Id);
+        if (boxArt?.LocalPath is not null)
+        {
+            // ImageCacheService dedupes cache files by image URL, not by GameId (ARCHITECTURE.md),
+            // so two Games could in theory share the same cached file if they ever had identical
+            // box-art URLs. Only delete the file if no other BoxArt row still points at it.
+            var allBoxArt = await _libraryRepository.GetAllBoxArtAsync();
+            var stillReferencedByAnotherGame = allBoxArt.Any(b => b.GameId != game.Id && b.LocalPath == boxArt.LocalPath);
+            if (!stillReferencedByAnotherGame)
+            {
+                await _imageCacheService.DeleteCachedImageAsync(boxArt.LocalPath);
+            }
+        }
+
+        await _libraryRepository.DeleteBoxArtAsync(game.Id);
+        await _libraryRepository.DeleteGameAsync(game.Id);
+
+        _logger.LogInformation("Removed {GameName} from the library.", game.Name);
+
+        await LoadGamesAsync();
+        StatusMessage = "Removed.";
     }
 
     private async Task TrackSessionEndAsync(string gameName, Task sessionEndedTask)

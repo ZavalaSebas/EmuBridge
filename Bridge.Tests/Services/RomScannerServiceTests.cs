@@ -112,6 +112,30 @@ public class RomScannerServiceTests : IDisposable
         Assert.False(_repository.Games.Single().IsMissing);
     }
 
+    // Documents the underlying re-add mechanism the "remove from library" feature's design
+    // deliberately relies on (see ARCHITECTURE.md -> ADR-15): the scanner's only dedup key is the
+    // in-memory snapshot of Game rows taken at the start of ScanAsync, built from whatever's
+    // currently in the DB. Deleting a Game row while its file is still on disk isn't reachable
+    // through the UI today (delete is gated on IsMissing == true, and a missing game's file is by
+    // definition not present), but the mechanism itself is real and worth locking in with a test —
+    // this is what would happen if a Game row disappeared some other way (manual DB edit, a future
+    // feature) while the file remained.
+    [Fact]
+    public async Task ScanAsync_GameDeletedButFileStillOnDisk_ReAddsAsNewGameWithFreshId()
+    {
+        CreateFile("mario.nes");
+        _repository.ScanFolders.Add(new ScanFolder { Id = Guid.NewGuid(), Path = _tempRoot });
+        await _scanner.ScanAsync();
+        var originalId = Assert.Single(_repository.Games).Id;
+
+        _repository.Games.Clear();
+        var result = await _scanner.ScanAsync();
+
+        var game = Assert.Single(_repository.Games);
+        Assert.NotEqual(originalId, game.Id);
+        Assert.Equal(1, result.GamesAdded);
+    }
+
     [Fact]
     public async Task ScanAsync_EmptyFile_IsSkippedAndNotPersisted()
     {

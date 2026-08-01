@@ -88,4 +88,28 @@ public class ImageCacheServiceTests : IDisposable
         Assert.True(File.Exists(pathA));
         Assert.True(File.Exists(pathB));
     }
+
+    [Fact]
+    public async Task DeleteCachedImageAsync_ExistingFile_RemovesIt()
+    {
+        var handler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(ValidPngBytes)
+        });
+        var service = CreateService(handler);
+        var path = await service.GetOrCacheImageAsync("https://example.com/cover.png", 100, 150);
+        Assert.True(File.Exists(path));
+
+        await service.DeleteCachedImageAsync(path!);
+
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public async Task DeleteCachedImageAsync_NonexistentFile_NoOpDoesNotThrow()
+    {
+        var service = CreateService(new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        await service.DeleteCachedImageAsync(Path.Combine(_cacheDirectory, "never-existed.png"));
+    }
 }

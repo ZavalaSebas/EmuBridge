@@ -14,4 +14,12 @@ internal class FakeImageCacheService : IImageCacheService
         RequestedUrls.Add(imageUrl);
         return Task.FromResult(ResultFactory(imageUrl));
     }
+
+    public List<string> DeletedPaths { get; } = [];
+
+    public Task DeleteCachedImageAsync(string localPath, CancellationToken ct = default)
+    {
+        DeletedPaths.Add(localPath);
+        return Task.CompletedTask;
+    }
 }

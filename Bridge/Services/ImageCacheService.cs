@@ -57,6 +57,23 @@ public class ImageCacheService : IImageCacheService
         }
     }
 
+    public Task DeleteCachedImageAsync(string localPath, CancellationToken ct = default)
+    {
+        try
+        {
+            if (File.Exists(localPath))
+            {
+                File.Delete(localPath);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Failed to delete cached image {LocalPath}; leaving it in place.", localPath);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private string GetCachePath(string imageUrl, int width, int height)
     {
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(imageUrl)))[..16];

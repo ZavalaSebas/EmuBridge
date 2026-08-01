@@ -10,9 +10,20 @@
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
         <conv:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
 
+        <!-- Shared across every missing-game tile's Button.ContextMenu (Style trigger below) — only
+             one instance is ever open at a time, so WPF re-parents PlacementTarget per-invocation.
+             Bindings inside route through PlacementTarget rather than relying on ContextMenu's
+             (unreliable) DataContext inheritance from its owning Button. -->
+        <ContextMenu x:Key="MissingGameContextMenu">
+            <MenuItem Header="Remove from Library"
+                      Command="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+        </ContextMenu>
+
         <DataTemplate x:Key="GameTileTemplate" DataType="{x:Type vm:GameTile}">
             <Button Command="{Binding DataContext.LaunchGameCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                     CommandParameter="{Binding}"
+                    Tag="{Binding DataContext.DeleteGameCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                     Margin="6" Padding="0" BorderThickness="0" Background="Transparent" Cursor="Hand"
                     ToolTip="{Binding Name}">
                 <Button.Style>
@@ -20,6 +31,7 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsMissing}" Value="True">
                                 <Setter Property="Opacity" Value="0.5" />
+                                <Setter Property="ContextMenu" Value="{StaticResource MissingGameContextMenu}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

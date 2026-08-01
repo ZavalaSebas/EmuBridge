@@ -618,6 +618,40 @@ Two things were investigated during this same session and confirmed, not assumed
 - **Confirm dialog stating the exact download size:** rejected for this pass — would need `IEmulatorInstallerService` to expose size info just for that one UX nicety; the confirmation dialog is generic ("this may take a while") instead, not worth a new interface method yet
 - **Roll back the frontend install if the core step fails:** rejected — directly contradicts the reason the `Emulator`/`EmulatorProfile` split exists; a working frontend is valuable on its own even without this one platform's core
 
+### ADR-15: Remove a `Game` from the library — restricted to `IsMissing`, context-menu UI
+
+**Status:** Accepted
+
+**Date:** 2026-08-05
+
+**Context:**
+Phase 1 only ever marks a `Game` `IsMissing = true` (ADR-6) — deliberate, so a temporarily-unavailable folder never silently loses data. But there was genuinely no way to get rid of an entry once confirmed gone for good, found as a real gap during interactive use (the leftover `.sav`-as-Game entry from before the companion-files fix, ADR-13, self-healed to `IsMissing` but sat in the grid forever with no way to clear it). Designed first (New Feature Process), reviewed and approved before any code.
+
+**Decision — scope: `IsMissing == true` only, not "hide any game":** the delete action is only exposed for missing entries, not for present ones. Two reasons, not one: (1) the motivating case, and everything ever tracked in `PLAN.md`'s backlog for this, was specifically about ghost/missing entries — extending to "hide a real game I don't want to see" is a different feature nobody asked for; (2) `RomScannerService.ScanAsync` (confirmed by reading it, not assumed) rebuilds its entire path→`Game` dedup map from the DB at the start of every scan — deleting a `Game` row whose file is still on disk means the next rescan can't tell the difference from a brand-new file, and silently re-adds it with a fresh `Guid` and no `BoxArt` row. Restricting to `IsMissing == true` sidesteps this entirely: a missing game's file isn't present *right now*, so there's no immediate reappearance to be surprised by. `RomScannerServiceTests.ScanAsync_GameDeletedButFileStillOnDisk_ReAddsAsNewGameWithFreshId` locks in and documents the underlying mechanism directly, even though it isn't reachable through the UI today.
+
+**Decision — defense in depth, not just a hidden menu item:** `MainWindow.xaml`'s context menu item is only attached to a tile's `Button.ContextMenu` when `IsMissing == True` (a `Style.Triggers` `DataTrigger`, same one that already sets the missing-tile `Opacity`), but `MainViewModel.DeleteGameAsync` also re-checks `game.IsMissing` itself before proceeding — the same "re-validate at the point of action, not just where it was configured" principle already applied by `LaunchService` (re-checks ROM/executable existence at launch time) and `EmulatorInstallerService` (re-checks `File.Exists` on a found `KnownEmulatorId` row).
+
+**Decision — UI surface: right-click context menu, not a new view or keyboard shortcut:** the entire game tile is already one `Button` fully consumed by `LaunchGameCommand` — no context menu, secondary button, or selection model existed before this. A context menu needed zero new state and doesn't compete with click-to-launch; a keyboard shortcut would have required inventing a "selected tile" concept the grid (`ItemsControl`, not `ListBox`) doesn't have; a separate "manage library" view was rejected as more surface than one action justifies. The `ContextMenu` is a single shared `Window.Resources` instance (`MissingGameContextMenu`) — WPF supports this since only one instance is ever visually open at a time; bindings inside it route through `PlacementTarget` (`Tag`/`DataContext`) rather than relying on `ContextMenu`'s otherwise-unreliable `DataContext` inheritance from its owning `Button`.
+
+**Decision — what gets deleted, and the shared-cache-file edge case:** deleting a `Game` also deletes its `BoxArt` row (`ILibraryRepository.DeleteBoxArtAsync`, new) and the cached box-art file on disk (`IImageCacheService.DeleteCachedImageAsync`, new) — otherwise the file becomes permanent orphaned garbage in `ImageCache\`, accumulating forever. `ImageCacheService`'s cache filename is a hash of the source image *URL* plus target dimensions (confirmed by reading `GetCachePath`), not the `GameId` — meaning two different `Game`s could in theory share one cached file if they ever had identical box-art URLs. Before deleting the file, `MainViewModel` checks whether any *other* `BoxArt` row still references the same `LocalPath` (via the already-existing `GetAllBoxArtAsync`) and skips the file delete if so — cheap to add (one in-memory scan of a small collection), so added now rather than hand-waved as a theoretical risk. Covered directly by `MainViewModelTests.DeleteGameCommand_SharedCachedImage_DoesNotDeleteFileStillReferencedByAnotherGame`. Cache-file deletion itself is best-effort — `ImageCacheService.DeleteCachedImageAsync` logs and swallows `IOException`/`UnauthorizedAccessException` rather than throwing, so a locked or already-gone file never blocks the actual `Game`/`BoxArt` deletion.
+
+**Consequences:**
+- ✅ The exact motivating gap (the `.sav`-as-Game ghost entry, and any future case like it) now has a real fix, not just a documented limitation
+- ✅ The re-scan-reappearance risk is avoided by scope restriction, not by a runtime check the user could still trigger accidentally — the "delete a present game" path doesn't exist in the UI at all
+- ✅ The shared-cache-file edge case is closed by an actual check, not left as an unverified assumption that SteamGridDB URLs are always unique per game
+- ✅ `ILibraryRepository.DeleteGameAsync`/`DeleteBoxArtAsync` are generic, policy-free CRUD methods (matching every other method in that class) — the `IsMissing` restriction lives entirely in `MainViewModel`, so a future feature needing unrestricted delete doesn't require touching the repository layer
+- ❌ "Hide/remove a game I don't want to see" (present, not missing) is still not possible — deliberately out of scope; would need its own design if ever requested, specifically around the re-scan-reappearance question this ADR sidestepped rather than solved generally
+- ❌ No visual/interactive confirmation that the context menu actually renders and behaves correctly in a real running window — same category of gap already noted for ADR-14's Auto-Install button before its first real click; covered here by `MainViewModelTests`/`LibraryRepositoryTests`/`ImageCacheServiceTests` at the ViewModel/service level, not by watching it on screen
+
+**Alternatives considered:**
+
+- **Allow deleting present games too, with a special warning dialog about reappearance on rescan:** rejected — expands scope beyond anything ever requested in the backlog, and adds a second confirmation-copy branch for a use case nobody asked for; revisit as its own design if requested
+- **A dedicated "Manage Library" view/window:** rejected — too much surface for one action; nothing in Bridge today has a secondary view, and this doesn't justify being the first
+- **Keyboard shortcut (e.g. Delete key) on a focused/selected tile:** rejected — the grid has no selection model today (`ItemsControl` of `Button`s, not `ListBox`); would require inventing that concept just for this one action
+- **Cascade the delete inside `LibraryRepository` itself (one method deletes `Game` + `BoxArt`):** rejected — breaks the existing pattern where `Game` and `BoxArt` CRUD are always independent at the repository layer; orchestrating both (plus the cache file) belongs in `MainViewModel`, matching how `RefreshLibraryAsync` already orchestrates multiple services directly rather than through a dedicated facade
+
+---
+
 1. Copy the ADR format block from the section above
 2. Assign the next sequential number (e.g., `ADR-1`, `ADR-2`, …)
 3. Paste it at the end of this document, before the "Creating a New ADR" section

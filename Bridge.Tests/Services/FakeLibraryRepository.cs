@@ -56,11 +56,23 @@ internal class FakeLibraryRepository : ILibraryRepository
         return Task.CompletedTask;
     }
 
+    public Task DeleteGameAsync(Guid gameId, CancellationToken ct = default)
+    {
+        Games.RemoveAll(g => g.Id == gameId);
+        return Task.CompletedTask;
+    }
+
     public Task<BoxArt?> GetBoxArtAsync(Guid gameId, CancellationToken ct = default)
         => Task.FromResult(BoxArtRecords.FirstOrDefault(b => b.GameId == gameId));
 
     public Task<IReadOnlyList<BoxArt>> GetAllBoxArtAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<BoxArt>>(BoxArtRecords.ToList());
+
+    public Task DeleteBoxArtAsync(Guid gameId, CancellationToken ct = default)
+    {
+        BoxArtRecords.RemoveAll(b => b.GameId == gameId);
+        return Task.CompletedTask;
+    }
 
     public Task UpsertBoxArtAsync(BoxArt boxArt, CancellationToken ct = default)
     {

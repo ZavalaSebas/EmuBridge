@@ -161,6 +161,12 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         return Task.CompletedTask;
     }
 
+    public Task DeleteGameAsync(Guid gameId, CancellationToken ct = default)
+    {
+        _db.GetCollection<Game>(GamesCollectionName).Delete(gameId);
+        return Task.CompletedTask;
+    }
+
     public Task<BoxArt?> GetBoxArtAsync(Guid gameId, CancellationToken ct = default)
     {
         var result = _db.GetCollection<BoxArt>(BoxArtCollectionName)
@@ -190,6 +196,18 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         }
 
         collection.Upsert(boxArt);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteBoxArtAsync(Guid gameId, CancellationToken ct = default)
+    {
+        var collection = _db.GetCollection<BoxArt>(BoxArtCollectionName);
+        var existing = collection.FindOne(b => b.GameId == gameId);
+        if (existing is not null)
+        {
+            collection.Delete(existing.Id);
+        }
+
         return Task.CompletedTask;
     }
 

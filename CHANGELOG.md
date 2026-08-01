@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Remove a `Game` from the library (right-click a missing tile → "Remove from Library") — deletes the `Game` row, its `BoxArt` row, and the cached box-art file (skipping the file delete if another `Game` still references the same cached file). Scoped to `IsMissing == true` only, not any game — see ARCHITECTURE.md → ADR-15 for why. Closes the gap first found during the Pokémon Emerald `.sav`-as-Game interactive session. 12 new tests (149 total in Release, 148 in Debug)
+
 ## [0.2.0] - 2026-08-05
 
 Phase 2 emulator auto-install: fully automatic download, verification, and installation of emulators/cores, replacing Phase 1's fully-manual per-system executable configuration. Catalog covers all 15 seed platforms, and every one of them has been interactively confirmed end-to-end — a real Auto-Install click that installed the emulator and launched a game. 137 unit tests in Release, 136 in Debug (up from 83 in `v0.1.0`).
