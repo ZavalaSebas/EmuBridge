@@ -153,17 +153,17 @@ Originally scoped as 2 small Phase 2 items left over from the auto-install work 
 
 See ARCHITECTURE.md → ADR-17 for the full decision record.
 
-### Reference roadmap, v0.4.0 → v0.9.0 — non-binding, re-confirm scope at each cut
+### Product-story groups after v0.3.0 — no version numbers assigned yet
 
-**Not fixed.** This is a plausible default chunking, not a committed plan — re-confirm what actually goes into each version when work on it is about to start, same discipline already applied to `v0.3.0` above and to every feature built today. Don't treat these version numbers or groupings as more precise than they are.
+Not a numbered ladder. `v0.1.0` and `v0.2.0` each represented one coherent story a user would actually notice ("play a game end-to-end," "install an emulator with one click"). `v0.3.0` ended up small by circumstance — the core picker fell out of scope once actually investigated (ARCHITECTURE.md → ADR-18), not by decision — and isn't the pattern to repeat going forward. From here, cuts group by product story, not by counting down a fixed list of small items.
 
-- `v0.4.0` — Game detail panel
-- `v0.5.0` — Favorites/recently played + refined "Library" view (related — both touch the main browsing experience)
-- `v0.6.0` — "Big Picture" view (large enough to warrant its own cut)
-- `v0.7.0` — Per-game emulator configuration (closes the rest of Phase 2)
-- `v0.8.0` — Phase Polish batch 1: transition animations + general UI pass (highest visual impact)
-- `v0.9.0` — Phase Polish batch 2: welcome sentinel + auto-updater + theming + sponsor/credits
-- `v1.0.0` — stabilization + QA pass against the criterion above
+**A group gets its version number only once it's complete and verified in real use — not now.** Assigning `v0.4.0`/`v0.5.0`/etc. to these groups today would fabricate a precision that doesn't exist yet — the same standard already applied to the Speculative / Future Ideas pool above (Section 13): a group earns its number when it ships, not when it's merely planned.
+
+- **Next — "Full library"**: game detail panel + favorites/recently played + the refined "Library" view. Grouped together because they tell one story — the main library stops feeling like Phase 1's functional-only grid and starts feeling finished.
+- **After that — "Big Picture"**: the streaming-style view with a recommended-games section. Large enough to be its own story, not folded into the group above.
+- **After that — "Rest of Phase 2"**: per-game emulator configuration, plus the core picker once a real multi-core case exists to design it against (ARCHITECTURE.md → ADR-18).
+- **After that — "Phase Polish"**: the same 6 items already listed above (`## Current State` → Phase Polish), unchanged — just without a version number yet.
+- **Then v1.0.0** — stabilization + QA pass against the criterion above, once every group up to here is done.
 
 ### v2.0+ — open bucket, one named focus
 
@@ -173,7 +173,7 @@ Everything else stays an undifferentiated bucket, not broken down by version yet
 
 ### How future paths get defined — not now, not by proximity
 
-**Rule 1 — the detailed path to v2.0 gets defined when v1.0 ships, not before.** The same process used today to define the Path to v1.0 (explicit criterion, reasoned per-component, presented for approval, recorded as an ADR — see ADR-17) repeats at that point for v2.0's own detailed path. Nothing in this document pre-defines it now; the `v0.4.0`→`v0.9.0` reference chunking and the `v2.0+` bucket above are deliberately as far as this plan goes today.
+**Rule 1 — the detailed path to v2.0 gets defined when v1.0 ships, not before.** The same process used today to define the Path to v1.0 (explicit criterion, reasoned per-component, presented for approval, recorded as an ADR — see ADR-17) repeats at that point for v2.0's own detailed path. Nothing in this document pre-defines it now; the unnumbered product-story groups above and the `v2.0+` bucket above are deliberately as far as this plan goes today.
 
 **Rule 2 — reaching v2.0 doesn't auto-promote anything out of the Speculative / Future Ideas pool.** Once in v2.0, what's still left undefined gets evaluated, and scope for pulling something from that pool (above) becomes a fair question to ask for the first time — but no individual idea moves from the pool into actual construction just because a version cut happens to be nearby in time. Each one still has to go through its own real definition process first (design, scope, Open Decisions if it needs any) — the same bar every feature already shipped in this document had to clear. Skipping that step for a pool idea because it's "close" to v2.0 would be exactly the scope-creep pattern ADR-17 was written to catch, applied here preventively to the whole pool instead of case-by-case.
 

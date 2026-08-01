@@ -706,7 +706,7 @@ Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, 
 **Consequences:**
 - ✅ "1.0" now has a real, written criterion instead of being whatever felt done when someone got there — the same standard this session already held every smaller claim to
 - ✅ The disc-system capability gap is tracked with real weight (named as v2.0's explicit first focus) instead of disappearing into a generic backlog bucket, while still correctly kept out of v1.0's path given no design exists for it yet
-- ❌ The intermediate version breakdown (`v0.4.0`-`v0.9.0` in `PLAN.md` → Roadmap) is explicitly a non-binding reference chunking, not a committed plan — re-confirmed at each cut, same discipline as `v0.3.0`. This ADR fixes the v1.0 *criterion*, not the exact path of versions that gets there.
+- ❌ The intermediate path (`PLAN.md` → Roadmap → product-story groups, revised 2026-08-06 from a fixed `v0.4.0`-`v0.9.0` ladder to unnumbered thematic groups) is explicitly non-binding — each group earns its version number only once it ships, same discipline already applied to `v0.3.0` and to the Speculative Ideas pool. This ADR fixes the v1.0 *criterion*, not the exact path of versions that gets there.
 - ❌ Whether any single Phase 3 item (RetroAchievements, cheats/mods, etc.) gets pulled into the v1.0 path remains genuinely undecided — this ADR deliberately doesn't pre-answer that per-item, only sets the default (excluded unless explicitly decided otherwise)
 
 **Alternatives considered:**
