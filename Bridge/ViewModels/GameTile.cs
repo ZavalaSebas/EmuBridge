@@ -14,4 +14,5 @@ public class GameTile
     public string? CoverImagePath { get; init; }
 
     public bool IsMissing { get; init; }
+    public bool IsFavorite { get; init; }
 }

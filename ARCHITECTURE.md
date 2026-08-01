@@ -788,6 +788,42 @@ The "Full library" Roadmap group's first item is the game detail panel `BRIDGE_P
 
 ---
 
+### ADR-20: Favorites and Recently Played split into 2 items; Favorites shipped, embedded on `Game`
+
+**Status:** Accepted
+
+**Date:** 2026-08-07
+
+**Context:**
+The "Full library" Roadmap group's second item, `PLAN.md`'s original "Favorites / recently played" bullet, bundles two mechanically different things: favorites is a manual, user-toggled flag; recently played is automatic, updated by the app itself when a game launches. Investigated before designing either, per the standing New Feature Process.
+
+**Decision — split into 2 separately tracked/committed items, not designed or shipped as one:** their verification stories differ enough to justify it — favorites is fully interactive (toggle, see it change, confirm on a real click); recently played, as scoped below, has no consuming UI yet, so its only real verification is inspecting persisted data, not clicking anything. Bundling them would force one feature's commit to wait on the other's unrelated verification path. This ADR covers Favorites in full and Recently Played's design only — Recently Played's implementation is a separate, later commit.
+
+**Decision — Favorites data model: `Game.IsFavorite` (`bool`), embedded, not a new entity:** matches `Game.IsMissing`'s precedent exactly — a simple, user/app-owned flag intrinsic to the game record itself, not provider-fetched metadata like `BoxArt` (ADR-3/ADR-8's reason for keeping `BoxArt` separate doesn't apply here — there's no external source, no fetch status, no cache path to track).
+
+**Decision — Favorites UI: generalize `GameTileContextMenu` again, no new plumbing:** "Add to Favorites"/"Remove from Favorites" (`MenuItem.Style` + `DataTrigger` on `IsFavorite`, swapping the `Header` text) added to the same shared context menu ADR-19 already generalized from `MissingGameContextMenu`. Reuses the tile's `Tag`-carries-`MainViewModel` binding from that same ADR unchanged — the third context-menu item in a row added with zero routing changes, the exact payoff that generalization was built for. A small gold star (`★`) overlay on the tile's cover, visible only when `IsFavorite`, gives immediate visual feedback — without it, toggling would be unconfirmable by looking at the grid, and this project doesn't ship state changes with no visible effect.
+
+**Decision — Recently Played design (approved, not built this pass):** trigger is `LaunchOutcome.Started`, not `GameSessionEndedTask` completing — waiting for session end would mean "recently played" never updates while an emulator stays open (common; could be hours, or indefinitely), and the launch attempt itself is the meaningful "played" event, the same point `MainViewModel` already logs `"Launched {GameName}."` at. Storage: a single nullable `Game.LastPlayedUtc`, not a play-history list — no requirement anywhere asks for history, and a single timestamp is sufficient to sort by "most recent."
+
+**Decision — capture `LastPlayedUtc` ahead of any consuming view, deliberately distinguished from the core-picker deferral (ADR-18):** the core picker was deferred because its triggering condition (a platform with more than one real core) doesn't exist anywhere in Bridge's data — building it would be provably dead code. Recently Played's triggering condition (launching a game) happens constantly, in production, right now — what's missing is a *consumer* of the data, not the data's *source event*. Delaying capture until the "Library" view (next in this group) ships would create a permanent, unrecoverable gap: every game played in the meantime would read "never played" forever, with no way to reconstruct the real history after the fact. Capturing now costs one field write on a `Game` object already in memory (reusing `UpsertGameAsync`, same as Favorites) — cheap enough that the asymmetry with the core picker's situation matters more than the surface-level similarity ("building ahead of a consumer").
+
+**Consequences:**
+- ✅ Favorites ships as a fully real, interactively-verifiable feature — toggle, star indicator, persistence, all confirmed on a real click, not just unit-tested
+- ✅ `GameTileContextMenu`'s ADR-19 generalization already paid for itself twice — Favorites needed zero changes to the `PlacementTarget`/`Tag` routing mechanism itself, only a new `MenuItem`
+- ✅ Splitting the two items means neither commit blocks on the other's different verification path
+- ❌ Recently Played is designed but not built — `PLAN.md`'s Phase 2 backlog and Roadmap both reflect this explicitly as remaining scope, not silently implied done because Favorites (its bundled sibling in the original bullet) shipped
+- ❌ `GameTile.IsFavorite` requires a full `LoadGamesAsync()` rebuild to reflect a toggle (same "rebuilt wholesale, no per-tile live mutation" tradeoff already accepted for the whole `GameTile` design, not a new cost introduced here)
+
+**Alternatives considered:**
+
+- **Design and ship Favorites + Recently Played together since they share a `PLAN.md` bullet and a UI area:** rejected — see the split decision above; sharing a bullet in a planning document isn't a reason to couple two mechanically different features' verification and commit boundaries
+- **New `Favorite` entity (mirroring `BoxArt`'s shape) instead of `Game.IsFavorite`:** rejected — no external source or fetch state to track, unlike `BoxArt`; would be structure for its own sake, contradicting the same `IsMissing`-precedent reasoning already applied everywhere else on `Game`
+- **No visual indicator on the tile, defer to the "Library" view's dedicated favorites filter:** rejected — would ship a toggle with no way to see its own effect until a later, unrelated item ships; the star costs one `TextBlock` and reuses the existing `BoolToVisibilityConverter`
+- **Update `LastPlayedUtc` when `GameSessionEndedTask` completes instead of on `Started`:** rejected — ties "recently played" to when the user closes the emulator, not when they chose to play, which could be arbitrarily delayed or never happen in a single session
+- **Defer capturing `LastPlayedUtc` until the "Library" view exists to consume it, matching the core-picker precedent:** rejected — the two situations aren't actually analogous; see the capture-now decision above for the specific distinction (real recurring event today vs. zero real cases ever)
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above

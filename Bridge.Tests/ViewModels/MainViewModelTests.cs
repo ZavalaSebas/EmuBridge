@@ -88,6 +88,16 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_FavoriteGame_TileHasIsFavoriteTrue()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes", IsFavorite = true });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.True(Assert.Single(_viewModel.Games).IsFavorite);
+    }
+
+    [Fact]
     public async Task RefreshLibraryCommand_CallsScanThenFetchMissingBoxArt()
     {
         await _viewModel.RefreshLibraryCommand.ExecuteAsync(null);
@@ -492,5 +502,44 @@ public class MainViewModelTests
         _viewModel.ViewGameDetailsCommand.Execute(tile);
 
         Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task ToggleFavoriteCommand_NotYetFavorite_MarksFavoriteAndPersists()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes", IsFavorite = false };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+
+        await _viewModel.ToggleFavoriteCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.True(Assert.Single(_repository.Games).IsFavorite);
+        Assert.True(Assert.Single(_viewModel.Games).IsFavorite);
+    }
+
+    [Fact]
+    public async Task ToggleFavoriteCommand_AlreadyFavorite_UnmarksFavoriteAndPersists()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes", IsFavorite = true };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+
+        await _viewModel.ToggleFavoriteCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.False(Assert.Single(_repository.Games).IsFavorite);
+        Assert.False(Assert.Single(_viewModel.Games).IsFavorite);
+    }
+
+    [Fact]
+    public async Task ToggleFavoriteCommand_UnknownTile_NoOp()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes", IsFavorite = false };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        var ghostTile = new GameTile { GameId = Guid.NewGuid(), Name = "Ghost" };
+
+        await _viewModel.ToggleFavoriteCommand.ExecuteAsync(ghostTile);
+
+        Assert.False(Assert.Single(_repository.Games).IsFavorite);
     }
 }

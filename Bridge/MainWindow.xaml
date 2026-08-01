@@ -20,6 +20,19 @@
             <MenuItem Header="View Details"
                       Command="{Binding PlacementTarget.Tag.ViewGameDetailsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                       CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Command="{Binding PlacementTarget.Tag.ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                <MenuItem.Style>
+                    <Style TargetType="MenuItem">
+                        <Setter Property="Header" Value="Add to Favorites" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsFavorite, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="True">
+                                <Setter Property="Header" Value="Remove from Favorites" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </MenuItem.Style>
+            </MenuItem>
             <MenuItem Header="Remove from Library"
                       Visibility="{Binding PlacementTarget.DataContext.IsMissing, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibilityConverter}}"
                       Command="{Binding PlacementTarget.Tag.DeleteGameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
@@ -48,6 +61,9 @@
                             <TextBlock Text="No Cover" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <Image Source="{Binding CoverImagePath}" Stretch="UniformToFill" />
+                        <TextBlock Text="&#9733;" FontSize="20" Foreground="Gold"
+                                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
+                                   Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}" />
                     </Grid>
                     <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" />
                     <TextBlock Text="(missing)" Foreground="OrangeRed" HorizontalAlignment="Center" FontSize="11"

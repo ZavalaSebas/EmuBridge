@@ -272,6 +272,20 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task ToggleFavoriteAsync(GameTile? tile)
+    {
+        if (tile is null || !_gamesById.TryGetValue(tile.GameId, out var game))
+        {
+            return;
+        }
+
+        game.IsFavorite = !game.IsFavorite;
+        await _libraryRepository.UpsertGameAsync(game);
+
+        await LoadGamesAsync();
+    }
+
+    [RelayCommand]
     private async Task DeleteGameAsync(GameTile? tile)
     {
         // Defense in depth: MainWindow.xaml only shows the "Remove from Library" context menu item
@@ -347,7 +361,8 @@ public partial class MainViewModel : ObservableObject
                 GameId = game.Id,
                 Name = game.Name,
                 CoverImagePath = boxArt?.Status == BoxArtStatus.Cached ? boxArt.LocalPath : null,
-                IsMissing = game.IsMissing
+                IsMissing = game.IsMissing,
+                IsFavorite = game.IsFavorite
             });
         }
 
