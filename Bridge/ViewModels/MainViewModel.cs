@@ -170,6 +170,7 @@ public partial class MainViewModel : ObservableObject
         if (result.Outcome == LaunchOutcome.Started)
         {
             _logger.LogInformation("Launched {GameName}.", game.Name);
+            await RecordGamePlayedAsync(game);
             _ = TrackSessionEndAsync(game.Name, result.GameSessionEndedTask!);
             return;
         }
@@ -233,6 +234,7 @@ public partial class MainViewModel : ObservableObject
             if (relaunchResult.Outcome == LaunchOutcome.Started)
             {
                 _logger.LogInformation("Launched {GameName} after Auto-Install.", game.Name);
+                await RecordGamePlayedAsync(game);
                 _ = TrackSessionEndAsync(game.Name, relaunchResult.GameSessionEndedTask!);
                 StatusMessage = string.Empty;
             }
@@ -328,6 +330,15 @@ public partial class MainViewModel : ObservableObject
 
         await LoadGamesAsync();
         StatusMessage = "Removed.";
+    }
+
+    // Recorded on LaunchOutcome.Started, not on session end — see ARCHITECTURE.md -> ADR-20. No
+    // consuming UI reads this yet (that's the "Library" view, a separate Roadmap item); awaited,
+    // not fire-and-forget, so the write is guaranteed to have landed before the command returns.
+    private async Task RecordGamePlayedAsync(Game game)
+    {
+        game.LastPlayedUtc = DateTime.UtcNow;
+        await _libraryRepository.UpsertGameAsync(game);
     }
 
     private async Task TrackSessionEndAsync(string gameName, Task sessionEndedTask)

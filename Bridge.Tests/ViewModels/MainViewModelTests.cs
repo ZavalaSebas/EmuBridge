@@ -224,6 +224,22 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task LaunchGameCommand_Success_RecordsLastPlayedUtc()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.Started, GameSessionEndedTask = Task.CompletedTask };
+        var beforeLaunch = DateTime.UtcNow;
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        var persisted = Assert.Single(_repository.Games);
+        Assert.NotNull(persisted.LastPlayedUtc);
+        Assert.True(persisted.LastPlayedUtc >= beforeLaunch);
+    }
+
+    [Fact]
     public async Task LaunchGameCommand_Failure_ShowsErrorMessage()
     {
         var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
@@ -235,6 +251,19 @@ public class MainViewModelTests
 
         Assert.True(_messageBox.ShowCalled);
         Assert.Equal("Set one up in Settings.", _messageBox.LastMessage);
+    }
+
+    [Fact]
+    public async Task LaunchGameCommand_Failure_DoesNotRecordLastPlayedUtc()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        _launchService.NextResult = new LaunchResult { Outcome = LaunchOutcome.NoEmulatorConfigured, ErrorMessage = "Set one up in Settings." };
+
+        await _viewModel.LaunchGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.Null(Assert.Single(_repository.Games).LastPlayedUtc);
     }
 
     [Fact]
@@ -323,6 +352,7 @@ public class MainViewModelTests
         Assert.Equal(1, _messageBox.ShowCallCount); // only the Yes/No confirm — no error dialog
         Assert.False(_viewModel.IsBusy);
         Assert.Equal(string.Empty, _viewModel.StatusMessage);
+        Assert.NotNull(Assert.Single(_repository.Games).LastPlayedUtc); // recorded on the relaunch's Started outcome
     }
 
     [Fact]
@@ -362,6 +392,7 @@ public class MainViewModelTests
         Assert.Equal("Core missing.", _messageBox.LastMessage);
         Assert.Equal("Couldn't Launch Game", _messageBox.LastCaption);
         Assert.False(_viewModel.IsBusy);
+        Assert.Null(Assert.Single(_repository.Games).LastPlayedUtc); // relaunch never reached Started
     }
 
     [Fact]
