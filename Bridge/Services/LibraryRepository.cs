@@ -40,6 +40,7 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         _db = new LiteDatabase(dbPath);
         EnsureIndexes();
         SeedPlatformsIfEmpty();
+        ReconcileSeedPlatformExtensions();
         MigrateLegacyEmulatorConfigsIfNeeded();
     }
 
@@ -78,32 +79,87 @@ public class LibraryRepository : ILibraryRepository, IDisposable
             Extensions = []
         });
 
+        var seedPlatforms = LoadSeedPlatforms();
+        if (seedPlatforms is null)
+        {
+            return;
+        }
+
+        foreach (var platform in seedPlatforms)
+        {
+            platforms.Insert(platform);
+        }
+
+        _logger.LogInformation("Seeded {Count} built-in platforms.", seedPlatforms.Count);
+    }
+
+    // SeedPlatformsIfEmpty only ever runs once per database, ever — gated on the whole Platform
+    // collection being empty, which stops being true after the very first open. Without this,
+    // editing SeedSystems.json (a new extension on an existing platform, or a whole new platform)
+    // would only ever reach brand-new databases; every already-seeded bridge.db — including every
+    // existing user's — would keep the old data forever. Runs on every open, not gated, since the
+    // cost is trivial (15 small list comparisons). Reconciles by union, never removes an
+    // extension — a platform row can carry more than the seed without this silently deleting
+    // anything (e.g. a future manual/custom addition). Deliberately does not touch Name — only
+    // Extensions was ever the problem, and syncing Name would risk overwriting something a user
+    // has already seen/relied on for a reason not in scope here.
+    private void ReconcileSeedPlatformExtensions()
+    {
+        var seedPlatforms = LoadSeedPlatforms();
+        if (seedPlatforms is null)
+        {
+            return;
+        }
+
+        var platforms = _db.GetCollection<Platform>(PlatformsCollectionName);
+        foreach (var seedPlatform in seedPlatforms)
+        {
+            var existing = platforms.FindById(seedPlatform.Id);
+            if (existing is null)
+            {
+                // A platform added to SeedSystems.json after this database was first seeded —
+                // same one-shot-seeding gap as a missing extension, same fix.
+                platforms.Insert(seedPlatform);
+                _logger.LogInformation("Added new seed platform {PlatformId} to an already-seeded database.", seedPlatform.Id);
+                continue;
+            }
+
+            var merged = existing.Extensions
+                .Union(seedPlatform.Extensions, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (merged.Count != existing.Extensions.Count)
+            {
+                _logger.LogInformation(
+                    "Updated {PlatformId}'s recognized extensions from an updated seed definition: [{Old}] -> [{New}].",
+                    seedPlatform.Id,
+                    string.Join(", ", existing.Extensions),
+                    string.Join(", ", merged));
+
+                existing.Extensions = merged;
+                platforms.Update(existing);
+            }
+        }
+    }
+
+    private List<Platform>? LoadSeedPlatforms()
+    {
         var assembly = Assembly.GetExecutingAssembly();
         using var stream = assembly.GetManifestResourceStream(Config.SeedSystemsResourceName);
         if (stream is null)
         {
-            _logger.LogError(
-                "Embedded seed resource {ResourceName} not found; only the unknown-platform sentinel was seeded.",
-                Config.SeedSystemsResourceName);
-            return;
+            _logger.LogError("Embedded seed resource {ResourceName} not found.", Config.SeedSystemsResourceName);
+            return null;
         }
 
         try
         {
-            var seedPlatforms = System.Text.Json.JsonSerializer.Deserialize<List<Platform>>(stream) ?? [];
-            foreach (var platform in seedPlatforms)
-            {
-                platforms.Insert(platform);
-            }
-
-            _logger.LogInformation("Seeded {Count} built-in platforms.", seedPlatforms.Count);
+            return System.Text.Json.JsonSerializer.Deserialize<List<Platform>>(stream) ?? [];
         }
         catch (System.Text.Json.JsonException ex)
         {
-            _logger.LogError(
-                ex,
-                "Failed to parse embedded seed resource {ResourceName}; only the unknown-platform sentinel was seeded.",
-                Config.SeedSystemsResourceName);
+            _logger.LogError(ex, "Failed to parse embedded seed resource {ResourceName}.", Config.SeedSystemsResourceName);
+            return null;
         }
     }
 

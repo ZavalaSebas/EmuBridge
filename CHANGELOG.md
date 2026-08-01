@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Remove a `Game` from the library (right-click a missing tile → "Remove from Library") — deletes the `Game` row, its `BoxArt` row, and the cached box-art file (skipping the file delete if another `Game` still references the same cached file). Scoped to `IsMissing == true` only, not any game — see ARCHITECTURE.md → ADR-15 for why. Closes the gap first found during the Pokémon Emerald `.sav`-as-Game interactive session. 12 new tests (149 total in Release, 148 in Debug)
+- Remove a `Game` from the library (right-click a missing tile → "Remove from Library") — deletes the `Game` row, its `BoxArt` row, and the cached box-art file (skipping the file delete if another `Game` still references the same cached file). Scoped to `IsMissing == true` only, not any game — see ARCHITECTURE.md → ADR-15 for why. Closes the gap first found during the Pokémon Emerald `.sav`-as-Game interactive session. 12 new tests
+
+### Fixed
+- Atari 2600 ROMs using the common headerless `.bin` extension weren't detected — `SeedSystems.json`'s `atari2600.Extensions` only had `.a26`. The JSON fix alone wouldn't have reached any already-seeded `bridge.db`, confirmed by reading `LibraryRepository.SeedPlatformsIfEmpty`: seeding is one-shot, gated on the whole `Platform` collection being non-empty. A new `ReconcileSeedPlatformExtensions()` now runs on every database open, unioning each seed platform's extensions into whatever's already stored (additive only — never removes anything) and inserting any seed platform whose row is missing entirely, closing the same gap for future seed changes generally, not just this one extension. See ARCHITECTURE.md → ADR-16. 3 new tests simulate real pre-existing (pre-fix) data, not just a fresh database. 152 total tests in Release, 151 in Debug
 
 ## [0.2.0] - 2026-08-05
 

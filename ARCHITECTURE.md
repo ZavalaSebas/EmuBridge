@@ -652,6 +652,38 @@ Phase 1 only ever marks a `Game` `IsMissing = true` (ADR-6) — deliberate, so a
 
 ---
 
+### ADR-16: Reconcile seed platform data on every open, not just first seed
+
+**Status:** Accepted
+
+**Date:** 2026-08-05
+
+**Context:**
+The `.bin`/Atari 2600 gap (found during interactive Auto-Install testing, ARCHITECTURE.md → ADR-14's 2026-08-04 update) needed `atari2600`'s `Extensions` in `SeedSystems.json` corrected from `["a26"]` to `["a26", "bin"]`. Before applying that one-line JSON fix, its actual propagation was checked, not assumed: `LibraryRepository.SeedPlatformsIfEmpty` (confirmed by reading it directly) gates on `platforms.Count() > 0` — the *entire* `Platform` collection, not per-row. That count stops being zero the moment any `bridge.db` is first opened, ever. Editing the embedded JSON alone would only ever reach brand-new databases; every already-seeded database — including the one used throughout this project's own interactive testing, and every real user's — would keep `atari2600.Extensions = ["a26"]` forever, with no code path that would ever revisit it. `Constructor_OnAlreadySeededDatabase_DoesNotReseed` already existed as a test proving this one-shot behavior, which is exactly what raised the question.
+
+**Decision:** a new `ReconcileSeedPlatformExtensions()` runs on every `LibraryRepository` construction (not gated on "collection empty" — cheap enough, ~15 small list comparisons, that gating it wasn't worth the complexity), reconciling each seed platform against whatever's already in the database:
+- If a seed platform's `Id` has no matching row at all, it's inserted. This isn't hypothetical for this fix specifically — it's the same one-shot-seeding gap applying to "a whole new platform added to the seed later," a broader instance of the exact bug just found for extensions, closed by the same mechanism rather than left for the next person to rediscover.
+- If the row exists, its `Extensions` are unioned (case-insensitive) with the seed's. The union only ever grows the list, never shrinks it — a platform row is free to carry extensions the seed doesn't (e.g. a hypothetical future user-editable extension list) without this silently deleting them on the next startup. A row is only re-`Update`d if the union actually added something, avoiding a write (and a log line) on the common case where nothing changed.
+- Deliberately scoped to `Extensions` only — `Name` is never touched. Only `Extensions` was ever the actual problem; syncing `Name` too would risk silently renaming something a user has already seen, a different risk not in scope for this fix.
+
+The embedded-resource-loading code (`Assembly.GetManifestResourceStream` + JSON parse + error logging) was already duplicated once between this and `SeedPlatformsIfEmpty` in the first draft; extracted to a shared `LoadSeedPlatforms()` helper instead of copy-pasting the same try/catch a second time.
+
+Verified against actual pre-existing data, not just a fresh database: `LibraryRepositoryTests` manipulates a raw `LiteDatabase` (same technique already used by `Constructor_LegacyEmulatorConfigsPresent_MigratesToEmulatorAndProfile`) to force an `atari2600` row back to the pre-fix `["a26"]` state, a row with an extra extension the seed doesn't know about, and a row deleted entirely — then reopens through `LibraryRepository` and confirms reconciliation actually reaches it.
+
+**Consequences:**
+- ✅ The `.bin` fix actually reaches every database that opens with this build, not just new ones — confirmed with a test that starts from simulated pre-existing (old) data, not assumed from the JSON change alone
+- ✅ The same mechanism closes the broader "a whole new seed platform never appears in old databases" gap, not just the narrower extensions case that was actually reported
+- ✅ A user's own additions to a platform's `Extensions` (if any future feature ever allows editing them) survive every future seed update — the union is additive-only, by design, not by accident
+- ❌ `Name` changes to a seed platform still never propagate to existing databases — deliberately out of scope here; would need its own decision if it ever comes up, since renaming something a user has already seen carries different risk than adding a recognized extension
+
+**Alternatives considered:**
+
+- **Bump a schema/seed version number and gate reconciliation on it changing:** rejected — adds a new piece of state to track and keep in sync with every future `SeedSystems.json` edit, for a check (`platforms.Count()` vs. running the comparison) that's already cheap enough to just always run
+- **Only fix the specific `atari2600` row via a one-off migration step (matching `MigrateLegacyEmulatorConfigsIfNeeded`'s shape):** rejected — solves today's instance but not the general class; the next time the seed data needs an update, the exact same investigation would have to happen again from scratch
+- **Sync `Name` too, for full seed-data parity:** rejected — out of scope for what was actually broken, and carries a different, unaddressed risk (silently changing what a user already sees)
+
+---
+
 1. Copy the ADR format block from the section above
 2. Assign the next sequential number (e.g., `ADR-1`, `ADR-2`, …)
 3. Paste it at the end of this document, before the "Creating a New ADR" section

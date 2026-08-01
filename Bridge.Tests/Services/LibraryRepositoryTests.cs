@@ -288,6 +288,74 @@ public class LibraryRepositoryTests : IDisposable
         _repository = migrated;
     }
 
+    // The actual scenario that motivated ReconcileSeedPlatformExtensions: a real, already-seeded
+    // bridge.db (like every existing user's) whose atari2600 row still only has the pre-fix
+    // extension list. SeedPlatformsIfEmpty is one-shot and would never touch this row again on
+    // its own — confirmed by reading the code, not assumed. This test proves the reconciliation
+    // actually reaches pre-existing data, not just fresh databases.
+    [Fact]
+    public async Task Constructor_PreExistingPlatformMissingNewSeedExtension_AddsItWithoutLosingExisting()
+    {
+        _repository.Dispose();
+
+        using (var db = new LiteDatabase(_dbPath))
+        {
+            var platforms = db.GetCollection<Platform>("platforms");
+            var atari2600 = platforms.FindById("atari2600");
+            atari2600.Extensions = ["a26"]; // simulates the pre-fix seed, before "bin" was added
+            platforms.Update(atari2600);
+        }
+
+        var reconciled = new LibraryRepository(_dbPath, NullLogger<LibraryRepository>.Instance);
+
+        var platform = (await reconciled.GetPlatformsAsync()).Single(p => p.Id == "atari2600");
+        Assert.Contains("a26", platform.Extensions);
+        Assert.Contains("bin", platform.Extensions);
+
+        _repository = reconciled;
+    }
+
+    [Fact]
+    public async Task Constructor_PreExistingRowHasCustomExtensionNotInSeed_IsPreserved()
+    {
+        _repository.Dispose();
+
+        using (var db = new LiteDatabase(_dbPath))
+        {
+            var platforms = db.GetCollection<Platform>("platforms");
+            var atari2600 = platforms.FindById("atari2600");
+            atari2600.Extensions = ["a26", "custom-user-ext"];
+            platforms.Update(atari2600);
+        }
+
+        var reconciled = new LibraryRepository(_dbPath, NullLogger<LibraryRepository>.Instance);
+
+        var platform = (await reconciled.GetPlatformsAsync()).Single(p => p.Id == "atari2600");
+        Assert.Contains("custom-user-ext", platform.Extensions);
+        Assert.Contains("bin", platform.Extensions);
+
+        _repository = reconciled;
+    }
+
+    [Fact]
+    public async Task Constructor_SeedPlatformRowMissingEntirely_IsReinserted()
+    {
+        _repository.Dispose();
+
+        using (var db = new LiteDatabase(_dbPath))
+        {
+            db.GetCollection<Platform>("platforms").Delete("atari2600");
+        }
+
+        var reconciled = new LibraryRepository(_dbPath, NullLogger<LibraryRepository>.Instance);
+
+        var platform = (await reconciled.GetPlatformsAsync()).SingleOrDefault(p => p.Id == "atari2600");
+        Assert.NotNull(platform);
+        Assert.Contains("bin", platform!.Extensions);
+
+        _repository = reconciled;
+    }
+
     private class LegacyEmulatorConfigForTest
     {
         public Guid Id { get; set; }
