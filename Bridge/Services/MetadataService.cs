@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Bridge.Models;
 using Microsoft.Extensions.Logging;
@@ -176,7 +177,7 @@ public class MetadataService : IMetadataService
             return LookupOutcome.Failed;
         }
 
-        await PersistBoxArtAsync(game.Id, BoxArtStatus.Cached, localPath, ct);
+        await PersistBoxArtAsync(game.Id, BoxArtStatus.Cached, localPath, ct, matchedGame.ReleaseYear);
         return LookupOutcome.Cached;
     }
 
@@ -223,7 +224,7 @@ public class MetadataService : IMetadataService
         }
     }
 
-    private async Task PersistBoxArtAsync(Guid gameId, BoxArtStatus status, string? localPath, CancellationToken ct)
+    private async Task PersistBoxArtAsync(Guid gameId, BoxArtStatus status, string? localPath, CancellationToken ct, int? releaseYear = null)
     {
         await _libraryRepository.UpsertBoxArtAsync(
             new BoxArt
@@ -231,7 +232,8 @@ public class MetadataService : IMetadataService
                 GameId = gameId,
                 Status = status,
                 LocalPath = localPath,
-                LastAttemptUtc = DateTime.UtcNow
+                LastAttemptUtc = DateTime.UtcNow,
+                ReleaseYear = releaseYear
             },
             ct);
     }
@@ -269,6 +271,18 @@ public class MetadataService : IMetadataService
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+
+        // Unix seconds — confirmed against the official node-steamgriddb wrapper's TypeScript
+        // definition (`release_date: number`), not assumed. 0/absent means SteamGridDB has no
+        // release date for this game, same convention as an unset Unix timestamp elsewhere.
+        // Real API field is snake_case; PropertyNameCaseInsensitive only handles casing, not
+        // underscore-vs-PascalCase, so this needs an explicit name mapping.
+        [JsonPropertyName("release_date")]
+        public long? ReleaseDate { get; set; }
+
+        public int? ReleaseYear => ReleaseDate is > 0
+            ? DateTimeOffset.FromUnixTimeSeconds(ReleaseDate.Value).UtcDateTime.Year
+            : null;
     }
 
     private class SteamGridDbGrid

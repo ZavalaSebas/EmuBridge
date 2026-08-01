@@ -1,0 +1,38 @@
+<Window x:Class="Bridge.GameDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding Name}" Height="440" Width="360"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Height="220">
+            <Border Background="#333333" CornerRadius="4">
+                <TextBlock Text="No Cover" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <Image Source="{Binding CoverImagePath}" Stretch="Uniform" />
+        </Grid>
+
+        <TextBlock Grid.Row="1" Text="{Binding Name}" FontSize="18" FontWeight="SemiBold"
+                   TextWrapping="Wrap" Margin="0,12,0,0" />
+        <TextBlock Grid.Row="2" Text="{Binding PlatformName}" Foreground="Gray" Margin="0,4,0,0" />
+        <TextBlock Grid.Row="3" Text="{Binding ReleaseYearText}" Margin="0,4,0,0" />
+
+        <!-- Static, not bound: SteamGridDB (the only metadata source Bridge has today) has no
+             description/blurb field at all — confirmed against the real API, not assumed. Shown
+             explicitly rather than left blank, same "never silent" standard as everywhere else. -->
+        <TextBlock Grid.Row="4" Text="Description: not available" Foreground="Gray"
+                   Margin="0,12,0,0" VerticalAlignment="Top" TextWrapping="Wrap" />
+
+        <Button Grid.Row="5" Content="Close" IsCancel="True" HorizontalAlignment="Right"
+                Padding="20,6" Margin="0,12,0,0" />
+    </Grid>
+</Window>

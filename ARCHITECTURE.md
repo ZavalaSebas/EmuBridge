@@ -753,6 +753,41 @@ Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, 
 
 ---
 
+### ADR-19: Game detail panel — scoped to what SteamGridDB actually provides; new "View Details" context menu item
+
+**Status:** Accepted
+
+**Date:** 2026-08-07
+
+**Context:**
+The "Full library" Roadmap group's first item is the game detail panel `BRIDGE_PROJECT_FOUNDATION.md` Section 2 describes: "short blurb/preview text, description, release year, console/system, additional screenshots, thumbnails." Investigated before designing anything: checked what SteamGridDB (Bridge's only integrated metadata source, ADR-8) actually exposes, against the official `node-steamgriddb` wrapper source rather than assumed. Its `SGDBGame` interface has `release_date: number` (Unix seconds) alongside `id`/`name`/`types`/`verified` — confirmed real and available. Every other wrapper method (`getGrids`/`getHeroes`/`getIcons`/`getLogos`) returns image assets only; **no method anywhere returns description text or gameplay screenshots.** SteamGridDB is an art-asset database, not a game-metadata database — a materially different service than what the foundation document's Section 2 wording assumed when it was written. `MetadataService`'s existing `SteamGridDbGame` DTO (ADR-8) only ever parsed `Id`/`Name`, discarding `release_date` from the same response it already fetches.
+
+**Decision — scope the panel to what's real, not what was originally envisioned:** release year, game name, platform, and the existing box art. Description is shown as a static, explicit "Description: not available" — visible, not hidden or silently blank, same never-fail-silently standard applied to every other missing-data case this project has handled (SteamGridDB not-found, rate limits, etc.), just applied here to "feature scope" rather than "error." Screenshots are out of scope entirely for this item — not approximated with SteamGridDB's other grid results (multiple grids per game do come back from `/grids/game/{id}`, `GetFirstGridAsync` already discards all but the first), since those are alternate box art, not gameplay screenshots, and conflating the two would misrepresent what's actually shown. That data is left for "Choose cover," a separately-tracked Speculative idea, not folded into this one. Description/screenshots stay unbuilt until a real decision to add a different external metadata API is made — not designed here, not assumed to be "coming soon."
+
+**Decision — data model: extend `BoxArt`, not a new entity:** `BoxArt.ReleaseYear` (`int?`) — exactly the shape ADR-8 pre-announced back in Phase 2 groundwork ("Phase 2's detail-panel metadata... is purely additive to this new entity, never touching `Game`"). `release_date` arrives in the same search response `FetchBoxArtForGameAsync` already makes; no new HTTP call. `SteamGridDbGame` gained a `[JsonPropertyName("release_date")] long? ReleaseDate` field (the real API key is snake_case; `PropertyNameCaseInsensitive` only handles casing, not the underscore, so this needed an explicit mapping — caught before it shipped as a silent-always-null bug) and a computed `ReleaseYear` (`DateTimeOffset.FromUnixTimeSeconds(...).UtcDateTime.Year`, treating `<= 0`/absent as unknown, not epoch 1970).
+
+**Decision — UI entry point: generalize the existing context menu, not a new interaction pattern:** right-click → "View Details," available on every tile, reusing ADR-15's exact reasoning ("the whole tile is already one Button consumed by launch — a context menu doesn't compete with click-to-launch, needs no new state") rather than inventing a hover-icon overlay or a double-click gesture. Required generalizing `MissingGameContextMenu` (ADR-15) into `GameTileContextMenu`, now always attached (previously only attached via a `Style.Trigger` when `IsMissing == True`) with "Remove from Library" gated by per-item `Visibility` instead of whole-menu attachment. The tile's `Tag` — previously bound directly to one command (`DeleteGameCommand`) — now carries the whole `MainViewModel`, so any current or future context-menu item can reach whichever command it needs without adding another routing property.
+
+**Decision — window, not a side panel:** `GameDetailWindow`/`GameDetailViewModel`, same modal-dialog shape as `SettingsWindow` (`Owner = this; ShowDialog();`, `Loaded` → `await viewModel.InitializeAsync()`). A slide-in side panel within `MainWindow` was explicitly not built — that's the kind of visual/animated work `PLAN.md` already scoped to Phase Polish, not something to build early just because this feature touches the main window.
+
+**Consequences:**
+- ✅ The panel ships honestly — every field shown is real, verified data; nothing is stubbed, guessed, or silently blank
+- ✅ `BoxArt.ReleaseYear` costs zero new API calls — it was always in the response, just discarded before now
+- ✅ The `[JsonPropertyName]` gap was caught by writing a real test with a realistic snake_case JSON fixture (`FetchMissingBoxArtAsync_SearchResultHasReleaseDate_PersistsReleaseYear`), not by inspection alone — the same class of bug ADR-11's `ExecutableRelativePath` was, caught this time before a real user's first click, not after
+- ✅ `GameTileContextMenu`'s `Tag`-carries-the-whole-ViewModel generalization means the next context-menu item (if any) needs no further plumbing changes to `MainWindow.xaml`
+- ❌ Description and screenshots remain genuinely unbuilt — the original foundation-document bullet is only partially delivered; revisiting either requires a new Open-Decision-weight choice of external metadata API, not scoped here
+- ❌ No visual/interactive confirmation yet that "View Details" renders and behaves correctly in a real running window — same category of gap already noted for ADR-14/ADR-15/ADR-18 before their first real click; covered here by `MainViewModelTests`/`GameDetailViewModelTests`/`MetadataServiceTests` at the ViewModel/service level, not by watching it on screen
+
+**Alternatives considered:**
+
+- **Block the whole feature until a new metadata API (IGDB/TheGamesDB/RAWG) is researched and integrated:** rejected — would indefinitely stall a real, shippable improvement (release year, a real detail view) behind an unrelated, much larger decision; the honest-partial-panel approach ships what's real now and revisits the rest later, explicitly, not silently
+- **Show SteamGridDB's additional grid results as "screenshots":** rejected — they're alternate cover art, not gameplay screenshots; presenting them as screenshots would misrepresent what SteamGridDB actually returns, the same category of overclaim this project's documentation audit spent a full session correcting
+- **New `GameDetail` entity instead of extending `BoxArt`:** rejected — `ReleaseYear` is exactly the kind of "detail-panel metadata" ADR-8 already earmarked for `BoxArt`; a separate entity for one nullable `int` would be premature structure with no second field to justify it yet
+- **Side panel inside `MainWindow` instead of a modal window:** rejected — real animated/layout work that belongs to Phase Polish (`PLAN.md`), not something to front-load into a Full-library-group item
+- **Hover-icon overlay on the tile instead of a context-menu item:** rejected — `GameTileTemplate`'s tile is a single `Button` with no room for a second interactive element without restructuring the layout; the context-menu pattern already exists, is already approved (ADR-15), and needed no new state
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above

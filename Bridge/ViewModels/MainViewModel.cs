@@ -45,6 +45,10 @@ public partial class MainViewModel : ObservableObject
     /// SettingsWindow/SettingsViewModel.</summary>
     public Action? OpenSettingsRequested { get; set; }
 
+    /// <summary>Same wiring shape as OpenSettingsRequested, parameterized with the specific Game
+    /// to show — this ViewModel doesn't need to know about GameDetailWindow/GameDetailViewModel.</summary>
+    public Action<Game>? OpenGameDetailsRequested { get; set; }
+
     public MainViewModel(
         IRomScannerService romScannerService,
         ILibraryRepository libraryRepository,
@@ -254,6 +258,17 @@ public partial class MainViewModel : ObservableObject
             _busyCts?.Dispose();
             _busyCts = null;
         }
+    }
+
+    [RelayCommand]
+    private void ViewGameDetails(GameTile? tile)
+    {
+        if (tile is null || !_gamesById.TryGetValue(tile.GameId, out var game))
+        {
+            return;
+        }
+
+        OpenGameDetailsRequested?.Invoke(game);
     }
 
     [RelayCommand]

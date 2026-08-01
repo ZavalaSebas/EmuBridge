@@ -467,4 +467,30 @@ public class MainViewModelTests
 
         Assert.True(invoked);
     }
+
+    [Fact]
+    public async Task ViewGameDetailsCommand_ValidTile_InvokesOpenGameDetailsRequestedWithGame()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        Game? requestedGame = null;
+        _viewModel.OpenGameDetailsRequested = g => requestedGame = g;
+
+        _viewModel.ViewGameDetailsCommand.Execute(_viewModel.Games[0]);
+
+        Assert.Equal(game.Id, requestedGame?.Id);
+    }
+
+    [Fact]
+    public void ViewGameDetailsCommand_UnknownTile_DoesNotInvoke()
+    {
+        var invoked = false;
+        _viewModel.OpenGameDetailsRequested = _ => invoked = true;
+        var tile = new GameTile { GameId = Guid.NewGuid(), Name = "Ghost" };
+
+        _viewModel.ViewGameDetailsCommand.Execute(tile);
+
+        Assert.False(invoked);
+    }
 }

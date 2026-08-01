@@ -9,6 +9,8 @@ namespace Bridge.Tests.Services;
 public class MetadataServiceTests
 {
     private const string SearchFoundJson = """{"success":true,"data":[{"id":123,"name":"Super Mario World"}]}""";
+    private const string SearchFoundWithReleaseDateJson = """{"success":true,"data":[{"id":123,"name":"Super Mario World","release_date":774835200}]}""";
+    private const string SearchFoundZeroReleaseDateJson = """{"success":true,"data":[{"id":123,"name":"Super Mario World","release_date":0}]}""";
     private const string SearchNotFoundJson = """{"success":true,"data":[]}""";
     private const string GridsFoundJson = """{"success":true,"data":[{"id":456,"url":"https://cdn.example.com/grid1.png"}]}""";
     private const string GridsNotFoundJson = """{"success":true,"data":[]}""";
@@ -65,6 +67,53 @@ public class MetadataServiceTests
         Assert.Equal(BoxArtStatus.Cached, boxArt.Status);
         Assert.NotNull(boxArt.LocalPath);
         Assert.Equal(["https://cdn.example.com/grid1.png"], images.RequestedUrls);
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_SearchResultHasReleaseDate_PersistsReleaseYear()
+    {
+        var (repo, settings, images) = CreateFakes();
+        AddGame(repo, "Super Mario World");
+        // 774835200 = some 1994 date (Unix seconds) — the exact day doesn't matter, only that it
+        // falls in 1994, to verify the Unix-seconds-to-year conversion end to end.
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundWithReleaseDateJson)
+            : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        await service.FetchMissingBoxArtAsync(100, 150);
+
+        Assert.Equal(1994, Assert.Single(repo.BoxArtRecords).ReleaseYear);
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_SearchResultHasNoReleaseDate_ReleaseYearIsNull()
+    {
+        var (repo, settings, images) = CreateFakes();
+        AddGame(repo, "Super Mario World");
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundJson)
+            : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        await service.FetchMissingBoxArtAsync(100, 150);
+
+        Assert.Null(Assert.Single(repo.BoxArtRecords).ReleaseYear);
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_SearchResultHasZeroReleaseDate_ReleaseYearIsNull()
+    {
+        var (repo, settings, images) = CreateFakes();
+        AddGame(repo, "Super Mario World");
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundZeroReleaseDateJson)
+            : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        await service.FetchMissingBoxArtAsync(100, 150);
+
+        Assert.Null(Assert.Single(repo.BoxArtRecords).ReleaseYear);
     }
 
     [Fact]

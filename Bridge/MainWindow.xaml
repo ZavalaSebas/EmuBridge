@@ -10,20 +10,27 @@
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
         <conv:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
 
-        <!-- Shared across every missing-game tile's Button.ContextMenu (Style trigger below) — only
-             one instance is ever open at a time, so WPF re-parents PlacementTarget per-invocation.
-             Bindings inside route through PlacementTarget rather than relying on ContextMenu's
-             (unreliable) DataContext inheritance from its owning Button. -->
-        <ContextMenu x:Key="MissingGameContextMenu">
+        <!-- One shared menu for every tile now (View Details applies to any game; Remove from
+             Library stays IsMissing-only, ADR-15) — only one instance is ever open at a time, so
+             WPF re-parents PlacementTarget per-invocation. Bindings route through PlacementTarget
+             rather than relying on ContextMenu's (unreliable) DataContext inheritance from its
+             owning Button. Tag now carries the whole MainViewModel (not one single command, the
+             original shape) so any menu item here can reach whichever command it needs. -->
+        <ContextMenu x:Key="GameTileContextMenu">
+            <MenuItem Header="View Details"
+                      Command="{Binding PlacementTarget.Tag.ViewGameDetailsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
             <MenuItem Header="Remove from Library"
-                      Command="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                      Visibility="{Binding PlacementTarget.DataContext.IsMissing, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibilityConverter}}"
+                      Command="{Binding PlacementTarget.Tag.DeleteGameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                       CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
         </ContextMenu>
 
         <DataTemplate x:Key="GameTileTemplate" DataType="{x:Type vm:GameTile}">
             <Button Command="{Binding DataContext.LaunchGameCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                     CommandParameter="{Binding}"
-                    Tag="{Binding DataContext.DeleteGameCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                    ContextMenu="{StaticResource GameTileContextMenu}"
                     Margin="6" Padding="0" BorderThickness="0" Background="Transparent" Cursor="Hand"
                     ToolTip="{Binding Name}">
                 <Button.Style>
@@ -31,7 +38,6 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsMissing}" Value="True">
                                 <Setter Property="Opacity" Value="0.5" />
-                                <Setter Property="ContextMenu" Value="{StaticResource MissingGameContextMenu}" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

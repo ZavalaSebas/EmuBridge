@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
+using Bridge.Models;
 using Bridge.Services;
 using Bridge.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +59,7 @@ public partial class App : Application
         var mainWindow = new MainWindow();
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
         mainViewModel.OpenSettingsRequested = () => OpenSettings(mainWindow);
+        mainViewModel.OpenGameDetailsRequested = game => OpenGameDetails(mainWindow, game);
         mainWindow.DataContext = mainViewModel;
 
         MainWindow = mainWindow;
@@ -72,6 +74,18 @@ public partial class App : Application
             DataContext = Services.GetRequiredService<SettingsViewModel>()
         };
         settingsWindow.ShowDialog();
+    }
+
+    private void OpenGameDetails(Window owner, Game game)
+    {
+        var viewModel = Services.GetRequiredService<GameDetailViewModel>();
+        viewModel.SetGame(game);
+        var detailWindow = new GameDetailWindow
+        {
+            Owner = owner,
+            DataContext = viewModel
+        };
+        detailWindow.ShowDialog();
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -122,6 +136,7 @@ public partial class App : Application
 
         services.AddTransient<MainViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<GameDetailViewModel>();
     }
 
     protected override void OnExit(ExitEventArgs e)
