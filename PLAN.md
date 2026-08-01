@@ -25,13 +25,12 @@ Goal: detect → show → play, using emulators the user has already installed m
 Explicitly out of scope for this phase: multiple views, video previews, cheats/mods, social features, RetroAchievements, automatic emulator download, recommendations, editable per-game emulator settings.
 
 ### Phase 2 (Should Have) — Partially Started
-Once the MVP works end-to-end. 1 of the 7 items originally scoped here shipped in `v0.2.0`; the other 6 haven't been started.
+Once the MVP works end-to-end. 1 of the 6 items originally scoped here shipped in `v0.2.0`; the other 5 haven't been started. (Two more items below — removing a `Game` from the library, and the `.bin`/Atari 2600 extension fix — were never part of Phase 2's original scope; they're backlog gaps found during interactive use, added here opportunistically rather than tracked as a separate list.)
 
 - Game detail panel: short blurb/preview text, description, release year, console/system, additional screenshots, thumbnails (distinct from the main box art)
 - Favorites / recently played
 - "Library" view (Playnite-style cover grid, refined from the Phase 1 functional version)
 - "Big Picture" / streaming-style view with a recommended-games section
-- Polished transition animations (this is where the EmulationStation inspiration gets invested in)
 - ~~Automatic emulator detection/download for known systems (e.g. RetroArch cores, PCSX2) — replaces the fully manual Phase 1 configuration~~ — done, shipped in `v0.2.0` (see ARCHITECTURE.md → ADR-11/ADR-14, `CHANGELOG.md`). **Caveat, not silently dropped:** only the 15 cartridge/handheld seed platforms (RetroArch cores) are covered — `PCSX2` was always just an illustrative example in this bullet's original wording, never actually implemented; PS2 and other disc-based systems were never in the seed list to begin with (ADR-7's cartridge/handheld scoping). This is a completed item, not a completed phase — see the header above.
 - Per-game emulator configuration editable directly from the launcher (not just per-system defaults)
 - ~~Manually remove/hide a `Game` from the library~~ — done, see Timeline below (ARCHITECTURE.md → ADR-15). Scoped to `IsMissing == true` only, not "hide any game" — see ADR-15 for why.
@@ -44,9 +43,19 @@ Once the base is solid and stable.
 - Cheats/mods management per game
 - Video previews / trailers
 - Recommendation engine ("similar games")
-- Additional views, theme customization
+- Additional views (beyond Library and Big Picture, already covered in Phase 2)
 
-**Won't Have (for now, not permanently ruled out):** any ROM discovery/acquisition feature; social features.
+### Phase Polish — Not Started
+Non-content work — do after Phase 2's remaining scope and Phase 3 are settled, not before: the core/foundation should stop changing shape before investing in how it looks and feels, so this work doesn't get redone against a moving target. This is everything that makes Bridge feel like a finished product rather than everything that makes it *work*.
+
+- Polished transition animations (moved from Phase 2 — this is where the EmulationStation inspiration gets invested in)
+- Theme customization / visual personalization (moved from Phase 3)
+- Welcome sentinel + "what's new" dialog on first run / after updates — reference pattern already sketched in DEVELOPMENT.md → Welcome Sentinel, not yet wired into the actual app
+- Auto-updater for Bridge itself, via GitHub Releases — distinct from Phase 2's emulator auto-install; reference pattern already sketched in DEVELOPMENT.md → Version Management ("Updater pattern"), not yet wired in
+- Sponsor/support icon (Ko-fi/GitHub Sponsors link) + Credits/About dialog with disclaimer — reference XAML/code already sketched in DEVELOPMENT.md → Branding & Sponsorship, not yet wired in
+- General UI pass on what already exists from Phase 1/2 (the functional-only grid, Settings screen) to match the visual bar the rest of this phase sets
+
+**Won't Have (for now, not permanently ruled out):** any ROM discovery/acquisition feature; social features; storefront integration (Steam/Epic/etc.) — not planned, not being designed for, far future only if ever revisited.
 
 ---
 
@@ -94,7 +103,7 @@ These reshape the architecture if resolved late, so they were closed in Phase 0,
 `v0.1.0` shipped the full Phase 1 (MVP) scope: detect → show → play. `v0.2.0` shipped exactly one item out of Phase 2's scope — automatic emulator detection/download (see above) — not the rest of Phase 2. Keep `<Version>` in `Bridge/Bridge.csproj` consistent with this document, `README.md`, and `docs/index.html` (see DEVELOPMENT.md → Version Management).
 
 ### Future Versions — Backlog
-The remaining Phase 2 scope (game detail panel, favorites/recently-played, refined "Library" view, "Big Picture" view, transition animations, per-game emulator configuration) and all of Phase 3 remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features) is out of scope indefinitely, not just for this version.
+The remaining Phase 2 scope (game detail panel, favorites/recently-played, refined "Library" view, "Big Picture" view, per-game emulator configuration), all of Phase 3, and all of Phase Polish (transition animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features; storefront integration) is out of scope indefinitely, not just for this version.
 
 ---
 

@@ -80,9 +80,8 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 - Library persists between sessions — no full re-scan on every launch
 
 **Known limitations** (see [DEVELOPMENT.md](DEVELOPMENT.md#known-limitations) for full detail):
-- Atari 2600 ROMs using the common headerless `.bin` extension aren't detected yet (only `.a26` is recognized) — a real, confirmed gap, not yet fixed
-- No way to remove a game from the library once it's confirmed gone for good — only auto-marks it "missing"
-- Phase 3 (achievements, cheats, video previews, recommendations) hasn't started
+- Removing a game from the library only works for entries already marked "missing" (right-click → Remove from Library) — there's no way to remove a game that's still present but you no longer want tracked
+- Phase 2's remaining scope (game detail panel, favorites, refined library/Big Picture views, per-game emulator config), Phase 3 (achievements, cheats, video previews, recommendations), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
 
 ---
 
