@@ -171,6 +171,12 @@ See ARCHITECTURE.md → ADR-17 for the full decision record.
 
 Everything else stays an undifferentiated bucket, not broken down by version yet: any Phase 3 items not explicitly pulled into the v1.0 path, and the Section 13-style speculative ideas tracked above (Speculative / Future Ideas). The "nearer-term, simple" speculative ideas specifically don't have to wait for v2.0 — they can slot into any earlier version once actually designed, the same way `.bin` detection and library removal landed alongside `v0.2.0`'s work today without being formally scoped into it ahead of time.
 
+### How future paths get defined — not now, not by proximity
+
+**Rule 1 — the detailed path to v2.0 gets defined when v1.0 ships, not before.** The same process used today to define the Path to v1.0 (explicit criterion, reasoned per-component, presented for approval, recorded as an ADR — see ADR-17) repeats at that point for v2.0's own detailed path. Nothing in this document pre-defines it now; the `v0.4.0`→`v0.9.0` reference chunking and the `v2.0+` bucket above are deliberately as far as this plan goes today.
+
+**Rule 2 — reaching v2.0 doesn't auto-promote anything out of the Speculative / Future Ideas pool.** Once in v2.0, what's still left undefined gets evaluated, and scope for pulling something from that pool (above) becomes a fair question to ask for the first time — but no individual idea moves from the pool into actual construction just because a version cut happens to be nearby in time. Each one still has to go through its own real definition process first (design, scope, Open Decisions if it needs any) — the same bar every feature already shipped in this document had to clear. Skipping that step for a pool idea because it's "close" to v2.0 would be exactly the scope-creep pattern ADR-17 was written to catch, applied here preventively to the whole pool instead of case-by-case.
+
 ---
 
 ## Project Structure
