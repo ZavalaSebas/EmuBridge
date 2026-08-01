@@ -10,17 +10,17 @@ Bridge is a Windows retro emulation launcher/frontend that eliminates the manual
 
 ## Current State
 
-### Phase 1 (MVP) — Not Started
+### Phase 1 (MVP) — Complete (shipped v0.1.0)
 Goal: detect → show → play, using emulators the user has already installed manually.
 
-- Scan user-selected ROM folders
-- Detect system/console by file extension (extension to system mapping)
-- Fetch box art from SteamGridDB (user-provided API key)
-- Local image cache, resized to the exact display resolution used in the UI — never scale large source images at render time
-- Manual emulator path configuration per system (user points to the .exe for each system)
-- Launch a ROM with the correct emulator and arguments
-- One functional view (simple cover grid) — no elaborate animations yet, functional only
-- Local library persistence (which ROMs, which system, which emulator assigned)
+- ~~Scan user-selected ROM folders~~ — done
+- ~~Detect system/console by file extension (extension to system mapping)~~ — done
+- ~~Fetch box art from SteamGridDB (user-provided API key)~~ — done
+- ~~Local image cache, resized to the exact display resolution used in the UI — never scale large source images at render time~~ — done
+- ~~Manual emulator path configuration per system (user points to the .exe for each system)~~ — done
+- ~~Launch a ROM with the correct emulator and arguments~~ — done
+- ~~One functional view (simple cover grid) — no elaborate animations yet, functional only~~ — done
+- ~~Local library persistence (which ROMs, which system, which emulator assigned)~~ — done
 
 Explicitly out of scope for this phase: multiple views, video previews, cheats/mods, social features, RetroAchievements, automatic emulator download, recommendations, editable per-game emulator settings.
 
