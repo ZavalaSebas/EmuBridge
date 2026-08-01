@@ -70,8 +70,10 @@ jobs:
       - name: Restore packages
         run: dotnet restore Bridge.slnx
 
+      # No --no-build: this job runs on its own fresh runner, not the build job's — there's no
+      # build output to reuse here, so --no-build always failed with "test source file not found".
       - name: Test
-        run: dotnet test Bridge.slnx -c Release --no-build --verbosity normal
+        run: dotnet test Bridge.slnx -c Release --verbosity normal
 
   codeql:
     needs: build
