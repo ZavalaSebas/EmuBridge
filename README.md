@@ -7,7 +7,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white&labelColor=1a1a2e)](https://dotnet.microsoft.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows-00a4ef?style=flat-square&logo=windows&logoColor=white&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge)
-[![Version](https://img.shields.io/badge/Version-0.1.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
+[![Version](https://img.shields.io/badge/Version-0.2.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
 
 A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.
 
@@ -29,7 +29,7 @@ Bridge is an all-in-one retro emulation launcher built around a single idea: poi
 
 <div align="center">
 
-> Screenshot coming soon — v0.1.0
+> Screenshot coming soon
 
 </div>
 
@@ -62,27 +62,33 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 ## Requirements
 
 - Windows 10/11
-- A free SteamGridDB API key for box art — the exact key-handling approach (user-supplied vs. embedded) is still pending, see [PLAN.md → Open Decisions](PLAN.md#open-decisions)
-- Emulators for the systems you want to play, already installed — Phase 1 requires pointing Bridge at each one manually
+- A free SteamGridDB API key for box art (optional — games still appear without one, shown with a "No Cover" placeholder); user-supplied, stored locally with DPAPI encryption, entered in Settings
+- Emulators for the systems you want to play — Bridge can auto-install RetroArch + the right core for any of its 15 supported platforms with one click (Settings → Auto-Install), or you can point it at an emulator you already have
 
 ---
 
 ## Features
 
-> 🚧 Bridge is in early development — nothing below is released yet. This list tracks the Phase 1 (MVP) scope.
+> Bridge is functional and shipping — v0.2.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) and Phase 2 (automatic emulator installation) are both complete: all 15 seed platforms have been confirmed end-to-end with real installs and real game launches, not just tested in isolation.
 
 - Scan your ROM folders and automatically detect which system each game belongs to
 - Fetch box art automatically from SteamGridDB
 - Local image cache, resized to the exact size used on screen — no runtime scaling
-- Configure one emulator per system and launch games with the correct arguments
+- Automatically download, install, and configure the right emulator for any of 15 supported systems — one click, no manual setup (or point Bridge at an emulator you already have)
+- Launch games with the correct emulator and arguments, automatically
 - Simple cover grid view
 - Library persists between sessions — no full re-scan on every launch
+
+**Known limitations** (see [DEVELOPMENT.md](DEVELOPMENT.md#known-limitations) for full detail):
+- Atari 2600 ROMs using the common headerless `.bin` extension aren't detected yet (only `.a26` is recognized) — a real, confirmed gap, not yet fixed
+- No way to remove a game from the library once it's confirmed gone for good — only auto-marks it "missing"
+- Phase 3 (achievements, cheats, video previews, recommendations) hasn't started
 
 ---
 
 ## Architecture
 
-Bridge is organized around six focused services — scanning, metadata lookup, image caching, emulator configuration, launching, and library persistence — following a standard Services/Models/ViewModels/Views separation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full breakdown and the reasoning behind each decision.
+Bridge is organized around eight focused services — scanning (`RomScannerService`), metadata lookup (`MetadataService`), image caching (`ImageCacheService`), settings (`SettingsService`), emulator configuration (`EmulatorService`), launching (`LaunchService`), verified downloads (`DownloadVerificationService`), and automatic emulator installation (`EmulatorInstallerService`) — following a standard Services/Models/ViewModels/Views separation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full breakdown and the reasoning behind each decision.
 
 ---
 
