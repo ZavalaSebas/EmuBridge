@@ -25,7 +25,7 @@ Goal: detect → show → play, using emulators the user has already installed m
 Explicitly out of scope for this phase: multiple views, video previews, cheats/mods, social features, RetroAchievements, automatic emulator download, recommendations, editable per-game emulator settings.
 
 ### Phase 2 (Should Have) — Partially Started
-Once the MVP works end-to-end. 1 of the 6 items originally scoped here shipped in `v0.2.0`; the other 5 haven't been started. (Two more items below — removing a `Game` from the library, and the `.bin`/Atari 2600 extension fix — were never part of Phase 2's original scope; they're backlog gaps found during interactive use, added here opportunistically rather than tracked as a separate list.)
+Once the MVP works end-to-end. 1 of the 6 items originally scoped here shipped in `v0.2.0`; the other 5 haven't been started. (Four more items below — a core picker UI, offering Auto-Install inline from the launch flow, removing a `Game` from the library, and the `.bin`/Atari 2600 extension fix — were never part of Phase 2's original scope; they're improvements/gaps surfaced while building and using the auto-install mechanism, added here opportunistically rather than tracked as a separate list.)
 
 - Game detail panel: short blurb/preview text, description, release year, console/system, additional screenshots, thumbnails (distinct from the main box art)
 - Favorites / recently played
@@ -33,6 +33,8 @@ Once the MVP works end-to-end. 1 of the 6 items originally scoped here shipped i
 - "Big Picture" / streaming-style view with a recommended-games section
 - ~~Automatic emulator detection/download for known systems (e.g. RetroArch cores, PCSX2) — replaces the fully manual Phase 1 configuration~~ — done, shipped in `v0.2.0` (see ARCHITECTURE.md → ADR-11/ADR-14, `CHANGELOG.md`). **Caveat, not silently dropped:** only the 15 cartridge/handheld seed platforms (RetroArch cores) are covered — `PCSX2` was always just an illustrative example in this bullet's original wording, never actually implemented; PS2 and other disc-based systems were never in the seed list to begin with (ADR-7's cartridge/handheld scoping). This is a completed item, not a completed phase — see the header above.
 - Per-game emulator configuration editable directly from the launcher (not just per-system defaults)
+  - Core picker UI when a platform has more than one known-good core candidate — today `EmulatorInstallerService.FindKnownCore` silently picks the first match and just logs a warning (`EmulatorInstallerService.cs:230`, `"...using the first. A core picker UI isn't built yet."`); never made it past a code comment into either an ADR or this plan until now. **Scope note:** this is specifically about picking between multiple *RetroArch cores* for one platform. It's related to, but narrower than, the speculative "standalone emulator" selection idea below (choosing RetroArch-via-core vs. a standalone emulator entirely) — worth clarifying the distinction when either gets designed for real, not assuming they're the same feature.
+- Offer Auto-Install inline from the launch flow itself (when `LaunchService` returns `NoEmulatorConfigured`), not just from Settings — deliberately deferred in ADR-14 "worth revisiting once the mechanism has more than one proven core behind it"; that condition is now met (15/15)
 - ~~Manually remove/hide a `Game` from the library~~ — done, see Timeline below (ARCHITECTURE.md → ADR-15). Scoped to `IsMissing == true` only, not "hide any game" — see ADR-15 for why.
 - ~~Extend `atari2600`'s recognized extensions to include `.bin`~~ — done, ARCHITECTURE.md → ADR-16. Confirmed no collision with any of the 15 seed platforms' extensions before applying. Required a real migration, not just a JSON edit — see Timeline below.
 
@@ -44,6 +46,8 @@ Once the base is solid and stable.
 - Video previews / trailers
 - Recommendation engine ("similar games")
 - Additional views (beyond Library and Big Picture, already covered in Phase 2)
+- Disc-based system support (PS1/PS2/Saturn/etc.) via checksum/DAT-CRC identification — Phase 1's extension-only matching has no way to disambiguate shared disc formats (`.iso`/`.bin`/`.cue`, ...) between different disc-based platforms (ADR-7), which is why none are in the seed today; hash/DAT-based identification (noted as a natural addition in ADR-6) is the mechanism that would make this safe to add
+- Check for and offer updates to already-installed emulator cores — today, once a core is installed it's reused forever (`EmulatorInstallerService`'s dedup-by-`KnownEmulatorId` never re-checks the nightly channel for a newer build, ADR-11/ADR-14); a maintenance improvement, not a blocker — all 15 seed platforms were proven end-to-end without needing this
 
 ### Phase Polish — Not Started
 Non-content work — do after Phase 2's remaining scope and Phase 3 are settled, not before: the core/foundation should stop changing shape before investing in how it looks and feels, so this work doesn't get redone against a moving target. This is everything that makes Bridge feel like a finished product rather than everything that makes it *work*.
@@ -56,6 +60,24 @@ Non-content work — do after Phase 2's remaining scope and Phase 3 are settled,
 - General UI pass on what already exists from Phase 1/2 (the functional-only grid, Settings screen) to match the visual bar the rest of this phase sets
 
 **Won't Have (for now, not permanently ruled out):** any ROM discovery/acquisition feature; social features; storefront integration (Steam/Epic/etc.) — not planned, not being designed for, far future only if ever revisited.
+
+### Speculative / Future Ideas — Not Scoped, No Version Assigned
+Came up while documenting Phase 2's work. Deliberately not assigned to Phase 2/3/Polish above — either they need real design work first, or they're genuinely "someday, maybe" with no committed shape. Recorded so they're not lost, not because they're promised.
+
+**Far future / speculative — no clear purpose or design yet:**
+- Distribution as an installer, instead of a single-file `.exe` — no clear reason yet, just a possibility being kept in mind; a distribution-model change, not a code change, if it ever happens
+- "All games" library, Playnite-style — beyond just ROMs/emulation. Not in tension with the "Won't Have: storefront integration" line above — it's the concrete example of exactly that far-future scope-permanence note
+- Discord Rich Presence — show the currently-playing game in Discord
+- Full first-run onboarding wizard (animated, step-by-step: name/avatar, ROM folder, suggested emulators based on detected ROMs, SteamGridDB key) — implies a real user-profile system (persisting name/avatar) that doesn't exist today. Distinct from Phase Polish's much simpler "Welcome sentinel + what's new dialog" above — not the same feature, don't conflate when scoping either one
+- Standalone emulator auto-download/configure (not just RetroArch/libretro cores) — extending `EmulatorInstallerService`'s auto-install mechanism (ARCHITECTURE.md → ADR-11/ADR-14) to arbitrary standalone emulators (e.g. mGBA) the same way it works for RetroArch today. Real new work — each standalone emulator has its own install format, argument syntax, and update channel; the far-future half of the standalone-emulator idea below
+
+**Nearer-term, simple — not yet designed, but low complexity:**
+- Choose cover — let the user pick among SteamGridDB's multiple candidate images instead of Bridge silently taking the first result. Directly ties to the existing documented simplification in ARCHITECTURE.md ("The first search result and the first grid result are used with no scoring (approved as-is for Phase 1)") — this idea is the eventual revisit of that simplification, not a new decision
+- "What to play next" — a section in the future Big Picture/streaming view (Phase 2) surfacing unplayed games
+- Random game — a button that picks and offers to launch a random game from the library
+- Drag-and-drop ROM import — drop a ROM file onto the app window, Bridge detects it and copies/moves it into a scanned ROM folder automatically
+- New-ROM-detected prompt — when a scan finds a ROM for a platform with no emulator configured, proactively offer to install one right there. The scan-triggered version; the launch-triggered version is already tracked above (Phase 2, "Offer Auto-Install inline from the launch flow")
+- Standalone emulator suggestions (links only, no auto-install) — the lighter-weight near-term half of the standalone-emulator idea above: suggest a good standalone emulator and where to get it, without downloading/configuring it automatically
 
 ---
 
@@ -103,7 +125,50 @@ These reshape the architecture if resolved late, so they were closed in Phase 0,
 `v0.1.0` shipped the full Phase 1 (MVP) scope: detect → show → play. `v0.2.0` shipped exactly one item out of Phase 2's scope — automatic emulator detection/download (see above) — not the rest of Phase 2. Keep `<Version>` in `Bridge/Bridge.csproj` consistent with this document, `README.md`, and `docs/index.html` (see DEVELOPMENT.md → Version Management).
 
 ### Future Versions — Backlog
-The remaining Phase 2 scope (game detail panel, favorites/recently-played, refined "Library" view, "Big Picture" view, per-game emulator configuration), all of Phase 3, and all of Phase Polish (transition animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features; storefront integration) is out of scope indefinitely, not just for this version.
+The remaining Phase 2 scope (game detail panel, favorites/recently-played, refined "Library" view, "Big Picture" view, per-game emulator configuration, a core picker UI, offering Auto-Install inline from the launch flow), all of Phase 3 (RetroAchievements, cheats/mods, video previews, recommendations, additional views, disc-based system support, emulator core update checks), and all of Phase Polish (transition animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features; storefront integration) is out of scope indefinitely, not just for this version.
+
+---
+
+## Roadmap
+
+Tracking approach as of `v0.2.0`: version cuts, not phase completion. `v0.1.0` and `v0.2.0` each shipped a coherent, tested, real-use-verified chunk without waiting for an entire phase to finish — the same pattern continues going forward. Phase 1/2/3/Polish above remain useful as *thematic buckets* (what kind of work something is), not as "when do we ship" gates.
+
+### v0.3.0 — Next confirmed cut
+The 2 small Phase 2 items left over from today's auto-install work, not the rest of Phase 2:
+- Core picker UI when a platform has more than one known-good core candidate
+- Offer Auto-Install inline from the launch flow (`LaunchService` → `NoEmulatorConfigured`), not just from Settings
+
+**Why these two, not something else:** both extend the exact mechanism (`EmulatorInstallerService`) that was today's entire focus, with the freshest possible context; neither needs a new view — they extend UI that already exists (the Settings Auto-Install button, the launch-failure dialog) — unlike the detail panel/Library view/Big Picture items, which do; and they're genuinely small, matching "one coherent, verified chunk," not a multi-feature bundle.
+
+### Path to v1.0
+
+**Criterion, decided (not assumed):** v1.0 = all of Phase 2 + all of Phase Polish. Phase 3 is excluded by default, not included unless a specific item is explicitly decided on later.
+
+**Reasoning:**
+- **All of Phase 2** — Bridge's core differentiator ("zero-friction setup," per the foundation document's Vision) lives largely here. A 1.0 missing the refined Library view, detail panel, or per-game config reads as an extended MVP, not a finished product.
+- **Phase 3 excluded by default** — it's "Could Have" in the original MoSCoW, a meaningfully lower commitment tier than Phase 2's "Should Have." RetroAchievements, cheats/mods, video previews, and a recommendation engine are legitimately post-1.0 growth, the same way comparable tools (early Playnite, EmulationStation) shipped without them initially.
+- **Disc-based system support (PS1/PS2/Saturn/etc.) explicitly excluded from the v1.0 path** — confirmed decision, not left as an open question: no checksum/DAT detection design exists yet (it's speculative, ARCHITECTURE.md → ADR-6/ADR-7 only note it as a natural future direction), and pulling it into the 1.0 path without that design done first would be exactly the kind of scope creep this whole session was built to avoid. It's real, substantial, user-facing capability — not dismissed — see v2.0+ below for where it actually lives.
+- **All of Phase Polish, not optional** — a 1.0 that still looks and feels like Phase 1's functional-only grid contradicts what shipping a "1.0" signals (stable, ready, finished) — animations and the general UI pass aren't cosmetic extras at that point, they're part of whether the product reads as done.
+
+See ARCHITECTURE.md → ADR-17 for the full decision record.
+
+### Reference roadmap, v0.4.0 → v0.9.0 — non-binding, re-confirm scope at each cut
+
+**Not fixed.** This is a plausible default chunking, not a committed plan — re-confirm what actually goes into each version when work on it is about to start, same discipline already applied to `v0.3.0` above and to every feature built today. Don't treat these version numbers or groupings as more precise than they are.
+
+- `v0.4.0` — Game detail panel
+- `v0.5.0` — Favorites/recently played + refined "Library" view (related — both touch the main browsing experience)
+- `v0.6.0` — "Big Picture" view (large enough to warrant its own cut)
+- `v0.7.0` — Per-game emulator configuration (closes the rest of Phase 2)
+- `v0.8.0` — Phase Polish batch 1: transition animations + general UI pass (highest visual impact)
+- `v0.9.0` — Phase Polish batch 2: welcome sentinel + auto-updater + theming + sponsor/credits
+- `v1.0.0` — stabilization + QA pass against the criterion above
+
+### v2.0+ — open bucket, one named focus
+
+**Disc-based system support (PS1/PS2/Saturn/etc.) is the explicit first focus of v2.0** — not buried in an undifferentiated backlog. It's a real capability gap (a large share of retro-gaming interest is disc-based), deliberately deferred out of the v1.0 path above specifically because the checksum/DAT detection design it needs doesn't exist yet — designing that mechanism is the actual first step, before any version number gets attached to it for real.
+
+Everything else stays an undifferentiated bucket, not broken down by version yet: any Phase 3 items not explicitly pulled into the v1.0 path, and the Section 13-style speculative ideas tracked above (Speculative / Future Ideas). The "nearer-term, simple" speculative ideas specifically don't have to wait for v2.0 — they can slot into any earlier version once actually designed, the same way `.bin` detection and library removal landed alongside `v0.2.0`'s work today without being formally scoped into it ahead of time.
 
 ---
 

@@ -684,6 +684,40 @@ Verified against actual pre-existing data, not just a fresh database: `LibraryRe
 
 ---
 
+### ADR-17: v1.0 criterion — all of Phase 2 + Phase Polish, Phase 3 excluded by default, disc systems explicitly deferred to v2.0
+
+**Status:** Accepted
+
+**Date:** 2026-08-05
+
+**Context:**
+Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, adding Phase Polish to `PLAN.md`) left `PLAN.md` with an accurate picture of what's actually done vs. remaining for the first time, but no answer to "what does v1.0 actually mean for Bridge" — a real product decision, not something to assume silently the way "Phase 2 complete" was asserted earlier today without checking. Tracking also shifted from phase-gated releases to version cuts (`v0.1.0`/`v0.2.0` each already shipped a coherent chunk without waiting for a whole phase) — a v1.0 criterion needs to say what "coherent chunk" means at the scale of a 1.0, not just for the next small cut.
+
+**Decision:** v1.0 = all of Phase 2 + all of Phase Polish. Phase 3 is excluded by default — not included unless a specific item is explicitly pulled in later, one at a time. Disc-based system support (PS1/PS2/Saturn/etc.) is explicitly named and excluded from the v1.0 path, not left as an open question.
+
+**Reasoning — why Phase 2 is in, fully:** Bridge's core differentiator, per the foundation document's Vision section, is "zero-friction setup" — the auto-install mechanism already shipped in `v0.2.0` is the install-time half of that; the detail panel, favorites, refined "Library" view, "Big Picture" view, and per-game config are the browsing/usage-time half. A v1.0 missing either half reads as an extended MVP demo, not a finished product a stranger could be handed.
+
+**Reasoning — why Phase 3 is out by default:** Phase 3 was scoped as "Could Have" in the original MoSCoW (`BRIDGE_PROJECT_FOUNDATION.md` section 2) — a meaningfully lower commitment tier than Phase 2's "Should Have," never promised as core. RetroAchievements, cheats/mods management, video previews, and a recommendation engine are legitimate post-1.0 growth — comparable tools in this space (early Playnite, EmulationStation) shipped stable, well-regarded versions without these before adding them later. "Excluded by default, not blanket-excluded forever" is deliberate phrasing — nothing stops a specific Phase 3 item from being pulled into the v1.0 path later through the same explicit decision process, just not assumed in by default.
+
+**Reasoning — why disc-based systems are named and deferred, not just silently left in Phase 3:** this one got its own explicit call-out because it's a real, substantial capability gap — a large share of retro-gaming interest is disc-based (PS1 especially, per ADR-7's own Consequences) — not a minor nice-to-have like the rest of Phase 3. It would be tempting to fold it into v1.0 on that basis. Rejected: no checksum/DAT-based detection design exists yet (ADR-6/ADR-7 only note the idea as a natural future direction, never designed for real) — pulling it into the v1.0 path without that design done first is exactly the scope-creep pattern this entire session's audit work was aimed at catching, applied to the roadmap itself. Not dismissed, either — named explicitly as v2.0's first focus (`PLAN.md` → Roadmap) rather than left to blend into an undifferentiated backlog bucket.
+
+**Reasoning — why Phase Polish is in, fully, not optional:** a v1.0 that still looks and behaves like Phase 1's functional-only grid contradicts what shipping a "1.0" signals to a user (stable, ready, finished) — visual/UX roughness is a real quality signal independent of whether anything is technically broken. Transition animations and the general UI pass specifically are load-bearing for that signal, not cosmetic extras that happen to be gated behind Phase 3-tier priority.
+
+**Consequences:**
+- ✅ "1.0" now has a real, written criterion instead of being whatever felt done when someone got there — the same standard this session already held every smaller claim to
+- ✅ The disc-system capability gap is tracked with real weight (named as v2.0's explicit first focus) instead of disappearing into a generic backlog bucket, while still correctly kept out of v1.0's path given no design exists for it yet
+- ❌ The intermediate version breakdown (`v0.4.0`-`v0.9.0` in `PLAN.md` → Roadmap) is explicitly a non-binding reference chunking, not a committed plan — re-confirmed at each cut, same discipline as `v0.3.0`. This ADR fixes the v1.0 *criterion*, not the exact path of versions that gets there.
+- ❌ Whether any single Phase 3 item (RetroAchievements, cheats/mods, etc.) gets pulled into the v1.0 path remains genuinely undecided — this ADR deliberately doesn't pre-answer that per-item, only sets the default (excluded unless explicitly decided otherwise)
+
+**Alternatives considered:**
+
+- **v1.0 = Phase 1 + Phase 2 + Phase 3 + Phase Polish, everything:** rejected — Phase 3's "Could Have" items were never promised as core, and waiting for all of them (including a not-yet-designed recommendation engine and RetroAchievements integration) would indefinitely delay a 1.0 that could otherwise ship a genuinely complete, polished core experience
+- **v1.0 = Phase 1 + Phase 2 only, Polish deferred to post-1.0:** rejected — a "1.0" that still looks like Phase 1's placeholder-grade grid undersells the actual functional completeness underneath it; the visual/UX bar is part of what "1.0" signals, not separable from it
+- **Include disc-based system support in the v1.0 path given how significant a gap it is:** rejected — the design work (checksum/DAT identification) doesn't exist yet; including undesigned work in a version criterion is the same unverified-claim pattern this session's audit already corrected three times today, just applied one level up (to the roadmap instead of to a status line)
+- **Leave disc-based systems in an undifferentiated Phase 3/backlog bucket instead of naming it as v2.0's explicit focus:** rejected — burying a capability gap this real in a generic "someday" bucket is how it would get lost the same way Phase Polish itself got lost earlier today; naming it explicitly is the same fix applied preventively
+
+---
+
 1. Copy the ADR format block from the section above
 2. Assign the next sequential number (e.g., `ADR-1`, `ADR-2`, …)
 3. Paste it at the end of this document, before the "Creating a New ADR" section
