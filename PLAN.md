@@ -24,15 +24,15 @@ Goal: detect → show → play, using emulators the user has already installed m
 
 Explicitly out of scope for this phase: multiple views, video previews, cheats/mods, social features, RetroAchievements, automatic emulator download, recommendations, editable per-game emulator settings.
 
-### Phase 2 (Should Have) — Not Started
-Once the MVP works end-to-end.
+### Phase 2 (Should Have) — Partially Started
+Once the MVP works end-to-end. 1 of the 7 items originally scoped here shipped in `v0.2.0`; the other 6 haven't been started.
 
 - Game detail panel: short blurb/preview text, description, release year, console/system, additional screenshots, thumbnails (distinct from the main box art)
 - Favorites / recently played
 - "Library" view (Playnite-style cover grid, refined from the Phase 1 functional version)
 - "Big Picture" / streaming-style view with a recommended-games section
 - Polished transition animations (this is where the EmulationStation inspiration gets invested in)
-- Automatic emulator detection/download for known systems (e.g. RetroArch cores, PCSX2) — replaces the fully manual Phase 1 configuration
+- ~~Automatic emulator detection/download for known systems (e.g. RetroArch cores, PCSX2) — replaces the fully manual Phase 1 configuration~~ — done, shipped in `v0.2.0` (see ARCHITECTURE.md → ADR-11/ADR-14, `CHANGELOG.md`). **Caveat, not silently dropped:** only the 15 cartridge/handheld seed platforms (RetroArch cores) are covered — `PCSX2` was always just an illustrative example in this bullet's original wording, never actually implemented; PS2 and other disc-based systems were never in the seed list to begin with (ADR-7's cartridge/handheld scoping). This is a completed item, not a completed phase — see the header above.
 - Per-game emulator configuration editable directly from the launcher (not just per-system defaults)
 - ~~Manually remove/hide a `Game` from the library~~ — done, see Timeline below (ARCHITECTURE.md → ADR-15). Scoped to `IsMissing == true` only, not "hide any game" — see ADR-15 for why.
 - ~~Extend `atari2600`'s recognized extensions to include `.bin`~~ — done, ARCHITECTURE.md → ADR-16. Confirmed no collision with any of the 15 seed platforms' extensions before applying. Required a real migration, not just a JSON edit — see Timeline below.
@@ -90,11 +90,11 @@ These reshape the architecture if resolved late, so they were closed in Phase 0,
 
 ## Scope: Current vs Future
 
-### Current Version (0.1.0) — In Progress
-Version 0.1.0 targets the full Phase 1 (MVP) scope listed above: detect → show → play. No feature from Phase 2 or Phase 3 is in scope for this version. `<Version>0.1.0</Version>` is the value to use once `Bridge.csproj` is created (see DEVELOPMENT.md → Version Management) — keep it consistent with this document, README.md, and docs/index.html.
+### Current Version (0.2.0) — Shipped
+`v0.1.0` shipped the full Phase 1 (MVP) scope: detect → show → play. `v0.2.0` shipped exactly one item out of Phase 2's scope — automatic emulator detection/download (see above) — not the rest of Phase 2. Keep `<Version>` in `Bridge/Bridge.csproj` consistent with this document, `README.md`, and `docs/index.html` (see DEVELOPMENT.md → Version Management).
 
 ### Future Versions — Backlog
-Phase 2 and Phase 3 scope (see above) are explicitly deferred and tracked as backlog — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features) is out of scope indefinitely, not just for this version.
+The remaining Phase 2 scope (game detail panel, favorites/recently-played, refined "Library" view, "Big Picture" view, transition animations, per-game emulator configuration) and all of Phase 3 remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features) is out of scope indefinitely, not just for this version.
 
 ---
 

@@ -69,7 +69,7 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 
 ## Features
 
-> Bridge is functional and shipping — v0.2.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) and Phase 2 (automatic emulator installation) are both complete: all 15 seed platforms have been confirmed end-to-end with real installs and real game launches, not just tested in isolation.
+> Bridge is functional and shipping — v0.2.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2's automatic emulator installation feature is complete too — all 15 seed platforms confirmed end-to-end with real installs and real game launches, not just tested in isolation — but it's one item out of Phase 2's full scope; the rest (game detail panel, favorites, a refined library view, a "Big Picture" view, per-game emulator config) hasn't been started.
 
 - Scan your ROM folders and automatically detect which system each game belongs to
 - Fetch box art automatically from SteamGridDB
