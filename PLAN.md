@@ -1,6 +1,6 @@
 # Bridge - Project Plan
 
-> **Status:** Phase 1 (MVP) shipped as tagged release `v0.1.0`. **The app has been launched, fixed, and interactively used end-to-end** — launch itself confirmed during the ADR-12 investigation (which found and fixed a real release-breaking packaging bug: `v0.1.0`'s published `.exe` didn't open at all, fixed in place, same tag), and separately, per the user's own direct report on their real machine: add folder → Pokémon Emerald detected → mGBA configured → rescan → launched successfully (FR-01/02/03/06/07/09), plus a full close-and-reopen confirming FR-08 (cross-session persistence). FR-04/FR-05 (SteamGridDB box art lookup + caching) are now confirmed too — box art was seen actually rendered in the cover grid after a rescan, not just present as a cached file on disk. **Phase 2's install orchestration is now built, proven end-to-end, and interactively tested** (`EmulatorInstallerService` — download, extract via `SharpCompress`, register a working `Emulator`/`EmulatorProfile` — see ARCHITECTURE.md → ADR-14), exposed via a new "Auto-Install" button in Settings; 137 tests pass in Release, 136 in Debug. The first real interactive click found and fixed two real bugs — a wrong `ExecutableRelativePath` (ARCHITECTURE.md → ADR-11's 2026-08-03 update) and a stale-`SelectedPlatform` refresh bug in `SettingsViewModel` — proof the mechanism now works end-to-end for the first fully-verified catalog pair (`nes` → FCEUmm). **The catalog itself is complete, and all 15 of 15 seed platforms have now been clicked and proven end-to-end** — `nes` first, then 11 more (`lynx`, `wonderswan`, `gb`/`gbc`, `genesis`/`sms`/`gamegear`, `gba`, `pcengine`, `n64`, `nds`) in one session, then the final 3 (`snes`, `atari2600`, `atari7800`) in a later session — see Timeline items 22–24. **Phase 2's install mechanism is no longer just data-verified for any platform — every seed platform has a real, interactive Auto-Install confirmation.** What's left open is a single, separate, newly-found (not yet fixed) `.bin`/Atari-2600 extension-matching gap, unrelated to the install mechanism. See `## Timeline` below for the exact handoff state.
+> **Status:** Phase 1 (MVP) shipped as tagged release `v0.1.0`. **The app has been launched, fixed, and interactively used end-to-end** — launch itself confirmed during the ADR-12 investigation (which found and fixed a real release-breaking packaging bug: `v0.1.0`'s published `.exe` didn't open at all, fixed in place, same tag), and separately, per the user's own direct report on their real machine: add folder → Pokémon Emerald detected → mGBA configured → rescan → launched successfully (FR-01/02/03/06/07/09), plus a full close-and-reopen confirming FR-08 (cross-session persistence). FR-04/FR-05 (SteamGridDB box art lookup + caching) are now confirmed too — box art was seen actually rendered in the cover grid after a rescan, not just present as a cached file on disk. **Phase 2's install orchestration is now built, proven end-to-end, and interactively tested** (`EmulatorInstallerService` — download, extract via `SharpCompress`, register a working `Emulator`/`EmulatorProfile` — see ARCHITECTURE.md → ADR-14), exposed via a new "Auto-Install" button in Settings; 152 tests pass in Release, 151 in Debug. The first real interactive click found and fixed two real bugs — a wrong `ExecutableRelativePath` (ARCHITECTURE.md → ADR-11's 2026-08-03 update) and a stale-`SelectedPlatform` refresh bug in `SettingsViewModel` — proof the mechanism now works end-to-end for the first fully-verified catalog pair (`nes` → FCEUmm). **The catalog itself is complete, and all 15 of 15 seed platforms have now been clicked and proven end-to-end** — `nes` first, then 11 more (`lynx`, `wonderswan`, `gb`/`gbc`, `genesis`/`sms`/`gamegear`, `gba`, `pcengine`, `n64`, `nds`) in one session, then the final 3 (`snes`, `atari2600`, `atari7800`) in a later session — see Timeline items 22–24. **Phase 2's install mechanism is no longer just data-verified for any platform — every seed platform has a real, interactive Auto-Install confirmation.** What's left open is a single, separate, newly-found (not yet fixed) `.bin`/Atari-2600 extension-matching gap, unrelated to the install mechanism. See `## Timeline` below for the exact handoff state.
 >
 > **Last updated:** 2026-08-05
 
@@ -52,6 +52,7 @@ Once the base is solid and stable.
 ### Phase Polish — Not Started
 Non-content work — do after Phase 2's remaining scope and Phase 3 are settled, not before: the core/foundation should stop changing shape before investing in how it looks and feels, so this work doesn't get redone against a moving target. This is everything that makes Bridge feel like a finished product rather than everything that makes it *work*.
 
+- **Integrate WPF-UI (lepo.co) for Mica/Fluent theming** — decided in the original foundation document (WPF + WPF-UI over WinUI 3, SteamManager as precedent) but never actually installed; confirmed via the 2026-08-06 documentation audit that Bridge ships on stock WPF today, with zero `Wpf.Ui` package reference and no WPF-UI resource dictionaries merged into `App.xaml`. Called out as its own item, not folded into "general UI pass" below — this is adding the theming stack itself, a prerequisite for the animation/UI-pass items, not just polish
 - Polished transition animations (moved from Phase 2 — this is where the EmulationStation inspiration gets invested in)
 - Theme customization / visual personalization (moved from Phase 3)
 - Welcome sentinel + "what's new" dialog on first run / after updates — reference pattern already sketched in DEVELOPMENT.md → Welcome Sentinel, not yet wired into the actual app
@@ -98,7 +99,7 @@ Bridge automates the parts of this setup that don't need to be manual. Extension
 | Aspect | Decision |
 |--------|----------|
 | Runtime | .NET 10, self-contained single-file publish (win-x64) |
-| UI Framework | WPF + WPF-UI (lepo.co) for Mica/Fluent styling |
+| UI Framework | WPF; WPF-UI (lepo.co) decided for Mica/Fluent styling but not yet integrated — Bridge ships on stock WPF today, WPF-UI is an explicit Phase Polish item (see `## Roadmap`) |
 | Architecture | MVVM (CommunityToolkit.Mvvm) + DI (Microsoft.Extensions.DependencyInjection) |
 | External Metadata API | SteamGridDB (box art) — API key-handling approach pending, see Open Decisions #4 below |
 | Packaging | PublishSingleFile, self-contained |
@@ -174,77 +175,7 @@ Everything else stays an undifferentiated bucket, not broken down by version yet
 
 ## Project Structure
 
-```
-Bridge/
-├── Bridge/                     # Main WPF project
-│   ├── Converters/
-│   │   ├── InverseBooleanConverter.cs
-│   │   └── InverseBooleanToVisibilityConverter.cs
-│   ├── Exceptions/
-│   │   └── BridgeException.cs
-│   ├── Models/
-│   │   ├── Platform.cs
-│   │   ├── Game.cs
-│   │   ├── EmulatorConfig.cs
-│   │   ├── ScanFolder.cs
-│   │   ├── ScanResult.cs
-│   │   ├── BoxArt.cs
-│   │   ├── MetadataFetchResult.cs
-│   │   └── LaunchResult.cs
-│   ├── Resources/
-│   │   └── SeedSystems.json    # EmbeddedResource — 15 built-in platforms
-│   ├── Services/
-│   │   ├── ILibraryRepository.cs / LibraryRepository.cs
-│   │   ├── IRomScannerService.cs / RomScannerService.cs
-│   │   ├── ISettingsService.cs / SettingsService.cs
-│   │   ├── IImageCacheService.cs / ImageCacheService.cs
-│   │   ├── IMetadataService.cs / MetadataService.cs
-│   │   ├── IEmulatorService.cs / EmulatorService.cs
-│   │   ├── ArgumentTemplate.cs     # shared {Token} resolver, used by EmulatorService + LaunchService
-│   │   ├── ILaunchService.cs / LaunchService.cs
-│   │   ├── MessageBoxService.cs      # IMessageBoxService/MessageBoxService
-│   │   ├── FolderPickerService.cs    # IFolderPickerService/FolderPickerService
-│   │   └── FilePickerService.cs      # IFilePickerService/FilePickerService
-│   ├── ViewModels/
-│   │   ├── MainViewModel.cs
-│   │   ├── GameTile.cs
-│   │   ├── SettingsViewModel.cs
-│   │   └── PlatformConfigItem.cs
-│   ├── App.xaml / App.xaml.cs        # composition root — DI wiring, no StartupUri
-│   ├── MainWindow.xaml / .xaml.cs
-│   ├── SettingsWindow.xaml / .xaml.cs
-│   └── Config.cs
-├── Bridge.Tests/
-│   ├── ViewModels/
-│   │   ├── MainViewModelTests.cs
-│   │   └── SettingsViewModelTests.cs
-│   └── Services/
-│       ├── LibraryRepositoryTests.cs
-│       ├── RomScannerServiceTests.cs
-│       ├── SettingsServiceTests.cs
-│       ├── ImageCacheServiceTests.cs
-│       ├── MetadataServiceTests.cs
-│       ├── ArgumentTemplateTests.cs
-│       ├── EmulatorServiceTests.cs
-│       ├── LaunchServiceTests.cs
-│       ├── FakeLibraryRepository.cs
-│       ├── FakeSettingsService.cs
-│       ├── FakeImageCacheService.cs
-│       ├── FakeEmulatorService.cs
-│       ├── FakeRomScannerService.cs
-│       ├── FakeMetadataService.cs
-│       ├── FakeLaunchService.cs
-│       ├── FakeMessageBoxService.cs
-│       ├── FakeFolderPickerService.cs
-│       ├── FakeFilePickerService.cs
-│       └── FakeHttpMessageHandler.cs
-├── docs/
-├── README.md
-├── PLAN.md
-├── DEVELOPMENT.md
-├── ARCHITECTURE.md
-└── Bridge.slnx
-```
+See `DEVELOPMENT.md` → Project Structure for the current, authoritative file tree. Deliberately kept in one place, not duplicated here — this section used to carry its own copy, which silently drifted out of sync with the real codebase through Phase 2 (still showing pre-ADR-11 `EmulatorConfig.cs`, missing `DownloadVerificationService`/`EmulatorInstallerService`/`KnownEmulators.json` and their tests) until the 2026-08-06 documentation audit caught it. One canonical copy removes the drift risk instead of just re-syncing it once.
 
 ---
 
@@ -290,11 +221,12 @@ Bridge/
 
 | Dependency | Version | Purpose | Notes |
 |-----------|---------|---------|-------|
-| WPF-UI (lepo.co) | TBD | Mica/Fluent theming | Validated in a prior project |
-| CommunityToolkit.Mvvm | TBD | MVVM (ObservableObject, RelayCommand) | Standard for this template |
-| Microsoft.Extensions.DependencyInjection | TBD | DI container | Standard for this template |
-| Microsoft.Extensions.Logging | TBD | `ILogger<T>` logging | Standard for this template |
-| Storage library (SQLite / LiteDB — TBD) | TBD | Library persistence | Pending Open Decision #1 |
+| WPF-UI (lepo.co) | **Not yet added** | Mica/Fluent theming | Decided in the original foundation document, validated in a prior project (SteamManager) — but never actually integrated (confirmed via the 2026-08-06 documentation audit: no `Wpf.Ui` package reference, no WPF-UI resources in `App.xaml`). Bridge ships on stock WPF today. Tracked as an explicit Phase Polish item, not assumed done — see `## Roadmap` |
+| CommunityToolkit.Mvvm | 8.4.2 | MVVM (ObservableObject, RelayCommand) | Standard for this template |
+| Microsoft.Extensions.DependencyInjection | 10.0.10 | DI container | Standard for this template |
+| Microsoft.Extensions.Logging | 10.0.10 | `ILogger<T>` logging | Standard for this template |
+| LiteDB | 5.0.21 | Library persistence | Resolved — see Open Decision #1 / ARCHITECTURE.md → ADR-2 |
+| SharpCompress | 0.50.2 | Archive extraction (`.7z`/`.zip`) for automatic emulator install | See ARCHITECTURE.md → ADR-14 |
 | SteamGridDB API | N/A (external HTTP) | Box art metadata | Requires an API key (handling approach pending, see Open Decisions #4); rate-limit handling required |
 
 ---

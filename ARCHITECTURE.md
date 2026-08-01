@@ -8,7 +8,7 @@ This document records architectural decisions made during the development of Bri
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Views (WPF + WPF-UI)                            │
+│  Views (WPF — stock; WPF-UI theming pending)      │
 │  MainWindow · Library cover grid view            │
 ├─────────────────────────────────────────────────┤
 │  ViewModels (CommunityToolkit.Mvvm)              │
@@ -30,7 +30,7 @@ This document records architectural decisions made during the development of Bri
 | Decision | Choice | Why |
 |----------|--------|-----|
 | UI Framework | WPF (.NET 10) | Proven in production on prior projects (SteamManager, OrbSpoofer); single-file self-contained distribution already validated |
-| Styling/Theming | WPF-UI (lepo.co) | Mica, Fluent Design, already validated in a prior project |
+| Styling/Theming | WPF-UI (lepo.co) — **decided, not yet integrated** | Mica, Fluent Design, already validated in a prior project (SteamManager). Confirmed via a documentation audit (2026-08-06) that Bridge ships on stock WPF today — zero `Wpf.Ui` package reference, no WPF-UI resource dictionaries in `App.xaml`. Tracked as an explicit Phase Polish item (`PLAN.md` → Roadmap), not assumed done just because it was decided early |
 | WPF vs. WinUI 3 | WPF | WinUI 3's Composition API has a genuine edge for fluid animations, but WPF wins on proven real-world experience and reuse of the existing process/tooling template. If Phase 2/3 animation polish doesn't feel fluid enough with classic Storyboards, investigate Windows.UI.Composition interop as a targeted enhancement — not a reason to change the UI framework |
 | MVVM | CommunityToolkit.Mvvm | Consistent with prior projects |
 | DI | Microsoft.Extensions.DependencyInjection | Standard already in use |
@@ -717,6 +717,8 @@ Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, 
 - **Leave disc-based systems in an undifferentiated Phase 3/backlog bucket instead of naming it as v2.0's explicit focus:** rejected — burying a capability gap this real in a generic "someday" bucket is how it would get lost the same way Phase Polish itself got lost earlier today; naming it explicitly is the same fix applied preventively
 
 ---
+
+## Creating a New ADR
 
 1. Copy the ADR format block from the section above
 2. Assign the next sequential number (e.g., `ADR-1`, `ADR-2`, …)
