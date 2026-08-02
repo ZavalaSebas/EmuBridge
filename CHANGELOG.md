@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-07
+
+"Rest of Phase 2": per-game emulator configuration, plus a real download-verification hardening pass found while re-testing it. 243 unit tests in Release, 242 in Debug (up from 209 in `v0.6.0`).
+
 ### Added
 - Per-game emulator configuration — right-click a tile → "Configure Emulator..." opens a dedicated window to set an executable/argument override for just that one game, without touching the platform's shared default. Falls back to showing the platform default when no override exists yet, so the fields are never blank for an already-configured platform. Removing a game also removes its per-game override, if any. No Auto-Install in this flow — it's for adjusting an already-configured emulator, not installing a new one. See ARCHITECTURE.md → ADR-24. 30 new tests
 
