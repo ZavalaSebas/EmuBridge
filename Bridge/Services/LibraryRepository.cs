@@ -58,10 +58,11 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         _db.GetCollection<Emulator>(EmulatorsCollectionName)
             .EnsureIndex(e => e.ExecutablePath, unique: true);
 
-        // No unique index on EmulatorProfile.PlatformId — deliberate loosening from the old
-        // EmulatorConfig.PlatformId constraint (ADR-11). "One active profile per platform" is
-        // still enforced, but at the EmulatorService layer via find-then-replace, not by the
-        // schema — so a future many-profiles-per-platform UI doesn't need another migration.
+        // No unique index on EmulatorProfile.(PlatformId, GameId) — enforcement happens in
+        // UpsertEmulatorProfileAsync's own find-then-replace below, not the schema. Originally
+        // documented (ADR-11) as "PlatformId alone, so a future per-game UI doesn't need another
+        // migration" — that was aspirational, not what the code actually did until ADR-24 added
+        // GameId and the composite-key lookup for real.
     }
 
     private void SeedPlatformsIfEmpty()
@@ -304,17 +305,29 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         return Task.FromResult(emulator);
     }
 
+    // GameId == null specifically — the platform-wide default, not any per-game override that
+    // might also exist for this platform (ADR-24). Every existing caller of this method wants the
+    // default; game-specific lookup goes through GetEmulatorProfileForGameAsync instead.
     public Task<EmulatorProfile?> GetEmulatorProfileByPlatformIdAsync(string platformId, CancellationToken ct = default)
     {
         var result = _db.GetCollection<EmulatorProfile>(EmulatorProfilesCollectionName)
-            .FindOne(p => p.PlatformId == platformId);
+            .FindOne(p => p.PlatformId == platformId && p.GameId == null);
+        return Task.FromResult<EmulatorProfile?>(result);
+    }
+
+    // GameId is unique by itself (a Game has exactly one PlatformId, fixed at scan time), so no
+    // need to also match PlatformId here — see ARCHITECTURE.md -> ADR-24.
+    public Task<EmulatorProfile?> GetEmulatorProfileForGameAsync(Guid gameId, CancellationToken ct = default)
+    {
+        var result = _db.GetCollection<EmulatorProfile>(EmulatorProfilesCollectionName)
+            .FindOne(p => p.GameId == gameId);
         return Task.FromResult<EmulatorProfile?>(result);
     }
 
     public Task UpsertEmulatorProfileAsync(EmulatorProfile profile, CancellationToken ct = default)
     {
         var collection = _db.GetCollection<EmulatorProfile>(EmulatorProfilesCollectionName);
-        var existing = collection.FindOne(p => p.PlatformId == profile.PlatformId);
+        var existing = collection.FindOne(p => p.PlatformId == profile.PlatformId && p.GameId == profile.GameId);
         if (existing is not null)
         {
             profile.Id = existing.Id;
@@ -325,6 +338,18 @@ public class LibraryRepository : ILibraryRepository, IDisposable
         }
 
         collection.Upsert(profile);
+        return Task.CompletedTask;
+    }
+
+    // Direct delete, no "still referenced elsewhere" check — unlike BoxArt's cached image files
+    // (deduped by URL hash, so two rows can share one file), a per-game EmulatorProfile row is
+    // looked up only by its own GameId and nothing else in the codebase stores a reference to
+    // EmulatorProfile.Id, so it can never be shared between games (ARCHITECTURE.md -> ADR-24).
+    // No-op if the game has no override — same silent-skip idiom as DeleteGameAsync/DeleteBoxArtAsync.
+    public Task DeleteEmulatorProfileForGameAsync(Guid gameId, CancellationToken ct = default)
+    {
+        _db.GetCollection<EmulatorProfile>(EmulatorProfilesCollectionName)
+            .DeleteMany(p => p.GameId == gameId);
         return Task.CompletedTask;
     }
 

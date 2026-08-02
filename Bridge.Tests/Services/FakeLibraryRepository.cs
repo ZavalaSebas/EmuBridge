@@ -126,11 +126,20 @@ internal class FakeLibraryRepository : ILibraryRepository
     }
 
     public Task<EmulatorProfile?> GetEmulatorProfileByPlatformIdAsync(string platformId, CancellationToken ct = default)
-        => Task.FromResult(EmulatorProfiles.FirstOrDefault(p => p.PlatformId == platformId));
+        => Task.FromResult(EmulatorProfiles.FirstOrDefault(p => p.PlatformId == platformId && p.GameId == null));
+
+    public Task<EmulatorProfile?> GetEmulatorProfileForGameAsync(Guid gameId, CancellationToken ct = default)
+        => Task.FromResult(EmulatorProfiles.FirstOrDefault(p => p.GameId == gameId));
+
+    public Task DeleteEmulatorProfileForGameAsync(Guid gameId, CancellationToken ct = default)
+    {
+        EmulatorProfiles.RemoveAll(p => p.GameId == gameId);
+        return Task.CompletedTask;
+    }
 
     public Task UpsertEmulatorProfileAsync(EmulatorProfile profile, CancellationToken ct = default)
     {
-        var index = EmulatorProfiles.FindIndex(p => p.PlatformId == profile.PlatformId);
+        var index = EmulatorProfiles.FindIndex(p => p.PlatformId == profile.PlatformId && p.GameId == profile.GameId);
         if (index >= 0)
         {
             profile.Id = EmulatorProfiles[index].Id;

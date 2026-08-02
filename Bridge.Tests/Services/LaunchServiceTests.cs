@@ -158,6 +158,38 @@ public class LaunchServiceTests : IDisposable
         Assert.Same(result.GameSessionEndedTask, completed);
     }
 
+    // Per-game override (ARCHITECTURE.md -> ADR-24) must win at the actual launch point, not just
+    // at the resolution-service level. Proven decisively, not just "it started": the platform
+    // default points at a nonexistent executable (would fail with ExecutableNotFound on its own),
+    // while the override points at a real one — only a real Started outcome proves the override's
+    // ExecutablePath was actually the one used.
+    [Fact]
+    public async Task LaunchAsync_GameHasOverride_UsesOverrideExecutableNotPlatformDefault()
+    {
+        var game = MakeGame("nes");
+        var cmdExePath = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        _emulatorService.ProfilesByPlatformId["nes"] = new ResolvedEmulatorProfile
+        {
+            PlatformId = "nes",
+            ExecutablePath = @"C:\moved\or\uninstalled.exe",
+            ArgumentTemplate = "\"{RomPath}\""
+        };
+        _emulatorService.ProfilesByGameId[game.Id] = new ResolvedEmulatorProfile
+        {
+            PlatformId = "nes",
+            ExecutablePath = cmdExePath,
+            ArgumentTemplate = "/c echo {RomPath}"
+        };
+
+        var result = await _launchService.LaunchAsync(game);
+
+        Assert.Equal(LaunchOutcome.Started, result.Outcome);
+        Assert.NotNull(result.GameSessionEndedTask);
+
+        var completed = await Task.WhenAny(result.GameSessionEndedTask, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.Same(result.GameSessionEndedTask, completed);
+    }
+
     [Fact]
     public async Task LaunchAsync_AlreadyCancelledToken_ThrowsOperationCanceledException()
     {

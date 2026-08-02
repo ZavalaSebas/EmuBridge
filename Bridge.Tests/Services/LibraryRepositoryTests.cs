@@ -256,6 +256,63 @@ public class LibraryRepositoryTests : IDisposable
         Assert.Equal("-L nestopia.dll \"{RomPath}\"", profile!.ArgumentTemplate);
     }
 
+    // Real LiteDB, not the fake — proves the composite-(PlatformId, GameId) key actually works
+    // against the real query engine, not just the in-memory test double (ARCHITECTURE.md -> ADR-24).
+    [Fact]
+    public async Task UpsertEmulatorProfileAsync_PerGameOverride_DoesNotClobberPlatformDefault()
+    {
+        var emulator = await _repository.UpsertEmulatorAsync(new Emulator { Name = "Snes9x", ExecutablePath = @"C:\emu\snes9x.exe", InstallSource = InstallSource.UserProvided });
+        var gameId = Guid.NewGuid();
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "snes", ArgumentTemplate = "\"{RomPath}\"" });
+
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "snes", ArgumentTemplate = "\"{RomPath}\" --gfx-compat", GameId = gameId });
+
+        var platformDefault = await _repository.GetEmulatorProfileByPlatformIdAsync("snes");
+        var gameOverride = await _repository.GetEmulatorProfileForGameAsync(gameId);
+        Assert.Equal("\"{RomPath}\"", platformDefault!.ArgumentTemplate);
+        Assert.Equal("\"{RomPath}\" --gfx-compat", gameOverride!.ArgumentTemplate);
+    }
+
+    [Fact]
+    public async Task GetEmulatorProfileByPlatformIdAsync_OnlyAPerGameOverrideExists_ReturnsNull()
+    {
+        var emulator = await _repository.UpsertEmulatorAsync(new Emulator { Name = "Snes9x", ExecutablePath = @"C:\emu\snes9x.exe", InstallSource = InstallSource.UserProvided });
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "snes", ArgumentTemplate = "\"{RomPath}\" --gfx-compat", GameId = Guid.NewGuid() });
+
+        var platformDefault = await _repository.GetEmulatorProfileByPlatformIdAsync("snes");
+
+        Assert.Null(platformDefault);
+    }
+
+    [Fact]
+    public async Task UpsertEmulatorProfileAsync_SameGameOverrideTwice_UpdatesWithoutDuplicating()
+    {
+        var emulator = await _repository.UpsertEmulatorAsync(new Emulator { Name = "Snes9x", ExecutablePath = @"C:\emu\snes9x.exe", InstallSource = InstallSource.UserProvided });
+        var gameId = Guid.NewGuid();
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "snes", ArgumentTemplate = "\"{RomPath}\" -a", GameId = gameId });
+
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "snes", ArgumentTemplate = "\"{RomPath}\" -b", GameId = gameId });
+
+        var overrides = await _repository.GetEmulatorProfileForGameAsync(gameId);
+        Assert.Equal("\"{RomPath}\" -b", overrides!.ArgumentTemplate);
+    }
+
+    [Fact]
+    public async Task DeleteEmulatorProfileForGameAsync_ExistingOverride_RemovesIt()
+    {
+        var emulator = await _repository.UpsertEmulatorAsync(new Emulator { Name = "Snes9x", ExecutablePath = @"C:\emu\snes9x.exe", InstallSource = InstallSource.UserProvided });
+        var gameId = Guid.NewGuid();
+        await _repository.UpsertEmulatorProfileAsync(new EmulatorProfile { EmulatorId = emulator.Id, PlatformId = "snes", ArgumentTemplate = "\"{RomPath}\" --gfx-compat", GameId = gameId });
+
+        await _repository.DeleteEmulatorProfileForGameAsync(gameId);
+
+        Assert.Null(await _repository.GetEmulatorProfileForGameAsync(gameId));
+    }
+
+    [Fact]
+    public async Task DeleteEmulatorProfileForGameAsync_NoOverrideExists_NoOpDoesNotThrow()
+        => await _repository.DeleteEmulatorProfileForGameAsync(Guid.NewGuid());
+
     // The whole point of ADR-11's migration: existing Phase 1 EmulatorConfig data must survive
     // the upgrade to Emulator/EmulatorProfile without the user having to reconfigure anything.
     [Fact]

@@ -30,19 +30,19 @@
         "Id": "sameboy",
         "PlatformId": "gb",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/sameboy_libretro.dll.zip",
-        "Sha256": "7c4f557015bb56e5444e92b6cb6f05b8eeabe41f3cd5079e7661eef8a2a5f3ae",
-        "ExpectedSizeBytes": 127314,
+        "Sha256": "1297c8f3ead0e9faf4ed9af2b43202af949ccc9b9f29bb0b12eaf810b517c3c0",
+        "ExpectedSizeBytes": 127315,
         "CoreFileName": "sameboy_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "sameboy_gbc",
         "PlatformId": "gbc",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/sameboy_libretro.dll.zip",
-        "Sha256": "7c4f557015bb56e5444e92b6cb6f05b8eeabe41f3cd5079e7661eef8a2a5f3ae",
-        "ExpectedSizeBytes": 127314,
+        "Sha256": "1297c8f3ead0e9faf4ed9af2b43202af949ccc9b9f29bb0b12eaf810b517c3c0",
+        "ExpectedSizeBytes": 127315,
         "CoreFileName": "sameboy_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "mgba",
@@ -57,91 +57,91 @@
         "Id": "mupen64plus_next",
         "PlatformId": "n64",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mupen64plus_next_libretro.dll.zip",
-        "Sha256": "1ed046b728f0e096c8eca22ea9bc0bcce77b13b53a367936d6254dbb82f5d3d9",
-        "ExpectedSizeBytes": 2892985,
+        "Sha256": "3eab8446f766d964d4f8705efbca6fcd0e7c3606e8f4fbad6ef5a98d741af7c2",
+        "ExpectedSizeBytes": 2892984,
         "CoreFileName": "mupen64plus_next_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "melondsds",
         "PlatformId": "nds",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/melondsds_libretro.dll.zip",
-        "Sha256": "f373adaf5b5594607161da17451c19751b09515dcec9c347625af5f4f9d676fe",
-        "ExpectedSizeBytes": 1902042,
+        "Sha256": "fa73c41f5417c66a598fac12a5c968070537cb806861a0d91601e6da6e2cd3be",
+        "ExpectedSizeBytes": 1902044,
         "CoreFileName": "melondsds_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "genesis_plus_gx",
         "PlatformId": "genesis",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip",
-        "Sha256": "3d0afdf8ad2998050ebac42e7001ae4428311c63c99f2f77d2294e93d446a739",
-        "ExpectedSizeBytes": 924640,
+        "Sha256": "cea8eb23798e3a9420754f0a2bfd3fe2faf029151c8f8f728d114a3bbbeb07e8",
+        "ExpectedSizeBytes": 924637,
         "CoreFileName": "genesis_plus_gx_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "genesis_plus_gx_sms",
         "PlatformId": "sms",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip",
-        "Sha256": "3d0afdf8ad2998050ebac42e7001ae4428311c63c99f2f77d2294e93d446a739",
-        "ExpectedSizeBytes": 924640,
+        "Sha256": "cea8eb23798e3a9420754f0a2bfd3fe2faf029151c8f8f728d114a3bbbeb07e8",
+        "ExpectedSizeBytes": 924637,
         "CoreFileName": "genesis_plus_gx_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "genesis_plus_gx_gg",
         "PlatformId": "gamegear",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip",
-        "Sha256": "3d0afdf8ad2998050ebac42e7001ae4428311c63c99f2f77d2294e93d446a739",
-        "ExpectedSizeBytes": 924640,
+        "Sha256": "cea8eb23798e3a9420754f0a2bfd3fe2faf029151c8f8f728d114a3bbbeb07e8",
+        "ExpectedSizeBytes": 924637,
         "CoreFileName": "genesis_plus_gx_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "stella",
         "PlatformId": "atari2600",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/stella_libretro.dll.zip",
-        "Sha256": "c6b5b070c36bf42323a868d1a16e57b7d0b0e296d49f86a0219d4c738e4e99ca",
+        "Sha256": "b9bd6061531f7d08fb8dbf2b273fd28c1acb9845d99deced272f59a169fb6801",
         "ExpectedSizeBytes": 1433565,
         "CoreFileName": "stella_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "prosystem",
         "PlatformId": "atari7800",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/prosystem_libretro.dll.zip",
-        "Sha256": "a62f8d0f38f93617e60b20c9d6bb88ebf9d1bc087453f33617eeca8c64095ea4",
-        "ExpectedSizeBytes": 90408,
+        "Sha256": "85c80b923d21f84c86f4a308918d147d273f58ca3e7ec5e37a854f2e2b9082e8",
+        "ExpectedSizeBytes": 90407,
         "CoreFileName": "prosystem_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "mednafen_pce",
         "PlatformId": "pcengine",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_pce_libretro.dll.zip",
-        "Sha256": "4fb69cd6cbbc1ee2517004e21a76f6b0d2ae001080fe5149a9e43c1256e99cb8",
-        "ExpectedSizeBytes": 656237,
+        "Sha256": "c4d0ddc4d5e0b059425140f46cfae665f9c952202a10872d44fb2dfa8a6dd118",
+        "ExpectedSizeBytes": 656238,
         "CoreFileName": "mednafen_pce_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "holani",
         "PlatformId": "lynx",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/holani_libretro.dll.zip",
-        "Sha256": "4b4e1c05e1e61857052f4ac0815d130eb6e1de1f25ae78f81fbbeffeb41fa20e",
-        "ExpectedSizeBytes": 235928,
+        "Sha256": "30b25f06aaa0d81691ec3d5354e947d37f58ce380e6c4bd4f83033c97db40937",
+        "ExpectedSizeBytes": 235930,
         "CoreFileName": "holani_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       },
       {
         "Id": "mednafen_wswan",
         "PlatformId": "wonderswan",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_wswan_libretro.dll.zip",
-        "Sha256": "cda1d9ba8aa9fcbb2c1be4c7e5d8e72ff3f887760b93ff934f3d25b8d083c28d",
-        "ExpectedSizeBytes": 114709,
+        "Sha256": "ae6f65b997fd1f44b369c87fcb12c9b1c67d9ed839336365ddc2df5be4dcfa35",
+        "ExpectedSizeBytes": 114707,
         "CoreFileName": "mednafen_wswan_libretro.dll",
-        "CapturedAt": "2026-07-31"
+        "CapturedAt": "2026-08-02"
       }
     ]
   }
