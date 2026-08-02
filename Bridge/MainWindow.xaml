@@ -3,12 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Bridge.ViewModels"
         xmlns:conv="clr-namespace:Bridge.Converters"
-        Title="Bridge" Height="650" Width="950">
+        Title="Bridge" Height="650" Width="950"
+        WindowState="{Binding IsBigPictureMode, Converter={StaticResource BoolToWindowStateConverter}}">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
-        <conv:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
 
         <!-- One shared menu for every tile now (View Details applies to any game; Remove from
              Library stays IsMissing-only, ADR-15) — only one instance is ever open at a time, so
@@ -83,6 +83,53 @@
                 </StackPanel>
             </Button>
         </DataTemplate>
+
+        <!-- Same bindings/ContextMenu as GameTileTemplate, just larger — Big Picture mode is a
+             different presentation of the same tiles, not different data (ARCHITECTURE.md -> ADR-22). -->
+        <DataTemplate x:Key="BigPictureTileTemplate" DataType="{x:Type vm:GameTile}">
+            <Button Command="{Binding DataContext.LaunchGameCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{Binding}"
+                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                    ContextMenu="{StaticResource GameTileContextMenu}"
+                    Margin="10" Padding="0" BorderThickness="0" Background="Transparent" Cursor="Hand"
+                    ToolTip="{Binding Name}">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsMissing}" Value="True">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <StackPanel Width="280">
+                    <Grid Height="420">
+                        <Border Background="#333333" CornerRadius="6">
+                            <TextBlock Text="No Cover" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Image Source="{Binding CoverImagePath}" Stretch="UniformToFill" />
+                        <TextBlock Text="&#9733;" FontSize="28" Foreground="Gold"
+                                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0"
+                                   Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    </Grid>
+                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" FontSize="16" Margin="0,8,0,0" />
+                    <TextBlock Text="{Binding ReleaseYearText}" Foreground="Gray" FontSize="13"
+                               HorizontalAlignment="Center" Margin="0,2,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ReleaseYearText}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="(missing)" Foreground="OrangeRed" HorizontalAlignment="Center" FontSize="13"
+                               Visibility="{Binding IsMissing, Converter={StaticResource BoolToVisibilityConverter}}" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -109,7 +156,9 @@
                 <ComboBoxItem Content="Favorites First" Tag="{x:Static vm:LibrarySortMode.FavoritesFirst}" />
             </ComboBox>
 
-            <CheckBox Content="Favorites only" IsChecked="{Binding ShowFavoritesOnly}" VerticalAlignment="Center" />
+            <CheckBox Content="Favorites only" IsChecked="{Binding ShowFavoritesOnly}" VerticalAlignment="Center" Margin="0,0,16,0" />
+
+            <CheckBox Content="Big Picture" IsChecked="{Binding IsBigPictureMode}" VerticalAlignment="Center" />
         </StackPanel>
 
         <!-- Content -->
@@ -121,9 +170,20 @@
                 <Button Content="Add Folder" Command="{Binding AddFolderCommand}" Padding="20,10" HorizontalAlignment="Center" />
             </StackPanel>
 
-            <!-- Cover grid -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          Visibility="{Binding HasNoScanFolders, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+            <!-- Cover grid (normal mode) -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasNoScanFolders}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsBigPictureMode}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
                 <ItemsControl ItemsSource="{Binding Games}" ItemTemplate="{StaticResource GameTileTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -132,6 +192,66 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </ScrollViewer>
+
+            <!-- Big Picture mode: same Games/TrySomethingNewGames data, streaming-style presentation
+                 (larger tiles, maximized window via BoolToWindowStateConverter on the Window itself)
+                 — no animation, same scope discipline as the Library view refinement (ADR-21). -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding HasNoScanFolders}" Value="False" />
+                                    <Condition Binding="{Binding IsBigPictureMode}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Never-played, still-present games, alphabetical — no scoring, no randomness
+                     (ARCHITECTURE.md -> ADR-22). Hidden entirely when there are no candidates. -->
+                <StackPanel Grid.Row="0">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding TrySomethingNewGames.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Text="Try Something New" FontSize="22" FontWeight="Bold" Margin="16,16,16,8" />
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding TrySomethingNewGames}" ItemTemplate="{StaticResource BigPictureTileTemplate}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+
+                <!-- Full library, same Games collection (already sorted/filtered by SortMode/
+                     ShowFavoritesOnly) as the normal grid, just bigger tiles. -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Games}" ItemTemplate="{StaticResource BigPictureTileTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
         </Grid>
 
         <!-- Status bar: scan/box-art progress -->

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Big Picture" mode (toolbar checkbox) — a maximized, larger-tile presentation of the same library, plus a "Try Something New" section surfacing never-played, still-present games alphabetically (no scoring, no randomness — capped at 10, hidden entirely when there are no candidates). Reuses the existing library/launch/context-menu behavior rather than a separate window. No genre/similarity-based recommendations — SteamGridDB has no such data (ADR-19); "Try Something New" resolves a previously-unscoped idea from the Speculative Ideas pool, promoted with the user's explicit confirmation before being folded in. Keyboard/gamepad navigation deferred to Phase Polish — no such input handling exists in Bridge today. See ARCHITECTURE.md → ADR-22. 6 new tests
+
 ## [0.5.0] - 2026-08-07
 
 The "Full library" group, complete: the main library stops feeling like Phase 1's functional-only grid and starts feeling finished. All 4 items are interactively confirmed on the user's real machine, not just unit-tested. 187 unit tests in Release, 186 in Debug (up from 161 in `v0.4.0`).

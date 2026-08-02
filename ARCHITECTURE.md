@@ -870,6 +870,49 @@ Deliberately **not** in scope, matching what was actually asked rather than expa
 - **`ICollectionView`/`CollectionViewSource` for sorting/filtering instead of manually rebuilding `Games`:** rejected — more idiomatic WPF for this exact problem, but the codebase doesn't use it anywhere yet, and a plain rebuild from an already-in-memory dictionary is simple enough not to need it; revisit if a future addition (e.g. live search-as-you-type) makes manual rebuilding awkward
 - **Nulls-first for `RecentlyPlayed`:** rejected — would put never-played games at the top of a sort whose entire point is surfacing what was actually played recently
 
+### ADR-22: "Big Picture" group — mode toggle on `MainWindow`, "Try Something New" resolves a Speculative idea
+
+**Status:** Accepted
+
+**Date:** 2026-08-07
+
+**Context:**
+`BRIDGE_PROJECT_FOUNDATION.md` Section 2 describes the next Roadmap group as "'Big Picture' / streaming-style view with a recommended-games section." Investigated before designing, same standard as ADR-19: Bridge has no genre/tag/similarity data at all (confirmed there — SteamGridDB provides only assets + `release_date`), so any "recommended" content had to be built from real, existing fields (`IsFavorite`, `LastPlayedUtc`, `IsMissing`) or not built at all — a real recommendation engine (content-based scoring) stays out of scope, already tracked separately in `PLAN.md`'s Phase 3 list.
+
+A second, more specific overlap surfaced during investigation, distinct from the recommendation-engine risk: `PLAN.md`'s Speculative/Future Ideas pool (Section 13) already carried its own line — *"'What to play next' — a section in the future Big Picture/streaming view (Phase 2) surfacing unplayed games"* — not yet designed, deliberately not folded into any shipped group. Silently building "unplayed games" as part of this cut would have skipped the same promotion discipline this session's own Roadmap governance rule requires (a Speculative idea needs its own real definition pass before entering a group that ships — see the "Numbering correction" note in `PLAN.md` → `## Roadmap`). Flagged to the user before designing further, per their own explicit instruction to pause on exactly this kind of signal; user confirmed promoting the idea now, with the definition below, as part of this same design pass.
+
+**Decision — mode toggle on `MainWindow`, not a separate `Window`:**
+`IsBigPictureMode` (`bool`, `MainViewModel`) — same shape as `ShowFavoritesOnly`, bound directly to a toolbar `CheckBox`, no `RelayCommand` needed. Big Picture is a different *presentation* of the same library (same `Games`, same `LaunchGameCommand`, same `GameTileContextMenu`), not a different data/action surface the way `SettingsWindow`/`GameDetailWindow` are — so it reuses the existing `MainViewModel` instance instead of a new `Window` + composition-root wiring (`OpenXRequested` action, owner/`ShowDialog` lifecycle) that would either duplicate `Games`/`SortMode`/`LaunchGameCommand` in a new `BigPictureViewModel` or need to juggle two top-level windows for one underlying library.
+
+`Window.WindowState` binds to `IsBigPictureMode` through a new `BoolToWindowStateConverter` (`Converters/`, same one-way shape as `InverseBooleanToVisibilityConverter`) — maximizes on toggle, since a windowed "Big Picture" undercuts the point of the mode. Content swap uses two overlapping panels in the same content `Grid`, `Visibility` driven by `DataTrigger`/`MultiDataTrigger` (no new converter needed for that part — same style-trigger pattern already used for `ReleaseYearText`/the missing-tile dimming in `GameTileTemplate`), not `ICollectionView` or a new UserControl.
+
+**Decision — "Try Something New" criterion, promoted from Speculative Ideas:**
+Candidates = `Game.LastPlayedUtc is null && !Game.IsMissing` (a missing game can't be launched, so it can't honestly be "try this"), ordered alphabetically by `Name` — deterministic, not random (leaves the separate "Random game" Speculative idea untouched), capped at 10 so it reads as a curated section, not a second full catalog. Section title is **"Try Something New,"** not "Recommended for You" — same honesty standard as ADR-19's "Description: not available": the criterion is real (never played, still present) but isn't personalization or scoring, and the name doesn't claim otherwise. Computed in `MainViewModel.RebuildGameTiles()` alongside the main `Games` rebuild, from `_gamesById` directly (not the sorted/filtered `games` local used for the grid) — independent of `SortMode`/`ShowFavoritesOnly`, no repository round-trip, consistent with ADR-21's existing in-memory-rebuild design. When there are no candidates, the section is hidden entirely (a `DataTrigger` on `TrySomethingNewGames.Count == 0`) rather than shown empty — same reasoning as ADR-21's other empty-state calls elsewhere in this phase.
+
+**Decision — controls: reuse click + context menu, no gamepad/keyboard nav:**
+Launching stays a click on `LaunchGameCommand`, same `GameTile` binding as the normal grid. The `GameTileContextMenu` (View Details/Favorite/Remove) stays available in Big Picture mode too — stripping it for aesthetics would remove working functionality without a real reason. Keyboard/gamepad navigation investigated and explicitly deferred: confirmed via a repo-wide search that no gamepad/XInput/DirectInput code exists anywhere in Bridge today — this would be genuinely new input-handling capability, not reuse, and belongs in Phase Polish's "general UI pass" alongside the animation investment `BRIDGE_PROJECT_FOUNDATION.md` Section 5 already earmarks for that phase.
+
+**Decision — favorites/year/missing shown identically, `BigPictureTileTemplate` scales `GameTileTemplate`:**
+No new `GameTile` fields — the star, release year, and dimmed "(missing)" treatment already exist and carry over unchanged. `BigPictureTileTemplate` (new `DataTemplate` in `MainWindow.xaml`) is `GameTileTemplate` scaled up (`200`→`280` tile width, `300`→`420` cover height, same 2:3 ratio) sharing the same bindings and the same `GameTileContextMenu` resource — not a rewrite.
+
+**Decision — no animation:** same rule as ADR-21 — functional, not elaborate. No transition/scale effects on mode entry or tile hover; that investment stays Phase Polish's, per `BRIDGE_PROJECT_FOUNDATION.md` Section 5's own note that a scale/`DropShadowEffect` treatment needs a pre-rendered-bitmap approach to avoid jank, not a naive per-frame shader — worth doing once, in Phase Polish, not twice.
+
+**Real bug found on the first interactive run, fixed before confirmation:** `MainWindow`'s own `WindowState` attribute binding through `{StaticResource BoolToWindowStateConverter}`, with the converter declared in that same `Window`'s own `Window.Resources`, threw `XamlParseException` → `"Cannot find resource named 'BoolToWindowStateConverter'"` on launch. Root cause: `Window.Resources` is parsed as a later property element, not yet in scope when the `Window` tag's own opening attributes (including `WindowState`) are evaluated — a real WPF resource-resolution-order gap, not something the Debug/Release build+test pass (276 insertions, 0 warnings) could have caught, since it only surfaces when the BAML is actually loaded at runtime. Fixed by moving the converter to `Application.Resources` in `App.xaml` instead — application-level resources load before any `Window`, so they're already in scope by the time `MainWindow.xaml` parses. Found and fixed because the user ran the app before approving the commit, not because it was caught by review or the test suite.
+
+**Consequences:**
+- ✅ Zero new `Window`/`ViewModel`/`Service`/repository methods — every field "Try Something New" needs already existed before this ADR
+- ✅ The Speculative-pool overlap was caught and resolved through an explicit pause-and-confirm, not silently — matches the same governance rule this session already applied to v2.0+ auto-promotion
+- ✅ `RebuildGameTiles()` stays the single place that turns "the current set of games" into everything the UI shows (main grid + Big Picture's library section + "Try Something New") — no second parallel rebuild path
+- ✅ Interactively confirmed on the user's real machine, all 5 points checked: toggle maximizes and restores correctly, "Try Something New" correctly filters to never-played games, click still launches, and the context menu (favorites/details/remove) works on the larger Big Picture tiles
+- ❌ `BigPictureTileTemplate` duplicates `GameTileTemplate`'s XAML structure at a different scale rather than parameterizing one template — acceptable for two fixed sizes; would need a real templated-size mechanism (e.g. a shared `Style` with a bindable width) if a third size ever appears
+
+**Alternatives considered:**
+
+- **Separate `BigPictureWindow`/`BigPictureViewModel`:** rejected — real cost comparison during design showed it would either duplicate `Games`/`SortMode`/`LaunchGameCommand` in a new ViewModel or require passing/sharing the existing `MainViewModel` instance across two top-level windows with their own show/hide lifecycle, for a feature that is the same library, not a different data surface
+- **Real content-based recommendation (genre/similarity):** rejected outright — no such data exists (ADR-19), and it's explicitly Phase 3 scope in `PLAN.md`, not touched here
+- **Random selection for "Try Something New":** rejected — would overlap the separate, still-untouched "Random game" Speculative idea, and a randomized "recommendation" reads as more algorithmic than the honest, deterministic criterion actually justifies
+- **Keyboard/gamepad navigation in this cut:** rejected — no existing input-handling code to build on, real new scope, correctly belongs with the rest of the input/animation investment in Phase Polish
+
 ---
 
 ## Creating a New ADR

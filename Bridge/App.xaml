@@ -1,8 +1,14 @@
 ﻿<Application x:Class="Bridge.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Bridge">
+             xmlns:local="clr-namespace:Bridge"
+             xmlns:conv="clr-namespace:Bridge.Converters">
     <Application.Resources>
-         
+        <!-- Application-level, not MainWindow.xaml's own Window.Resources: needed by a binding on
+             MainWindow's own WindowState attribute, and a StaticResource defined in a Window's own
+             Resources isn't resolvable from that same Window's opening-tag attributes (Resources is
+             parsed as a later property element) — Application.Resources loads before any Window,
+             so it's already in scope by the time MainWindow's XAML is parsed. -->
+        <conv:BoolToWindowStateConverter x:Key="BoolToWindowStateConverter" />
     </Application.Resources>
 </Application>

@@ -652,4 +652,71 @@ public class MainViewModelTests
 
         Assert.False(Assert.Single(_repository.Games).IsFavorite);
     }
+
+    [Fact]
+    public async Task TrySomethingNewGames_ExcludesPlayedGames()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes", LastPlayedUtc = null });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\b.nes", Name = "Beta", PlatformId = "nes", LastPlayedUtc = DateTime.UtcNow });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal(["Alpha"], _viewModel.TrySomethingNewGames.Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task TrySomethingNewGames_ExcludesMissingGames()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes", IsMissing = true });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\b.nes", Name = "Beta", PlatformId = "nes", IsMissing = false });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal(["Beta"], _viewModel.TrySomethingNewGames.Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task TrySomethingNewGames_OrderedAlphabeticallyNotByInsertionOrder()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\z.nes", Name = "Zelda", PlatformId = "nes" });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes" });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal(["Alpha", "Zelda"], _viewModel.TrySomethingNewGames.Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task TrySomethingNewGames_MoreThanTenCandidates_CapsAtTen()
+    {
+        for (var i = 0; i < 15; i++)
+        {
+            _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = $@"C:\roms\g{i:D2}.nes", Name = $"Game{i:D2}", PlatformId = "nes" });
+        }
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal(10, _viewModel.TrySomethingNewGames.Count);
+    }
+
+    [Fact]
+    public async Task TrySomethingNewGames_NoCandidates_IsEmpty()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes", LastPlayedUtc = DateTime.UtcNow });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Empty(_viewModel.TrySomethingNewGames);
+    }
+
+    [Fact]
+    public async Task TrySomethingNewGames_UnaffectedByShowFavoritesOnly()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes", IsFavorite = false });
+        await _viewModel.InitializeAsync();
+
+        _viewModel.ShowFavoritesOnly = true;
+
+        Assert.Equal(["Alpha"], _viewModel.TrySomethingNewGames.Select(t => t.Name));
+    }
 }

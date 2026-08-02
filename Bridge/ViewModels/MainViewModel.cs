@@ -47,6 +47,15 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _showFavoritesOnly;
 
+    // "Big Picture" mode — a different presentation of the same Games/TrySomethingNewGames data,
+    // not a separate data set (see ARCHITECTURE.md -> ADR-22). Plain bound bool, same shape as
+    // ShowFavoritesOnly; MainWindow binds WindowState to this too, so toggling it also maximizes.
+    [ObservableProperty]
+    private bool _isBigPictureMode;
+
+    [ObservableProperty]
+    private ObservableCollection<GameTile> _trySomethingNewGames = new();
+
     partial void OnSortModeChanged(LibrarySortMode value) => RebuildGameTiles();
 
     partial void OnShowFavoritesOnlyChanged(bool value) => RebuildGameTiles();
@@ -415,22 +424,31 @@ public partial class MainViewModel : ObservableObject
             _ => games.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
         };
 
-        var tiles = new List<GameTile>();
-        foreach (var game in games)
+        Games = new ObservableCollection<GameTile>(games.Select(BuildTile));
+
+        // "Try Something New" (Big Picture mode, ARCHITECTURE.md -> ADR-22): never-played, still-
+        // present games, alphabetical — no scoring, no randomness, honestly named for what it
+        // actually is. Independent of SortMode/ShowFavoritesOnly, which only affect the main grid.
+        // Sourced from _gamesById directly (not the filtered/sorted `games` above), capped to 10.
+        var trySomethingNew = _gamesById.Values
+            .Where(g => g.LastPlayedUtc is null && !g.IsMissing)
+            .OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(10);
+        TrySomethingNewGames = new ObservableCollection<GameTile>(trySomethingNew.Select(BuildTile));
+    }
+
+    private GameTile BuildTile(Game game)
+    {
+        _boxArtByGameId.TryGetValue(game.Id, out var boxArt);
+
+        return new GameTile
         {
-            _boxArtByGameId.TryGetValue(game.Id, out var boxArt);
-
-            tiles.Add(new GameTile
-            {
-                GameId = game.Id,
-                Name = game.Name,
-                CoverImagePath = boxArt?.Status == BoxArtStatus.Cached ? boxArt.LocalPath : null,
-                IsMissing = game.IsMissing,
-                IsFavorite = game.IsFavorite,
-                ReleaseYearText = boxArt?.ReleaseYear?.ToString()
-            });
-        }
-
-        Games = new ObservableCollection<GameTile>(tiles);
+            GameId = game.Id,
+            Name = game.Name,
+            CoverImagePath = boxArt?.Status == BoxArtStatus.Cached ? boxArt.LocalPath : null,
+            IsMissing = game.IsMissing,
+            IsFavorite = game.IsFavorite,
+            ReleaseYearText = boxArt?.ReleaseYear?.ToString()
+        };
     }
 }
