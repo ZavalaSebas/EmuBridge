@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-07
+
+A same-day data-only patch, cut on its own rather than bundled with other work — a third real drift incident left an insignia feature (Auto-Install) effectively broken for multiple platforms, the same urgency standard as the `v0.1.0` `.exe` fix. 243 unit tests in Release, 242 in Debug (unchanged from `v0.7.0` — data-only fix, no test changes needed).
+
+### Fixed
+- A third real emulator-catalog drift incident, post-`v0.7.0`: `fceumm`, `snes9x`, and `mgba` had each drifted from their pinned hash (same compressed size, different content — the same pattern as `stella`'s fix in `v0.7.0`). Found by sweeping all 15 catalog entries in one pass instead of investigating the one reported core in isolation, since the report suggested more than one core could be affected. All 3 re-verified with the established double-hash method and re-pinned together. See ARCHITECTURE.md → ADR-11 (2026-08-02 update). With this, all 15 of 15 catalog core entries have now drifted from their pin at least once in one working session — the underlying maintenance gap (`DEVELOPMENT.md` → Known Limitations) has been escalated to next priority in `PLAN.md` → Roadmap, no longer a low-priority "someday" item
+
 ## [0.7.0] - 2026-08-07
 
 "Rest of Phase 2": per-game emulator configuration, plus a real download-verification hardening pass found while re-testing it. 243 unit tests in Release, 242 in Debug (up from 209 in `v0.6.0`).
