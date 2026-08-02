@@ -273,7 +273,7 @@ On push to `main`, `.github/workflows/release.yml` runs:
 
 1. **Check version change** — compares `<Version>` in HEAD vs HEAD~1
 2. **Build** — `dotnet build Bridge.slnx -c Release`
-3. **Test** — `dotnet test Bridge.slnx -c Release --no-build`
+3. **Test** — `dotnet test Bridge.slnx -c Release` (no `--no-build` — the `test` job runs on its own fresh runner with no shared build output from `build`; see the `v0.2.0` section below for why this line drifted from the real workflow once already)
 4. **CodeQL** — security scanning
 5. **NuGet Audit** — vulnerability check
 6. **Release** (only if version changed):
@@ -317,6 +317,10 @@ The fix landed in a **second, separate commit** (`ddaf02a`), after the version b
 
 **The general lesson, not just this one instance:** the version-change check can only ever fire once, on the exact commit that changes `<Version>`. If anything blocks that specific run from reaching the `release` job — a flaky CI job, a bug in the workflow itself, an infrastructure outage — there is no automated way to retroactively claim that release later; falling back to the same manual `git tag` + `gh publish` + `dotnet publish` + `gh release create` process used for `v0.1.0` and `v0.2.0` is the correct recovery, not a workaround to be embarrassed about. The manual process's own verification discipline (isolate the `.exe` in an empty folder before trusting it, hash the uploaded asset against the local build) doesn't go away just because the automated pipeline usually handles it — see the Release Checklist above.
 
+### v0.3.0: the automated release job worked, for the first time
+
+Unlike `v0.1.0`/`v0.2.0`, `v0.3.0`'s tag and GitHub Release were created **by `release.yml` itself** — the `--no-build` fix verified after `v0.2.0` held under real conditions this time, not just in the one-off CI run that confirmed it. Verified anyway, not assumed: downloaded the actual uploaded asset (not just checked it existed), confirmed its hash independently against what GitHub itself reports, and isolate-tested it in an empty folder per the checklist above. One real thing learned in the process: the downloaded asset's hash did **not** match the local build made before pushing — expected and harmless (see the Release Checklist note above on why local-build-hash comparisons don't apply to automated releases), not a repeat of the `v0.2.0`-style gap.
+
 ---
 
 ## Release Checklist
@@ -347,6 +351,8 @@ The fix landed in a **second, separate commit** (`ddaf02a`), after the version b
 - [ ] Check release page on GitHub
 - [ ] **Test the downloaded `.exe` in isolation** — copy *only* the downloaded `.exe` into an empty folder and run it from there, nothing else present. Checking the asset's byte size, or running it from a folder that still has other publish output sitting next to it, is not sufficient — see ARCHITECTURE.md → ADR-12: the `v0.1.0` release shipped completely broken (WPF's native interop DLLs missing from the bundle) and the only verification done at the time was confirming `Bridge.exe`'s size matched, which caught nothing.
 - [ ] Update documentation if needed
+
+**Hash verification means something different for an automated release than a manual one — found for real during `v0.3.0`.** `PublishSingleFile` isn't byte-reproducible across separate `dotnet publish` invocations (embedded timestamps/GUIDs differ), so a local build's hash will **not** match what CI's own independent `dotnet publish` (in the `release` job, on a fresh runner) uploads — even when both are byte-size-identical and functionally correct. Comparing a local build's hash against an automated release's asset will always "fail" and is not a meaningful check. What actually verifies an automated release: (1) confirm the *downloaded* asset's hash matches what GitHub itself reports for that asset (`gh release view --json assets` → `digest` field, or recompute independently — this catches a corrupted/tampered upload, not a rebuild difference), and (2) isolate-test that same downloaded asset per the step above. The local-build-hash-matches-uploaded-asset check only applies to the **manual** release path (`v0.1.0`/`v0.2.0`'s process below), where the exact file already tested locally is the one `gh release create` uploads — there, a mismatch would mean something real went wrong.
 
 ### Hotfix
 
