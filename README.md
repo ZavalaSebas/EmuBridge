@@ -7,7 +7,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white&labelColor=1a1a2e)](https://dotnet.microsoft.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows-00a4ef?style=flat-square&logo=windows&logoColor=white&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge)
-[![Version](https://img.shields.io/badge/Version-0.7.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
+[![Version](https://img.shields.io/badge/Version-0.7.1-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
 
 A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.
 
@@ -69,7 +69,7 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 
 ## Features
 
-> Bridge is functional and shipping — v0.7.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is effectively complete too — the only remaining piece is a core picker UI, deliberately deferred until a platform actually has more than one known-good core to choose between. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completed the "Big Picture" group — a streaming-style mode with real box art per view; `v0.7.0` adds per-game emulator configuration and hardens the download-verification guard against the libretro nightly channel's real rebuild frequency.
+> Bridge is functional and shipping — v0.7.1. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is effectively complete too — the only remaining piece is a core picker UI, deliberately deferred until a platform actually has more than one known-good core to choose between. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completed the "Big Picture" group — a streaming-style mode with real box art per view; `v0.7.0` added per-game emulator configuration and hardened the download-verification guard against the libretro nightly channel's real rebuild frequency; `v0.7.1` is a same-day patch re-verifying the entire emulator catalog against that same channel — 15 of 15 core entries had drifted from their pin at least once within one working session, all now re-pinned.
 
 - Scan your ROM folders and automatically detect which system each game belongs to
 - Fetch box art automatically from SteamGridDB
