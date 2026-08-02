@@ -325,6 +325,10 @@ Unlike `v0.1.0`/`v0.2.0`, `v0.3.0`'s tag and GitHub Release were created **by `r
 
 Same as `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly (confirming download integrity), and that exact file, isolated in an empty folder, ran cleanly (stable memory, empty `stderr`, closed on request rather than crashing). No new findings this time; the pattern established at `v0.3.0` held. https://github.com/ZavalaSebas/Bridge/releases/tag/v0.4.0
 
+### v0.5.0: automated release, same verification, same result
+
+Same as `v0.3.0`/`v0.4.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly, and that exact file, isolated in an empty folder, ran cleanly. This closes the retroactive 3-version sequence (`v0.3.0`, `v0.4.0`, `v0.5.0`) covering everything built but not yet released as of the Documentation Audit that started this stretch of work. https://github.com/ZavalaSebas/Bridge/releases/tag/v0.5.0
+
 ---
 
 ## Release Checklist
