@@ -333,6 +333,10 @@ Same as `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash 
 
 Same as `v0.3.0`/`v0.4.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly, and that exact file, isolated in an empty folder, ran cleanly. This closes the retroactive 3-version sequence (`v0.3.0`, `v0.4.0`, `v0.5.0`) covering everything built but not yet released as of the Documentation Audit that started this stretch of work. https://github.com/ZavalaSebas/Bridge/releases/tag/v0.5.0
 
+### v0.6.0: automated release, same verification, same result
+
+Same as every release since `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly, and that exact file, isolated in an empty folder, ran cleanly. Ships the "Big Picture" group, including the 3 real bugs found and fixed during its own interactive testing (see ARCHITECTURE.md → ADR-23 for the full investigation record). https://github.com/ZavalaSebas/Bridge/releases/tag/v0.6.0
+
 ---
 
 ## Release Checklist
