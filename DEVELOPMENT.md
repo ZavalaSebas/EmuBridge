@@ -321,6 +321,10 @@ The fix landed in a **second, separate commit** (`ddaf02a`), after the version b
 
 Unlike `v0.1.0`/`v0.2.0`, `v0.3.0`'s tag and GitHub Release were created **by `release.yml` itself** — the `--no-build` fix verified after `v0.2.0` held under real conditions this time, not just in the one-off CI run that confirmed it. Verified anyway, not assumed: downloaded the actual uploaded asset (not just checked it existed), confirmed its hash independently against what GitHub itself reports, and isolate-tested it in an empty folder per the checklist above. One real thing learned in the process: the downloaded asset's hash did **not** match the local build made before pushing — expected and harmless (see the Release Checklist note above on why local-build-hash comparisons don't apply to automated releases), not a repeat of the `v0.2.0`-style gap.
 
+### v0.4.0: automated release, same verification, same result
+
+Same as `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly (confirming download integrity), and that exact file, isolated in an empty folder, ran cleanly (stable memory, empty `stderr`, closed on request rather than crashing). No new findings this time; the pattern established at `v0.3.0` held. https://github.com/ZavalaSebas/Bridge/releases/tag/v0.4.0
+
 ---
 
 ## Release Checklist

@@ -21,12 +21,12 @@
 
 <h1>Bridge</h1>
 
-<p><strong>Version:</strong> 0.4.0</p>
+<p><strong>Version:</strong> 0.5.0</p>
 
 <p>A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.</p>
 
 <h2>Features</h2>
-<p>Bridge is functional and shipping — v0.4.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2's automatic emulator installation feature is complete too — all 15 seed platforms confirmed end-to-end with real installs and real game launches, not just tested in isolation. v0.3.0 shipped removing a confirmed-gone game from the library and a ROM-detection fix; v0.4.0 additionally offers Auto-Install inline right from the launch flow, not just from Settings. More of Phase 2's scope (a refined library view, favorites, recently played, a game detail panel) is already built and tested but not yet released.</p>
+<p>Bridge is functional and shipping — v0.5.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2's automatic emulator installation feature is complete too — all 15 seed platforms confirmed end-to-end with real installs and real game launches, not just tested in isolation. v0.3.0 shipped removing a confirmed-gone game from the library and a ROM-detection fix; v0.4.0 added offering Auto-Install inline right from the launch flow; v0.5.0 completes the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel — closing out everything that was built but not yet released.</p>
 <ul>
 <li>Scan your ROM folders and automatically detect which system each game belongs to</li>
 <li>Fetch box art automatically from SteamGridDB</li>
@@ -34,11 +34,13 @@
 <li>Automatically download, install, and configure the right emulator for any of 15 supported systems — one click, no manual setup (or point Bridge at an emulator you already have)</li>
 <li>Launching a game with no emulator configured yet offers to install one automatically, right there — not just from Settings</li>
 <li>Launch games with the correct emulator and arguments, automatically</li>
+<li>Mark games as favorites and see when you last played each one, right on the cover grid</li>
+<li>Sort the library by name, recently played, or favorites first, and filter to favorites only</li>
+<li>A game detail panel (right-click → "View Details") with release year, platform, and cover art</li>
 <li>Remove a game from the library once it's confirmed gone for good (right-click a missing game → "Remove from Library")</li>
-<li>Simple cover grid view</li>
 <li>Library persists between sessions — no full re-scan on every launch</li>
 </ul>
-<p><strong>Known limitations:</strong> removing a game from the library only works for entries already marked "missing" — no way to remove a still-present game you no longer want tracked; a refined library view, favorites, recently played, and a game detail panel are built and tested but not yet released; Phase 3 (achievements, cheats, video previews, recommendations) and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, UI pass) haven't been started. See <a href="../DEVELOPMENT.md">Development Guide</a> for full detail.</p>
+<p><strong>Known limitations:</strong> removing a game from the library only works for entries already marked "missing" — no way to remove a still-present game you no longer want tracked; the game detail panel has no description/blurb, since SteamGridDB (Bridge's only metadata source today) doesn't provide one; a "Big Picture" view, per-game emulator configuration, Phase 3 (achievements, cheats, video previews, recommendations), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, UI pass) haven't been started. See <a href="../DEVELOPMENT.md">Development Guide</a> for full detail.</p>
 
 <h2>Getting Started</h2>
 <p>Coming soon</p>

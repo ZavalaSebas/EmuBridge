@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-07
+
+The "Full library" group, complete: the main library stops feeling like Phase 1's functional-only grid and starts feeling finished. All 4 items are interactively confirmed on the user's real machine, not just unit-tested. 187 unit tests in Release, 186 in Debug (up from 161 in `v0.4.0`).
+
 ### Added
 - Game detail panel (right-click a tile → "View Details") — shows release year, name, platform, and the existing box art. Scoped down from the original plan after confirming against SteamGridDB's real API that it has no description/blurb or screenshot data at all — shows "Description: not available" explicitly rather than a blank or fabricated field; screenshots are out of scope until a different metadata source is decided on. `BoxArt` gained a nullable `ReleaseYear`, sourced from data `MetadataService` already fetches (no new API call). See ARCHITECTURE.md → ADR-19. 14 new tests
 - Favorites (right-click a tile → "Add to Favorites"/"Remove from Favorites") — `Game.IsFavorite`, embedded like `IsMissing`, with a star (★) indicator on the tile's cover when favorited. Split out from "recently played," which shares the same `PLAN.md` bullet but has different mechanics (automatic, not a manual toggle) and ships separately. See ARCHITECTURE.md → ADR-20. 4 new tests
