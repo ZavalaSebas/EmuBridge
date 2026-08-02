@@ -7,7 +7,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white&labelColor=1a1a2e)](https://dotnet.microsoft.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows-00a4ef?style=flat-square&logo=windows&logoColor=white&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge)
-[![Version](https://img.shields.io/badge/Version-0.6.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
+[![Version](https://img.shields.io/badge/Version-0.7.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
 
 A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.
 
@@ -69,7 +69,7 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 
 ## Features
 
-> Bridge is functional and shipping — v0.6.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2's automatic emulator installation feature is complete too — all 15 seed platforms confirmed end-to-end with real installs and real game launches, not just tested in isolation. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completes the "Big Picture" group — a streaming-style mode with real box art per view, closing out everything that was built but not yet released.
+> Bridge is functional and shipping — v0.7.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is effectively complete too — the only remaining piece is a core picker UI, deliberately deferred until a platform actually has more than one known-good core to choose between. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completed the "Big Picture" group — a streaming-style mode with real box art per view; `v0.7.0` adds per-game emulator configuration and hardens the download-verification guard against the libretro nightly channel's real rebuild frequency.
 
 - Scan your ROM folders and automatically detect which system each game belongs to
 - Fetch box art automatically from SteamGridDB
@@ -77,6 +77,7 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 - Automatically download, install, and configure the right emulator for any of 15 supported systems — one click, no manual setup (or point Bridge at an emulator you already have)
 - Launching a game with no emulator configured yet offers to install one automatically, right there — not just from Settings
 - Launch games with the correct emulator and arguments, automatically
+- Set a different emulator/arguments for one specific game without touching the platform's shared default (right-click a tile → "Configure Emulator...")
 - Mark games as favorites and see when you last played each one, right on the cover grid
 - Sort the library by name, recently played, or favorites first, and filter to favorites only
 - A game detail panel (right-click → "View Details") with release year, platform, and cover art
@@ -88,7 +89,8 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 **Known limitations** (see [DEVELOPMENT.md](DEVELOPMENT.md#known-limitations) for full detail):
 - Removing a game from the library only works for entries already marked "missing" — there's no way to remove a game that's still present but you no longer want tracked
 - The game detail panel has no description/blurb — SteamGridDB (Bridge's only metadata source today) doesn't provide one
-- Per-game emulator configuration, Phase 3 (achievements, cheats, video previews, recommendations), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
+- The built-in emulator catalog needs occasional manual maintenance to stay in sync with the libretro nightly build channel, which rebuilds frequently — Bridge's download verification always catches and rejects a stale entry rather than installing something unverified, so this affects availability (a real install can fail until the catalog is updated), never safety
+- A core picker UI, Phase 3 (achievements, cheats, video previews, recommendations), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
 
 ---
 
