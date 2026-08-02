@@ -98,6 +98,85 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_BoxArtWithReleaseYear_TileHasReleaseYearText()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        _repository.BoxArtRecords.Add(new BoxArt { GameId = game.Id, Status = BoxArtStatus.Cached, ReleaseYear = 1990 });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal("1990", Assert.Single(_viewModel.Games).ReleaseYearText);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_NoBoxArtOrNoReleaseYear_TileReleaseYearTextIsNull()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Null(Assert.Single(_viewModel.Games).ReleaseYearText);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DefaultSortIsName_OrdersGamesAlphabetically()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\z.nes", Name = "Zelda", PlatformId = "nes" });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\m.nes", Name = "Mario", PlatformId = "nes" });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes" });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal(LibrarySortMode.Name, _viewModel.SortMode);
+        Assert.Equal(["Alpha", "Mario", "Zelda"], _viewModel.Games.Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task SortMode_RecentlyPlayed_OrdersMostRecentFirstWithNeverPlayedLastAlphabetically()
+    {
+        var now = DateTime.UtcNow;
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\z.nes", Name = "Zelda", PlatformId = "nes", LastPlayedUtc = null });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes", LastPlayedUtc = null });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\m.nes", Name = "Mario", PlatformId = "nes", LastPlayedUtc = now.AddDays(-1) });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\l.nes", Name = "Link", PlatformId = "nes", LastPlayedUtc = now });
+        await _viewModel.InitializeAsync();
+
+        _viewModel.SortMode = LibrarySortMode.RecentlyPlayed;
+
+        Assert.Equal(["Link", "Mario", "Alpha", "Zelda"], _viewModel.Games.Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task SortMode_FavoritesFirst_OrdersFavoritesBeforeOthersAlphabeticallyWithinEachGroup()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\z.nes", Name = "Zelda", PlatformId = "nes", IsFavorite = true });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\m.nes", Name = "Mario", PlatformId = "nes", IsFavorite = false });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\a.nes", Name = "Alpha", PlatformId = "nes", IsFavorite = true });
+        await _viewModel.InitializeAsync();
+
+        _viewModel.SortMode = LibrarySortMode.FavoritesFirst;
+
+        Assert.Equal(["Alpha", "Zelda", "Mario"], _viewModel.Games.Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task ShowFavoritesOnly_FiltersOutNonFavoritesWithoutReloadingFromRepository()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\m.nes", Name = "Mario", PlatformId = "nes", IsFavorite = false });
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\z.nes", Name = "Zelda", PlatformId = "nes", IsFavorite = true });
+        await _viewModel.InitializeAsync();
+
+        _viewModel.ShowFavoritesOnly = true;
+
+        Assert.Equal(["Zelda"], _viewModel.Games.Select(t => t.Name));
+
+        _viewModel.ShowFavoritesOnly = false;
+
+        Assert.Equal(["Mario", "Zelda"], _viewModel.Games.Select(t => t.Name));
+    }
+
+    [Fact]
     public async Task RefreshLibraryCommand_CallsScanThenFetchMissingBoxArt()
     {
         await _viewModel.RefreshLibraryCommand.ExecuteAsync(null);

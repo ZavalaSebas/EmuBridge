@@ -828,6 +828,48 @@ The "Full library" Roadmap group's second item, `PLAN.md`'s original "Favorites 
 
 ---
 
+### ADR-21: "Full library" group's last item — sort/filter for the cover grid, no animation
+
+**Status:** Accepted
+
+**Date:** 2026-08-07
+
+**Context:**
+The "Full library" group's last item is the refined "Library" view `BRIDGE_PROJECT_FOUNDATION.md` describes as "Playnite-style cover grid, refined from the Phase 1 functional version." By this point the group's first three items had already produced real, unused-until-now data — `Game.IsFavorite` (ADR-20), `Game.LastPlayedUtc` (ADR-20), `BoxArt.ReleaseYear` (ADR-19) — none of which the grid itself surfaced. Explicitly scoped against Phase Polish before designing: this item is "Full library," not Phase Polish — no transition animations, no theming, functional refinement only, per `PLAN.md`'s own phase boundary.
+
+**Decision — scope: sorting, one filter, one added tile indicator:**
+- **Sorting**, 3 modes: `Name` (new explicit default, replacing the previously undefined LiteDB return order), `RecentlyPlayed` (`Game.LastPlayedUtc` descending), `FavoritesFirst` (`Game.IsFavorite` descending, then name).
+- **Filtering**: `ShowFavoritesOnly` only. A second candidate, "hide missing," was investigated and explicitly rejected — see Alternatives.
+- **Tile indicator**: `BoxArt.ReleaseYear` shown directly on the tile (not just the ADR-19 detail panel) — real data already fetched, zero new calls.
+
+Deliberately **not** in scope, matching what was actually asked rather than expanding it: platform filtering (a real Playnite feature, but never raised as a candidate — would need its own data plumbing and design pass) and a "played N days ago" tile badge (`ReleaseYear` was the specific example given; a relative-time badge wasn't).
+
+**Decision — "hide missing" rejected, not built:** investigated as a real candidate, then rejected on a real edge case: a user with several ghost/missing entries would likely enable a hide filter for exactly that clutter — and then have no way to reach `ADR-15`'s "Remove from Library" context-menu action for those same entries while the filter stays on, since hidden tiles render nothing to right-click. Two fixes were possible (drop the filter entirely, or keep it and add a "N hidden" counter so the user knows to toggle it off before cleaning up) — dropped the filter entirely: `ADR-15`/`ADR-6` already established that `Remove` is the correct tool for confirmed-gone-forever entries, and the existing dimmed-opacity + "(missing)" badge treatment already de-emphasizes missing tiles without needing a second, filter-shaped path to the same declutter goal.
+
+**Decision — nulls-last for `RecentlyPlayed`, alphabetical tiebreak:** never-played games (`LastPlayedUtc == null`) sort after every played game, not before — surfacing untouched games ahead of what was actually played recently would contradict the sort's own name. Within the never-played group, alphabetical by name, so that subset isn't left in an arbitrary/unstable order.
+
+**Decision — in-memory rebuild, no repository round-trip for sort/filter changes:** `_gamesById` (already populated by `LoadGamesAsync`) is the source of truth; a new `_boxArtByGameId` cache was added alongside it (previously `BoxArt` was only used transiently inside `LoadGamesAsync`, never retained) so a sort/filter change can rebuild `GameTile`s purely from what's already in memory. `SortMode`/`ShowFavoritesOnly` are `[ObservableProperty]`s with `partial void On...Changed` hooks calling a new private `RebuildGameTiles()` — no `IsBusy`, no async, no new call to `ILibraryRepository`. `LoadGamesAsync` (used after a real reload — scan, favorite toggle, delete) populates the caches then calls the same `RebuildGameTiles()`, so there's one place, not two, that knows how to turn "the current set of games" into what the grid shows.
+
+**Decision — toolbar controls, not a new view or panel:** a `ComboBox` (3 friendly-labeled `ComboBoxItem`s, `Tag` carrying the real `LibrarySortMode` enum value, `SelectedValuePath="Tag"`) and a `CheckBox`, added to the existing toolbar `StackPanel` next to Add Folder/Rescan/Settings — no new window, no new panel, matching the "functional, not elaborate" bar already applied to every control in `MainWindow`/`SettingsWindow` this phase.
+
+**Consequences:**
+- ✅ Every piece of data the "Full library" group produced (favorites, recently played, release year) is now actually visible/usable in the one place a user spends most of their time — the grid itself, not buried behind a detail-panel click
+- ✅ Sort/filter changes are instant — no spinner, no `IsBusy`, no repository hit — because they operate on data already in memory
+- ✅ The "hide missing" rejection is a real, evidenced decision (a specific interaction conflict with `ADR-15`), not a guess or a default-to-simpler choice
+- ✅ `RebuildGameTiles()` being the single path both `LoadGamesAsync` and the property-changed hooks call means a future sort/filter addition doesn't need a second implementation
+- ❌ `LibrarySortMode`'s `ComboBox` items store friendly display text a second time (in XAML `Content`), separate from the enum's own member names — acceptable for 3 fixed items, would need a real converter or view-model-exposed display list if this ever needed to be more dynamic
+- ❌ No visual/interactive confirmation yet that sort/filter/the release-year tile line render and behave correctly in a real running window — same category of gap already noted before every other UI feature's first real click this phase; covered here by `MainViewModelTests` at the ViewModel level, not by watching it on screen
+
+**Alternatives considered:**
+
+- **Add platform filtering:** rejected — never raised as a candidate for this pass; a real Playnite feature, but its own design/data-plumbing effort, not an opportunistic add-on
+- **Add a "played N days ago" relative-time badge on the tile:** rejected for the same reason — `ReleaseYear` was the specific example given to investigate, a relative-time badge wasn't, and it's a meaningfully bigger scope (needs live/refreshing relative-time formatting, not a static string)
+- **Keep "hide missing," add a "N hidden — missing" counter instead of dropping it:** rejected — adds a second piece of new UI (a counter) to work around a problem that dropping the filter avoids for free, and the counter itself doesn't restore access to `Remove`, only informs the user they'd need to toggle off first
+- **`ICollectionView`/`CollectionViewSource` for sorting/filtering instead of manually rebuilding `Games`:** rejected — more idiomatic WPF for this exact problem, but the codebase doesn't use it anywhere yet, and a plain rebuild from an already-in-memory dictionary is simple enough not to need it; revisit if a future addition (e.g. live search-as-you-type) makes manual rebuilding awkward
+- **Nulls-first for `RecentlyPlayed`:** rejected — would put never-played games at the top of a sort whose entire point is surfacing what was actually played recently
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above

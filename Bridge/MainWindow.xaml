@@ -66,6 +66,18 @@
                                    Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}" />
                     </Grid>
                     <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" />
+                    <TextBlock Text="{Binding ReleaseYearText}" Foreground="Gray" FontSize="11"
+                               HorizontalAlignment="Center" Margin="0,2,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ReleaseYearText}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <TextBlock Text="(missing)" Foreground="OrangeRed" HorizontalAlignment="Center" FontSize="11"
                                Visibility="{Binding IsMissing, Converter={StaticResource BoolToVisibilityConverter}}" />
                 </StackPanel>
@@ -88,7 +100,16 @@
             <Button Content="Rescan" Command="{Binding RefreshLibraryCommand}"
                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
                     Margin="0,0,8,0" Padding="10,4" />
-            <Button Content="Settings" Command="{Binding OpenSettingsCommand}" Padding="10,4" />
+            <Button Content="Settings" Command="{Binding OpenSettingsCommand}" Padding="10,4" Margin="0,0,16,0" />
+
+            <TextBlock Text="Sort:" VerticalAlignment="Center" Margin="0,0,4,0" />
+            <ComboBox SelectedValue="{Binding SortMode}" SelectedValuePath="Tag" Width="140" Margin="0,0,12,0">
+                <ComboBoxItem Content="Name" Tag="{x:Static vm:LibrarySortMode.Name}" />
+                <ComboBoxItem Content="Recently Played" Tag="{x:Static vm:LibrarySortMode.RecentlyPlayed}" />
+                <ComboBoxItem Content="Favorites First" Tag="{x:Static vm:LibrarySortMode.FavoritesFirst}" />
+            </ComboBox>
+
+            <CheckBox Content="Favorites only" IsChecked="{Binding ShowFavoritesOnly}" VerticalAlignment="Center" />
         </StackPanel>
 
         <!-- Content -->

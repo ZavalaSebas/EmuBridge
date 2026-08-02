@@ -22,6 +22,7 @@ public partial class MainViewModel : ObservableObject
     private readonly ILogger<MainViewModel> _logger;
 
     private readonly Dictionary<Guid, Game> _gamesById = new();
+    private readonly Dictionary<Guid, BoxArt> _boxArtByGameId = new();
 
     // Shared across RefreshLibraryAsync (scan) and OfferInlineAutoInstallAsync (install) —
     // IsBusy is exclusive between the two, so only one of them is ever running, and one Cancel
@@ -39,6 +40,16 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private LibrarySortMode _sortMode = LibrarySortMode.Name;
+
+    [ObservableProperty]
+    private bool _showFavoritesOnly;
+
+    partial void OnSortModeChanged(LibrarySortMode value) => RebuildGameTiles();
+
+    partial void OnShowFavoritesOnlyChanged(bool value) => RebuildGameTiles();
 
     /// <summary>Invoked by MainWindow to open the Settings window — wired from the composition
     /// root, not referenced directly here, so this ViewModel doesn't need to know about
@@ -361,11 +372,53 @@ public partial class MainViewModel : ObservableObject
             .ToDictionary(b => b.GameId);
 
         _gamesById.Clear();
-        var tiles = new List<GameTile>();
+        _boxArtByGameId.Clear();
         foreach (var game in games)
         {
             _gamesById[game.Id] = game;
-            boxArtByGameId.TryGetValue(game.Id, out var boxArt);
+            if (boxArtByGameId.TryGetValue(game.Id, out var boxArt))
+            {
+                _boxArtByGameId[game.Id] = boxArt;
+            }
+        }
+
+        RebuildGameTiles();
+
+        var scanFolders = await _libraryRepository.GetScanFoldersAsync(ct);
+        HasNoScanFolders = scanFolders.Count == 0;
+    }
+
+    // Reorders/filters what's already cached in _gamesById/_boxArtByGameId — no repository
+    // round-trip, no IsBusy needed. Called after a real reload (LoadGamesAsync) and whenever
+    // SortMode/ShowFavoritesOnly change, so both paths share one place that knows how to turn
+    // "the current set of Games" into what the grid actually displays.
+    private void RebuildGameTiles()
+    {
+        IEnumerable<Game> games = _gamesById.Values;
+
+        if (ShowFavoritesOnly)
+        {
+            games = games.Where(g => g.IsFavorite);
+        }
+
+        // Nulls (never played) sort last, alphabetically among themselves — not first, which
+        // would surface games nobody has touched ahead of what was actually played recently.
+        games = SortMode switch
+        {
+            LibrarySortMode.RecentlyPlayed => games
+                .OrderByDescending(g => g.LastPlayedUtc.HasValue)
+                .ThenByDescending(g => g.LastPlayedUtc)
+                .ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase),
+            LibrarySortMode.FavoritesFirst => games
+                .OrderByDescending(g => g.IsFavorite)
+                .ThenBy(g => g.Name, StringComparer.OrdinalIgnoreCase),
+            _ => games.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
+        };
+
+        var tiles = new List<GameTile>();
+        foreach (var game in games)
+        {
+            _boxArtByGameId.TryGetValue(game.Id, out var boxArt);
 
             tiles.Add(new GameTile
             {
@@ -373,13 +426,11 @@ public partial class MainViewModel : ObservableObject
                 Name = game.Name,
                 CoverImagePath = boxArt?.Status == BoxArtStatus.Cached ? boxArt.LocalPath : null,
                 IsMissing = game.IsMissing,
-                IsFavorite = game.IsFavorite
+                IsFavorite = game.IsFavorite,
+                ReleaseYearText = boxArt?.ReleaseYear?.ToString()
             });
         }
 
         Games = new ObservableCollection<GameTile>(tiles);
-
-        var scanFolders = await _libraryRepository.GetScanFoldersAsync(ct);
-        HasNoScanFolders = scanFolders.Count == 0;
     }
 }

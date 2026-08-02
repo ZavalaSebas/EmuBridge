@@ -15,4 +15,17 @@ public class GameTile
 
     public bool IsMissing { get; init; }
     public bool IsFavorite { get; init; }
+
+    /// <summary>Null means BoxArt has no release year (not fetched, or SteamGridDB had none) —
+    /// the View hides this line entirely rather than showing an empty one.</summary>
+    public string? ReleaseYearText { get; init; }
+}
+
+// UI-only display concern — where to sort a Game in the library grid. Not a domain model, so it
+// doesn't live in Bridge.Models alongside things like LaunchOutcome/BoxArtStatus.
+public enum LibrarySortMode
+{
+    Name,
+    RecentlyPlayed,
+    FavoritesFirst
 }
