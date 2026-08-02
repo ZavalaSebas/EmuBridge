@@ -124,11 +124,11 @@ These reshape the architecture if resolved late, so they were closed in Phase 0,
 
 ## Scope: Current vs Future
 
-### Current Version (0.3.0) — Shipped
-`v0.1.0` shipped the full Phase 1 (MVP) scope: detect → show → play. `v0.2.0` shipped one item out of Phase 2's scope — automatic emulator detection/download. `v0.3.0` shipped two small, unrelated items that had been sitting committed but unreleased since shortly after `v0.2.0`: removing a `Game` from the library, and the `.bin`/Atari 2600 extension fix. Keep `<Version>` in `Bridge/Bridge.csproj` consistent with this document, `README.md`, and `docs/index.html` (see DEVELOPMENT.md → Version Management).
+### Current Version (0.4.0) — Shipped
+`v0.1.0` shipped the full Phase 1 (MVP) scope: detect → show → play. `v0.2.0` shipped one item out of Phase 2's scope — automatic emulator detection/download. `v0.3.0` shipped two small, unrelated items that had been sitting committed but unreleased since shortly after `v0.2.0`: removing a `Game` from the library, and the `.bin`/Atari 2600 extension fix. `v0.4.0` shipped offering Auto-Install inline from the launch flow itself — the item originally scoped as `v0.3.0`, retroactively renumbered once the two smaller items above turned out to have taken that slot first. Keep `<Version>` in `Bridge/Bridge.csproj` consistent with this document, `README.md`, and `docs/index.html` (see DEVELOPMENT.md → Version Management).
 
-### Already built, staged for their own release — not "Future," not yet tagged
-Two more chunks of work are code-complete, tested, and interactively confirmed, but not yet cut as their own version (each earns its number only once released, per `## Roadmap` below): offering Auto-Install inline from the launch flow (staged as `v0.4.0`), and the full "Full library" group — game detail panel, favorites, recently played, refined "Library" view (staged as `v0.5.0`). Listed here separately from the real backlog below so this section doesn't imply they're unstarted.
+### Already built, staged for its own release — not "Future," not yet tagged
+The full "Full library" group — game detail panel, favorites, recently played, refined "Library" view — is code-complete, tested, and interactively confirmed, but not yet cut as its own version (earns its number only once released, per `## Roadmap` below, staged as `v0.5.0`). Listed here separately from the real backlog below so this section doesn't imply it's unstarted.
 
 ### Future Versions — Backlog
 "Big Picture" view, per-game emulator configuration, a core picker UI (no real multi-core case exists yet — see ADR-18), all of Phase 3 (RetroAchievements, cheats/mods, video previews, recommendations, additional views, disc-based system support, emulator core update checks), and all of Phase Polish (transition animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass — including integrating WPF-UI itself, decided early but never installed) remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features; storefront integration) is out of scope indefinitely, not just for this version.

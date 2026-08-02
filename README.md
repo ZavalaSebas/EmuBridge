@@ -7,7 +7,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white&labelColor=1a1a2e)](https://dotnet.microsoft.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows-00a4ef?style=flat-square&logo=windows&logoColor=white&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge)
-[![Version](https://img.shields.io/badge/Version-0.3.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
+[![Version](https://img.shields.io/badge/Version-0.4.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
 
 A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.
 
@@ -69,12 +69,13 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 
 ## Features
 
-> Bridge is functional and shipping — v0.3.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2's automatic emulator installation feature is complete too — all 15 seed platforms confirmed end-to-end with real installs and real game launches, not just tested in isolation. `v0.3.0` additionally ships removing a confirmed-gone game from the library and a ROM-detection fix. More of Phase 2's scope (a refined library view, favorites, a game detail panel, offering Auto-Install inline from the launch flow) is already built and tested but not yet released — staged for `v0.4.0`/`v0.5.0`.
+> Bridge is functional and shipping — v0.4.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2's automatic emulator installation feature is complete too — all 15 seed platforms confirmed end-to-end with real installs and real game launches, not just tested in isolation. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` additionally offers Auto-Install inline right from the launch flow, not just from Settings. More of Phase 2's scope (a refined library view, favorites, recently played, a game detail panel) is already built and tested but not yet released — staged for `v0.5.0`.
 
 - Scan your ROM folders and automatically detect which system each game belongs to
 - Fetch box art automatically from SteamGridDB
 - Local image cache, resized to the exact size used on screen — no runtime scaling
 - Automatically download, install, and configure the right emulator for any of 15 supported systems — one click, no manual setup (or point Bridge at an emulator you already have)
+- Launching a game with no emulator configured yet offers to install one automatically, right there — not just from Settings
 - Launch games with the correct emulator and arguments, automatically
 - Remove a game from the library once it's confirmed gone for good (right-click a missing game → "Remove from Library")
 - Simple cover grid view
@@ -82,7 +83,7 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 
 **Known limitations** (see [DEVELOPMENT.md](DEVELOPMENT.md#known-limitations) for full detail):
 - Removing a game from the library only works for entries already marked "missing" — there's no way to remove a game that's still present but you no longer want tracked
-- A refined library view (sorting/filtering), favorites, recently played, a game detail panel, and offering Auto-Install inline from the launch flow are built and tested but not yet released. Phase 3 (achievements, cheats, video previews, recommendations) and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
+- A refined library view (sorting/filtering), favorites, recently played, and a game detail panel are built and tested but not yet released. Phase 3 (achievements, cheats, video previews, recommendations) and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
 
 ---
 
