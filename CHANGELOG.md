@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-07
+
+The "Big Picture" group, complete: a streaming-style mode with a maximized window, landscape tiles, a "Try Something New" section, and real box art per view (vertical for the normal grid, horizontal for Big Picture) instead of one orientation stretched to fit both. Three real bugs were found and fixed during interactive testing, each investigated with real evidence before any fix — see ARCHITECTURE.md → ADR-22/ADR-23 for the full design and investigation record. 209 unit tests in Release, 208 in Debug (up from 187 in `v0.5.0`).
+
 ### Added
 - "Big Picture" mode (toolbar checkbox) — a maximized, larger-tile presentation of the same library, plus a "Try Something New" section surfacing never-played, still-present games alphabetically (no scoring, no randomness — capped at 10, hidden entirely when there are no candidates). Reuses the existing library/launch/context-menu behavior rather than a separate window. No genre/similarity-based recommendations — SteamGridDB has no such data (ADR-19); "Try Something New" resolves a previously-unscoped idea from the Speculative Ideas pool, promoted with the user's explicit confirmation before being folded in. Keyboard/gamepad navigation deferred to Phase Polish — no such input handling exists in Bridge today. See ARCHITECTURE.md → ADR-22. 6 new tests
 - Vertical/poster-style box art for the normal library grid's portrait tiles, and landscape/streaming-style box art for Big Picture's tiles — each orientation falls back to the other when one isn't available for a game. One combined SteamGridDB request (no new HTTP calls) classifies grids by real aspect ratio; games cached before this change get the missing orientation backfilled automatically on the next scan, without re-downloading the cover they already have. See ARCHITECTURE.md → ADR-23. 8 new tests
