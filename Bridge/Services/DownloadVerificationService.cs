@@ -7,14 +7,26 @@ using Microsoft.Extensions.Logging;
 namespace Bridge.Services;
 
 // Downloads a file to a Bridge-managed staging area and verifies it against a pinned SHA256 +
-// exact expected size before it's ever treated as installed. See ARCHITECTURE.md -> ADR-11 for
-// the full threat model: this protects against transit corruption, a compromised CDN serving a
-// different file than what was pinned, and a hung/oversized download filling the user's disk.
-// It does NOT protect against the pinned source itself being malicious at pin time — that's a
-// property of Bridge's own manifest-authoring process, not of this verification step.
+// expected size (within a small tolerance, see SizeToleranceBytes) before it's ever treated as
+// installed. See ARCHITECTURE.md -> ADR-11 for the full threat model: this protects against
+// transit corruption, a compromised CDN serving a different file than what was pinned, and a
+// hung/oversized download filling the user's disk. It does NOT protect against the pinned source
+// itself being malicious at pin time — that's a property of Bridge's own manifest-authoring
+// process, not of this verification step.
 public class DownloadVerificationService : IDownloadVerificationService
 {
     private const int BufferSize = 81920;
+
+    // The size check is a cheap first-line gate, not the real verification — SHA256 (below) is the
+    // one that actually decides trust, exact comparison, no tolerance. This margin exists only
+    // because libretro's nightly core builds are a rolling channel: a routine rebuild can shift a
+    // binary's size by a few bytes (build timestamp/commit hash embedded in the output) with no
+    // functional change at all. Calibrated against real evidence, not guessed: re-verifying all 15
+    // seed-platform cores on 2026-08-02 found 11 of 15 had drifted from their pinned
+    // ExpectedSizeBytes, by -3 to +2 bytes. 32 bytes is ~10x that observed worst case — comfortable
+    // headroom for future rebuilds — while staying negligible (0.035% of the smallest catalog file,
+    // ARCHITECTURE.md -> ADR-11) next to what an actually different or tampered file would shift by.
+    private const long SizeToleranceBytes = 32;
 
     private readonly HttpClient _httpClient;
     private readonly string _downloadDirectory;
@@ -64,13 +76,14 @@ public class DownloadVerificationService : IDownloadVerificationService
         using (response)
         {
             var reportedLength = response.Content.Headers.ContentLength;
-            if (reportedLength is not null && reportedLength.Value != expectedSizeBytes)
+            if (reportedLength is not null && !IsWithinSizeTolerance(reportedLength.Value, expectedSizeBytes))
             {
                 _logger.LogError(
-                    "Download size mismatch for {Url}: server reported {Reported} bytes, expected {Expected} bytes. Rejected before downloading.",
+                    "Download size mismatch for {Url}: server reported {Reported} bytes, expected {Expected} bytes (tolerance +/-{Tolerance}). Rejected before downloading.",
                     sourceUrl,
                     reportedLength.Value,
-                    expectedSizeBytes);
+                    expectedSizeBytes,
+                    SizeToleranceBytes);
                 return SizeMismatchResult(destinationFileName, "reported an unexpected size and was rejected before downloading");
             }
 
@@ -99,9 +112,12 @@ public class DownloadVerificationService : IDownloadVerificationService
     }
 
     // Streams the response body to disk, cutting off the instant the byte count exceeds
-    // expectedSizeBytes rather than waiting for the transfer to finish — bounds worst-case disk
-    // usage even when the server never sends Content-Length. Returns null on success (file fully
-    // staged, size matched exactly); returns the terminal DownloadResult directly on any failure.
+    // expectedSizeBytes + SizeToleranceBytes rather than waiting for the transfer to finish — bounds
+    // worst-case disk usage even when the server never sends Content-Length. The ceiling must match
+    // the tolerance used elsewhere in this class, or a file that's legitimately a few bytes over
+    // (and would pass the final size check below) would get truncated mid-stream instead. Returns
+    // null on success (file fully staged, size within tolerance); returns the terminal
+    // DownloadResult directly on any failure.
     private async Task<DownloadResult?> StreamToStagingFileAsync(
         HttpResponseMessage response,
         string stagingPath,
@@ -122,7 +138,7 @@ public class DownloadVerificationService : IDownloadVerificationService
                 while ((bytesRead = await sourceStream.ReadAsync(buffer, ct)) > 0)
                 {
                     totalRead += bytesRead;
-                    if (totalRead > expectedSizeBytes)
+                    if (totalRead > expectedSizeBytes + SizeToleranceBytes)
                     {
                         break;
                     }
@@ -150,21 +166,22 @@ public class DownloadVerificationService : IDownloadVerificationService
             throw;
         }
 
-        if (totalRead > expectedSizeBytes)
+        if (totalRead > expectedSizeBytes + SizeToleranceBytes)
         {
             DeleteIfExists(stagingPath);
             _logger.LogError(
-                "Download for {Url} exceeded expected size ({Expected} bytes) — stopped early at {Actual} bytes.",
+                "Download for {Url} exceeded expected size ({Expected} bytes, tolerance +/-{Tolerance}) — stopped early at {Actual} bytes.",
                 sourceUrl,
                 expectedSizeBytes,
+                SizeToleranceBytes,
                 totalRead);
             return SizeMismatchResult(destinationFileName, "was larger than expected and was stopped");
         }
 
-        if (totalRead != expectedSizeBytes)
+        if (!IsWithinSizeTolerance(totalRead, expectedSizeBytes))
         {
             DeleteIfExists(stagingPath);
-            _logger.LogError("Download for {Url} ended early: got {Actual} of {Expected} expected bytes.", sourceUrl, totalRead, expectedSizeBytes);
+            _logger.LogError("Download for {Url} ended early: got {Actual} of {Expected} expected bytes (tolerance +/-{Tolerance}).", sourceUrl, totalRead, expectedSizeBytes, SizeToleranceBytes);
             return new DownloadResult
             {
                 Outcome = DownloadOutcome.SizeExceeded,
@@ -174,6 +191,8 @@ public class DownloadVerificationService : IDownloadVerificationService
 
         return null;
     }
+
+    private static bool IsWithinSizeTolerance(long actual, long expected) => Math.Abs(actual - expected) <= SizeToleranceBytes;
 
     private static async Task<string> ComputeSha256Async(string filePath, CancellationToken ct)
     {

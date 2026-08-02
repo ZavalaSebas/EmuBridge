@@ -135,4 +135,95 @@ public class EmulatorServiceTests : IDisposable
         Assert.Equal(corePath, profile.CorePath);
         Assert.Equal(_fakeExecutablePath, profile.ExecutablePath);
     }
+
+    // Per-game override (ARCHITECTURE.md -> ADR-24). The exact motivating case: 20 SNES games
+    // share one platform-wide profile, but one game needs a different argument.
+    [Fact]
+    public async Task GetProfileForGameAsync_OverrideExists_UsesOverrideNotPlatformDefault()
+    {
+        await _service.SaveProfileAsync("snes", "Snes9x", _fakeExecutablePath, "\"{RomPath}\"");
+        var oddGame = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Star Fox 2" };
+
+        await _service.SaveProfileAsync("snes", "Snes9x (compat)", _fakeExecutablePath, "\"{RomPath}\" --gfx-compat", oddGame.Id);
+
+        var resolved = await _service.GetProfileForGameAsync(oddGame);
+        Assert.NotNull(resolved);
+        Assert.Equal("\"{RomPath}\" --gfx-compat", resolved.ArgumentTemplate);
+    }
+
+    [Fact]
+    public async Task GetProfileForGameAsync_NoOverride_FallsBackToPlatformDefault()
+    {
+        await _service.SaveProfileAsync("snes", "Snes9x", _fakeExecutablePath, "\"{RomPath}\"");
+        var ordinaryGame = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Super Mario World" };
+
+        var resolved = await _service.GetProfileForGameAsync(ordinaryGame);
+
+        Assert.NotNull(resolved);
+        Assert.Equal("\"{RomPath}\"", resolved.ArgumentTemplate);
+    }
+
+    [Fact]
+    public async Task GetProfileForGameAsync_NeitherOverrideNorPlatformDefaultExists_ReturnsNull()
+    {
+        var game = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Unconfigured" };
+
+        var resolved = await _service.GetProfileForGameAsync(game);
+
+        Assert.Null(resolved);
+    }
+
+    [Fact]
+    public async Task SaveProfileAsync_OverrideForOneGame_DoesNotAffectSiblingGamesOnSamePlatform()
+    {
+        await _service.SaveProfileAsync("snes", "Snes9x", _fakeExecutablePath, "\"{RomPath}\"");
+        var oddGame = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Star Fox 2" };
+        var siblingGame = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Super Mario World" };
+
+        await _service.SaveProfileAsync("snes", "Snes9x (compat)", _fakeExecutablePath, "\"{RomPath}\" --gfx-compat", oddGame.Id);
+
+        var siblingResolved = await _service.GetProfileForGameAsync(siblingGame);
+        var platformDefault = await _service.GetProfileForPlatformAsync("snes");
+        Assert.Equal("\"{RomPath}\"", siblingResolved!.ArgumentTemplate);
+        Assert.Equal("\"{RomPath}\"", platformDefault!.ArgumentTemplate);
+        Assert.Equal(2, _repository.EmulatorProfiles.Count); // platform default + the one override
+    }
+
+    [Fact]
+    public async Task SaveProfileAsync_PlatformDefaultAfterOverrideExists_DoesNotClobberOverride()
+    {
+        var oddGame = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Star Fox 2" };
+        await _service.SaveProfileAsync("snes", "Snes9x (compat)", _fakeExecutablePath, "\"{RomPath}\" --gfx-compat", oddGame.Id);
+
+        // Platform default configured (or reconfigured) afterward — must not touch the override.
+        await _service.SaveProfileAsync("snes", "Snes9x", _fakeExecutablePath, "\"{RomPath}\"");
+
+        var overrideResolved = await _service.GetProfileForGameAsync(oddGame);
+        Assert.Equal("\"{RomPath}\" --gfx-compat", overrideResolved!.ArgumentTemplate);
+    }
+
+    [Fact]
+    public async Task HasGameOverrideAsync_ReflectsWhetherOverrideExists()
+    {
+        var game = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Star Fox 2" };
+        Assert.False(await _service.HasGameOverrideAsync(game.Id));
+
+        await _service.SaveProfileAsync("snes", "Snes9x (compat)", _fakeExecutablePath, "\"{RomPath}\" --gfx-compat", game.Id);
+
+        Assert.True(await _service.HasGameOverrideAsync(game.Id));
+    }
+
+    [Fact]
+    public async Task ClearGameOverrideAsync_RemovesOverride_ResolutionFallsBackToPlatformDefault()
+    {
+        await _service.SaveProfileAsync("snes", "Snes9x", _fakeExecutablePath, "\"{RomPath}\"");
+        var game = new Game { Id = Guid.NewGuid(), PlatformId = "snes", Name = "Star Fox 2" };
+        await _service.SaveProfileAsync("snes", "Snes9x (compat)", _fakeExecutablePath, "\"{RomPath}\" --gfx-compat", game.Id);
+
+        await _service.ClearGameOverrideAsync(game.Id);
+
+        Assert.False(await _service.HasGameOverrideAsync(game.Id));
+        var resolved = await _service.GetProfileForGameAsync(game);
+        Assert.Equal("\"{RomPath}\"", resolved!.ArgumentTemplate);
+    }
 }

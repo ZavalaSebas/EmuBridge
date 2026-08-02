@@ -32,7 +32,7 @@ public class LaunchService : ILaunchService
             };
         }
 
-        var profile = await _emulatorService.GetProfileForPlatformAsync(game.PlatformId, ct);
+        var profile = await _emulatorService.GetProfileForGameAsync(game, ct);
         if (profile is null)
         {
             var message = game.PlatformId == Config.UnknownPlatformId

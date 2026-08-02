@@ -69,6 +69,10 @@ public partial class MainViewModel : ObservableObject
     /// to show — this ViewModel doesn't need to know about GameDetailWindow/GameDetailViewModel.</summary>
     public Action<Game>? OpenGameDetailsRequested { get; set; }
 
+    /// <summary>Same wiring shape as OpenGameDetailsRequested — this ViewModel doesn't need to know
+    /// about EmulatorOverrideWindow/EmulatorOverrideViewModel (ARCHITECTURE.md -> ADR-24).</summary>
+    public Action<Game>? OpenEmulatorOverrideRequested { get; set; }
+
     public MainViewModel(
         IRomScannerService romScannerService,
         ILibraryRepository libraryRepository,
@@ -302,6 +306,17 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ConfigureEmulator(GameTile? tile)
+    {
+        if (tile is null || !_gamesById.TryGetValue(tile.GameId, out var game))
+        {
+            return;
+        }
+
+        OpenEmulatorOverrideRequested?.Invoke(game);
+    }
+
+    [RelayCommand]
     private async Task ToggleFavoriteAsync(GameTile? tile)
     {
         if (tile is null || !_gamesById.TryGetValue(tile.GameId, out var game))
@@ -352,6 +367,13 @@ public partial class MainViewModel : ObservableObject
         }
 
         await _libraryRepository.DeleteBoxArtAsync(game.Id);
+
+        // Direct delete, no "still referenced elsewhere" check needed — unlike the BoxArt file
+        // above, a per-game EmulatorProfile row is looked up only by this exact GameId and nothing
+        // else stores a reference to it, so it can never be shared with another game (ARCHITECTURE.md
+        // -> ADR-24). No-op if this game never had an override.
+        await _libraryRepository.DeleteEmulatorProfileForGameAsync(game.Id);
+
         await _libraryRepository.DeleteGameAsync(game.Id);
 
         _logger.LogInformation("Removed {GameName} from the library.", game.Name);

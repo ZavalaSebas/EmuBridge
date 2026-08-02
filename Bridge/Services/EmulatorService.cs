@@ -16,7 +16,7 @@ public class EmulatorService : IEmulatorService
         _logger = logger;
     }
 
-    public async Task SaveProfileAsync(string platformId, string emulatorName, string executablePath, string argumentTemplate, CancellationToken ct = default)
+    public async Task SaveProfileAsync(string platformId, string emulatorName, string executablePath, string argumentTemplate, Guid? gameId = null, CancellationToken ct = default)
     {
         if (!File.Exists(executablePath))
         {
@@ -45,18 +45,39 @@ public class EmulatorService : IEmulatorService
         {
             EmulatorId = emulator.Id,
             PlatformId = platformId,
-            ArgumentTemplate = argumentTemplate
+            ArgumentTemplate = argumentTemplate,
+            GameId = gameId
         }, ct);
 
-        _logger.LogInformation(
-            "Saved emulator profile for platform {PlatformId}: {ExecutablePath}",
-            platformId,
-            executablePath);
+        if (gameId is null)
+        {
+            _logger.LogInformation("Saved emulator profile for platform {PlatformId}: {ExecutablePath}", platformId, executablePath);
+        }
+        else
+        {
+            _logger.LogInformation("Saved per-game emulator override for game {GameId} (platform {PlatformId}): {ExecutablePath}", gameId, platformId, executablePath);
+        }
     }
 
     public async Task<ResolvedEmulatorProfile?> GetProfileForPlatformAsync(string platformId, CancellationToken ct = default)
+        => await ResolveAsync(await _repository.GetEmulatorProfileByPlatformIdAsync(platformId, ct), platformId, ct);
+
+    public async Task<ResolvedEmulatorProfile?> GetProfileForGameAsync(Game game, CancellationToken ct = default)
     {
-        var profile = await _repository.GetEmulatorProfileByPlatformIdAsync(platformId, ct);
+        var overrideProfile = await _repository.GetEmulatorProfileForGameAsync(game.Id, ct);
+        return overrideProfile is not null
+            ? await ResolveAsync(overrideProfile, game.PlatformId, ct)
+            : await GetProfileForPlatformAsync(game.PlatformId, ct);
+    }
+
+    public async Task<bool> HasGameOverrideAsync(Guid gameId, CancellationToken ct = default)
+        => await _repository.GetEmulatorProfileForGameAsync(gameId, ct) is not null;
+
+    public Task ClearGameOverrideAsync(Guid gameId, CancellationToken ct = default)
+        => _repository.DeleteEmulatorProfileForGameAsync(gameId, ct);
+
+    private async Task<ResolvedEmulatorProfile?> ResolveAsync(EmulatorProfile? profile, string platformId, CancellationToken ct)
+    {
         if (profile is null)
         {
             return null;

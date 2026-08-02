@@ -41,5 +41,9 @@ public interface ILibraryRepository
     Task<Emulator> UpsertEmulatorAsync(Emulator emulator, CancellationToken ct = default);
 
     Task<EmulatorProfile?> GetEmulatorProfileByPlatformIdAsync(string platformId, CancellationToken ct = default);
+    Task<EmulatorProfile?> GetEmulatorProfileForGameAsync(Guid gameId, CancellationToken ct = default);
     Task UpsertEmulatorProfileAsync(EmulatorProfile profile, CancellationToken ct = default);
+
+    // No-op if the game has no override — mirrors DeleteGameAsync/DeleteBoxArtAsync's silent-skip idiom.
+    Task DeleteEmulatorProfileForGameAsync(Guid gameId, CancellationToken ct = default);
 }

@@ -112,6 +112,67 @@ public class DownloadVerificationServiceTests : IDisposable
         Assert.Empty(Directory.GetFiles(_downloadDirectory));
     }
 
+    // Size tolerance (ARCHITECTURE.md -> ADR-11): the libretro nightly core channel rebuilds
+    // regularly and can shift a binary's size by a few bytes with no functional change. The
+    // boundary below is literal, not an approximation — SizeToleranceBytes is exactly 32.
+    [Fact]
+    public async Task DownloadAndVerifyAsync_ContentLengthExactlyAtToleranceBoundary_Succeeds()
+    {
+        var bytes = new byte[50];
+        new Random(1).NextBytes(bytes);
+        var handler = new FakeHttpMessageHandler(_ => OkResponse(bytes));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", Sha256Hex(bytes), bytes.Length - 32);
+
+        Assert.Equal(DownloadOutcome.Success, result.Outcome);
+        Assert.NotNull(result.FilePath);
+        Assert.True(File.Exists(result.FilePath));
+    }
+
+    [Fact]
+    public async Task DownloadAndVerifyAsync_ContentLengthOneByteBeyondToleranceBoundary_RejectsBeforeDownloading()
+    {
+        var bytes = new byte[50];
+        new Random(1).NextBytes(bytes);
+        var handler = new FakeHttpMessageHandler(_ => OkResponse(bytes));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", Sha256Hex(bytes), bytes.Length - 33);
+
+        Assert.Equal(DownloadOutcome.SizeExceeded, result.Outcome);
+        Assert.Contains("rejected before downloading", result.ErrorMessage);
+        Assert.Empty(Directory.GetFiles(_downloadDirectory));
+    }
+
+    [Fact]
+    public async Task DownloadAndVerifyAsync_NoContentLengthBodyExactlyAtToleranceBoundary_Succeeds()
+    {
+        var bytes = new byte[50];
+        new Random(1).NextBytes(bytes);
+        var handler = new FakeHttpMessageHandler(_ => OkResponse(bytes, suppressContentLength: true));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", Sha256Hex(bytes), bytes.Length - 32);
+
+        Assert.Equal(DownloadOutcome.Success, result.Outcome);
+    }
+
+    [Fact]
+    public async Task DownloadAndVerifyAsync_NoContentLengthBodyOneByteBeyondToleranceBoundary_CutsOffEarlyAndDeletesFile()
+    {
+        var bytes = new byte[50];
+        new Random(1).NextBytes(bytes);
+        var handler = new FakeHttpMessageHandler(_ => OkResponse(bytes, suppressContentLength: true));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", Sha256Hex(bytes), bytes.Length - 33);
+
+        Assert.Equal(DownloadOutcome.SizeExceeded, result.Outcome);
+        Assert.Contains("larger than expected", result.ErrorMessage);
+        Assert.Empty(Directory.GetFiles(_downloadDirectory));
+    }
+
     [Fact]
     public async Task DownloadAndVerifyAsync_ServerReturnsError_ReturnsNetworkError()
     {

@@ -688,6 +688,48 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task ConfigureEmulatorCommand_ValidTile_InvokesOpenEmulatorOverrideRequestedWithGame()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        await _viewModel.InitializeAsync();
+        Game? requestedGame = null;
+        _viewModel.OpenEmulatorOverrideRequested = g => requestedGame = g;
+
+        _viewModel.ConfigureEmulatorCommand.Execute(_viewModel.Games[0]);
+
+        Assert.Equal(game.Id, requestedGame?.Id);
+    }
+
+    [Fact]
+    public void ConfigureEmulatorCommand_UnknownTile_DoesNotInvoke()
+    {
+        var invoked = false;
+        _viewModel.OpenEmulatorOverrideRequested = _ => invoked = true;
+        var tile = new GameTile { GameId = Guid.NewGuid(), Name = "Ghost" };
+
+        _viewModel.ConfigureEmulatorCommand.Execute(tile);
+
+        Assert.False(invoked);
+    }
+
+    // Removing a game must also clean up any per-game emulator override (ARCHITECTURE.md -> ADR-24),
+    // otherwise a stale EmulatorProfile row lingers keyed to a GameId that no longer exists.
+    [Fact]
+    public async Task DeleteGameCommand_UserConfirms_RemovesPerGameEmulatorOverride()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes", IsMissing = true };
+        _repository.Games.Add(game);
+        _repository.EmulatorProfiles.Add(new EmulatorProfile { Id = Guid.NewGuid(), PlatformId = "nes", GameId = game.Id, EmulatorId = Guid.NewGuid(), ArgumentTemplate = "\"{RomPath}\" --gfx-compat" });
+        await _viewModel.InitializeAsync();
+        _messageBox.NextResult = MessageBoxResult.Yes;
+
+        await _viewModel.DeleteGameCommand.ExecuteAsync(_viewModel.Games[0]);
+
+        Assert.DoesNotContain(_repository.EmulatorProfiles, p => p.GameId == game.Id);
+    }
+
+    [Fact]
     public async Task ToggleFavoriteCommand_NotYetFavorite_MarksFavoriteAndPersists()
     {
         var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes", IsFavorite = false };

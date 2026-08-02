@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Per-game emulator configuration — right-click a tile → "Configure Emulator..." opens a dedicated window to set an executable/argument override for just that one game, without touching the platform's shared default. Falls back to showing the platform default when no override exists yet, so the fields are never blank for an already-configured platform. Removing a game also removes its per-game override, if any. No Auto-Install in this flow — it's for adjusting an already-configured emulator, not installing a new one. See ARCHITECTURE.md → ADR-24. 30 new tests
+
+### Fixed
+- Auto-Install could reject a core download as an "unexpected size" even though nothing was wrong — the libretro nightly build channel rebuilds regularly, and a routine rebuild can shift a core's size by a few bytes with no functional change. 11 of the catalog's 15 core entries had already drifted from their pinned size at the time this was found. Re-verified and re-pinned all 11 against the real, current files, and changed the size guard from exact equality to a small (±32 byte) tolerance, calibrated from the real drift observed — the SHA256 hash check, the actual security boundary, is untouched and still exact. See ARCHITECTURE.md → ADR-11 (2026-08-02 update). 4 new tests
+- `stella` (Atari 2600) failed Auto-Install a second time, same session, with a hash mismatch rather than a size mismatch — the nightly channel rebuilt it again, landing on the exact same compressed size as the prior pin but genuinely different content. Confirmed real (not a bug in today's tolerance change: size matched exactly, so tolerance never applied; the hash check, always exact, correctly caught a real content difference) and re-pinned. See ARCHITECTURE.md → ADR-11 (2026-08-02 update) and `DEVELOPMENT.md` → Known Limitations for the underlying recurring-maintenance gap this confirms
+
 ## [0.6.0] - 2026-08-07
 
 The "Big Picture" group, complete: a streaming-style mode with a maximized window, landscape tiles, a "Try Something New" section, and real box art per view (vertical for the normal grid, horizontal for Big Picture) instead of one orientation stretched to fit both. Three real bugs were found and fixed during interactive testing, each investigated with real evidence before any fix — see ARCHITECTURE.md → ADR-22/ADR-23 for the full design and investigation record. 209 unit tests in Release, 208 in Debug (up from 187 in `v0.5.0`).

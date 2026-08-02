@@ -60,6 +60,7 @@ public partial class App : Application
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
         mainViewModel.OpenSettingsRequested = () => OpenSettings(mainWindow);
         mainViewModel.OpenGameDetailsRequested = game => OpenGameDetails(mainWindow, game);
+        mainViewModel.OpenEmulatorOverrideRequested = game => OpenEmulatorOverride(mainWindow, game);
         mainWindow.DataContext = mainViewModel;
 
         MainWindow = mainWindow;
@@ -86,6 +87,18 @@ public partial class App : Application
             DataContext = viewModel
         };
         detailWindow.ShowDialog();
+    }
+
+    private void OpenEmulatorOverride(Window owner, Game game)
+    {
+        var viewModel = Services.GetRequiredService<EmulatorOverrideViewModel>();
+        viewModel.SetGame(game);
+        var overrideWindow = new EmulatorOverrideWindow
+        {
+            Owner = owner,
+            DataContext = viewModel
+        };
+        overrideWindow.ShowDialog();
     }
 
     private static void ConfigureServices(IServiceCollection services)
@@ -137,6 +150,7 @@ public partial class App : Application
         services.AddTransient<MainViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<GameDetailViewModel>();
+        services.AddTransient<EmulatorOverrideViewModel>();
     }
 
     protected override void OnExit(ExitEventArgs e)

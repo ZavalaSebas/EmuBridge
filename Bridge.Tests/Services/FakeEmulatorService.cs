@@ -6,29 +6,52 @@ namespace Bridge.Tests.Services;
 internal class FakeEmulatorService : IEmulatorService
 {
     public Dictionary<string, ResolvedEmulatorProfile> ProfilesByPlatformId { get; } = [];
+    public Dictionary<Guid, ResolvedEmulatorProfile> ProfilesByGameId { get; } = [];
     public List<Emulator> InstalledEmulators { get; } = [];
     public Exception? ThrowOnSave { get; set; }
     public Exception? ThrowOnRegisterEmulator { get; set; }
     public Exception? ThrowOnRegisterCoreProfile { get; set; }
 
-    public Task SaveProfileAsync(string platformId, string emulatorName, string executablePath, string argumentTemplate, CancellationToken ct = default)
+    public Task SaveProfileAsync(string platformId, string emulatorName, string executablePath, string argumentTemplate, Guid? gameId = null, CancellationToken ct = default)
     {
         if (ThrowOnSave is not null)
         {
             throw ThrowOnSave;
         }
 
-        ProfilesByPlatformId[platformId] = new ResolvedEmulatorProfile
+        var resolved = new ResolvedEmulatorProfile
         {
             PlatformId = platformId,
             ExecutablePath = executablePath,
             ArgumentTemplate = argumentTemplate
         };
+
+        if (gameId is null)
+        {
+            ProfilesByPlatformId[platformId] = resolved;
+        }
+        else
+        {
+            ProfilesByGameId[gameId.Value] = resolved;
+        }
+
         return Task.CompletedTask;
     }
 
     public Task<ResolvedEmulatorProfile?> GetProfileForPlatformAsync(string platformId, CancellationToken ct = default)
         => Task.FromResult(ProfilesByPlatformId.GetValueOrDefault(platformId));
+
+    public Task<ResolvedEmulatorProfile?> GetProfileForGameAsync(Game game, CancellationToken ct = default)
+        => Task.FromResult(ProfilesByGameId.GetValueOrDefault(game.Id) ?? ProfilesByPlatformId.GetValueOrDefault(game.PlatformId));
+
+    public Task<bool> HasGameOverrideAsync(Guid gameId, CancellationToken ct = default)
+        => Task.FromResult(ProfilesByGameId.ContainsKey(gameId));
+
+    public Task ClearGameOverrideAsync(Guid gameId, CancellationToken ct = default)
+    {
+        ProfilesByGameId.Remove(gameId);
+        return Task.CompletedTask;
+    }
 
     public Task<Emulator?> GetInstalledKnownEmulatorAsync(string knownEmulatorId, CancellationToken ct = default)
         => Task.FromResult(InstalledEmulators.FirstOrDefault(e => e.KnownEmulatorId == knownEmulatorId));
