@@ -24,6 +24,14 @@ public static class Config
     public const int CoverWidth = 200;
     public const int CoverHeight = 300;
 
+    // Big Picture mode's tile size (MainWindow.xaml -> BigPictureTileTemplate) — landscape, not
+    // portrait: Big Picture shows the horizontal grid (matches this shape closely, ~2.14:1, the
+    // same ratio as SteamGridDB's real 460x215/920x430 dimensions), while the normal grid shows
+    // the vertical grid (matches CoverWidth/CoverHeight's 2:3 shape instead). See ARCHITECTURE.md
+    // -> ADR-23 (Update).
+    public const int BigPictureCoverWidth = 460;
+    public const int BigPictureCoverHeight = 215;
+
     public static string AppDataPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         AppName);

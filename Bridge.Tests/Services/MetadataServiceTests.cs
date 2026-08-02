@@ -15,6 +15,13 @@ public class MetadataServiceTests
     private const string GridsFoundJson = """{"success":true,"data":[{"id":456,"url":"https://cdn.example.com/grid1.png"}]}""";
     private const string GridsNotFoundJson = """{"success":true,"data":[]}""";
 
+    // Real dimension pairs confirmed via ARCHITECTURE.md -> ADR-23 (460x215 horizontal, 600x900
+    // vertical) — width/height drive the classification, not array order.
+    private const string GridsHorizontalOnlyJson = """{"success":true,"data":[{"id":456,"url":"https://cdn.example.com/horizontal.png","width":460,"height":215}]}""";
+    private const string GridsVerticalOnlyJson = """{"success":true,"data":[{"id":789,"url":"https://cdn.example.com/vertical.png","width":600,"height":900}]}""";
+    // Vertical listed first, horizontal second — proves classification isn't order-dependent.
+    private const string GridsBothJson = """{"success":true,"data":[{"id":789,"url":"https://cdn.example.com/vertical.png","width":600,"height":900},{"id":456,"url":"https://cdn.example.com/horizontal.png","width":460,"height":215}]}""";
+
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, string json)
         => new(status) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
 
@@ -43,7 +50,7 @@ public class MetadataServiceTests
         var handler = new FakeHttpMessageHandler(_ => throw new InvalidOperationException("HTTP should not be called"));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Equal(0, result.Fetched);
         Assert.Empty(handler.Requests);
@@ -59,7 +66,7 @@ public class MetadataServiceTests
             : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Equal(1, result.Fetched);
         var boxArt = Assert.Single(repo.BoxArtRecords);
@@ -81,7 +88,7 @@ public class MetadataServiceTests
             : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        await service.FetchMissingBoxArtAsync(100, 150);
+        await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Equal(1994, Assert.Single(repo.BoxArtRecords).ReleaseYear);
     }
@@ -96,7 +103,7 @@ public class MetadataServiceTests
             : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        await service.FetchMissingBoxArtAsync(100, 150);
+        await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Null(Assert.Single(repo.BoxArtRecords).ReleaseYear);
     }
@@ -111,7 +118,7 @@ public class MetadataServiceTests
             : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        await service.FetchMissingBoxArtAsync(100, 150);
+        await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Null(Assert.Single(repo.BoxArtRecords).ReleaseYear);
     }
@@ -124,7 +131,7 @@ public class MetadataServiceTests
         var handler = new FakeHttpMessageHandler(_ => JsonResponse(HttpStatusCode.OK, SearchNotFoundJson));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Equal(1, result.NotFound);
         Assert.Equal(BoxArtStatus.NotFoundOnProvider, Assert.Single(repo.BoxArtRecords).Status);
@@ -135,11 +142,19 @@ public class MetadataServiceTests
     {
         var (repo, settings, images) = CreateFakes();
         var game = AddGame(repo, "Super Mario World");
-        repo.BoxArtRecords.Add(new BoxArt { Id = Guid.NewGuid(), GameId = game.Id, Status = BoxArtStatus.Cached, LocalPath = @"C:\cache\already.png" });
+        // Both orientations already terminal — only then is the game fully skipped (ADR-23).
+        repo.BoxArtRecords.Add(new BoxArt
+        {
+            Id = Guid.NewGuid(),
+            GameId = game.Id,
+            Status = BoxArtStatus.Cached,
+            LocalPath = @"C:\cache\already.png",
+            VerticalStatus = BoxArtStatus.NotFoundOnProvider
+        });
         var handler = new FakeHttpMessageHandler(_ => throw new InvalidOperationException("HTTP should not be called for an already-cached game"));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Equal(0, result.Fetched);
         Assert.Empty(handler.Requests);
@@ -150,13 +165,121 @@ public class MetadataServiceTests
     {
         var (repo, settings, images) = CreateFakes();
         var game = AddGame(repo, "Some Obscure Homebrew");
-        repo.BoxArtRecords.Add(new BoxArt { Id = Guid.NewGuid(), GameId = game.Id, Status = BoxArtStatus.NotFoundOnProvider });
+        repo.BoxArtRecords.Add(new BoxArt
+        {
+            Id = Guid.NewGuid(),
+            GameId = game.Id,
+            Status = BoxArtStatus.NotFoundOnProvider,
+            VerticalStatus = BoxArtStatus.NotFoundOnProvider
+        });
         var handler = new FakeHttpMessageHandler(_ => throw new InvalidOperationException("HTTP should not be called for a terminal not-found game"));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_GridsResponseHasBothDimensions_PersistsHorizontalAndVertical()
+    {
+        var (repo, settings, images) = CreateFakes();
+        var game = AddGame(repo, "Super Mario World");
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundJson)
+            : JsonResponse(HttpStatusCode.OK, GridsBothJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
+
+        Assert.Equal(1, result.Fetched);
+        var boxArt = Assert.Single(repo.BoxArtRecords);
+        Assert.Equal(BoxArtStatus.Cached, boxArt.Status);
+        Assert.Equal(BoxArtStatus.Cached, boxArt.VerticalStatus);
+        Assert.NotNull(boxArt.LocalPath);
+        Assert.NotNull(boxArt.VerticalLocalPath);
+        Assert.NotEqual(boxArt.LocalPath, boxArt.VerticalLocalPath);
+        Assert.Contains("https://cdn.example.com/horizontal.png", images.RequestedUrls);
+        Assert.Contains("https://cdn.example.com/vertical.png", images.RequestedUrls);
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_GridsResponseHasOnlyHorizontalDimension_VerticalStatusIsNotFoundOnProvider()
+    {
+        var (repo, settings, images) = CreateFakes();
+        AddGame(repo, "Super Mario World");
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundJson)
+            : JsonResponse(HttpStatusCode.OK, GridsHorizontalOnlyJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
+
+        var boxArt = Assert.Single(repo.BoxArtRecords);
+        Assert.Equal(BoxArtStatus.Cached, boxArt.Status);
+        Assert.Equal(BoxArtStatus.NotFoundOnProvider, boxArt.VerticalStatus);
+        Assert.Null(boxArt.VerticalLocalPath);
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_HorizontalAlreadyCachedVerticalNotFetched_RetroactivelyFetchesVerticalOnlyWithoutRedownloadingHorizontal()
+    {
+        var (repo, settings, images) = CreateFakes();
+        var game = AddGame(repo, "Super Mario World");
+        // The pre-ADR-23 state every already-cached game has: Status resolved, VerticalStatus at
+        // its new field's default (NotFetched) — must be retroactively backfilled, not skipped.
+        repo.BoxArtRecords.Add(new BoxArt
+        {
+            Id = Guid.NewGuid(),
+            GameId = game.Id,
+            Status = BoxArtStatus.Cached,
+            LocalPath = @"C:\cache\pre-existing-horizontal.png",
+            VerticalStatus = BoxArtStatus.NotFetched
+        });
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundJson)
+            : JsonResponse(HttpStatusCode.OK, GridsBothJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
+
+        Assert.Equal(1, result.Fetched);
+        var boxArt = Assert.Single(repo.BoxArtRecords);
+        // Horizontal untouched — never re-downloaded just to backfill vertical.
+        Assert.Equal(@"C:\cache\pre-existing-horizontal.png", boxArt.LocalPath);
+        Assert.DoesNotContain("https://cdn.example.com/horizontal.png", images.RequestedUrls);
+        // Vertical newly resolved.
+        Assert.Equal(BoxArtStatus.Cached, boxArt.VerticalStatus);
+        Assert.NotNull(boxArt.VerticalLocalPath);
+        Assert.Contains("https://cdn.example.com/vertical.png", images.RequestedUrls);
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_VerticalAlreadyResolvedHorizontalNotFetched_OnlyFetchesHorizontal()
+    {
+        var (repo, settings, images) = CreateFakes();
+        var game = AddGame(repo, "Super Mario World");
+        repo.BoxArtRecords.Add(new BoxArt
+        {
+            Id = Guid.NewGuid(),
+            GameId = game.Id,
+            Status = BoxArtStatus.NotFetched,
+            VerticalStatus = BoxArtStatus.NotFoundOnProvider
+        });
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundJson)
+            : JsonResponse(HttpStatusCode.OK, GridsBothJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
+
+        var boxArt = Assert.Single(repo.BoxArtRecords);
+        Assert.Equal(BoxArtStatus.Cached, boxArt.Status);
+        Assert.NotNull(boxArt.LocalPath);
+        // Vertical stays exactly as it was — never re-resolved once terminal.
+        Assert.Equal(BoxArtStatus.NotFoundOnProvider, boxArt.VerticalStatus);
+        Assert.Null(boxArt.VerticalLocalPath);
+        Assert.DoesNotContain("https://cdn.example.com/vertical.png", images.RequestedUrls);
     }
 
     [Fact]
@@ -170,7 +293,7 @@ public class MetadataServiceTests
             : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Equal(1, result.Fetched);
         Assert.Equal(BoxArtStatus.Cached, Assert.Single(repo.BoxArtRecords).Status);
@@ -185,7 +308,7 @@ public class MetadataServiceTests
         var handler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.True(result.StoppedEarlyDueToRateLimit);
         Assert.Equal(1, result.Failed);
@@ -201,10 +324,28 @@ public class MetadataServiceTests
         var handler = new FakeHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        var result = await service.FetchMissingBoxArtAsync(100, 150);
+        var result = await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         Assert.Equal(1, result.Failed);
         Assert.Single(handler.Requests); // second game never attempted
+    }
+
+    [Fact]
+    public async Task FetchMissingBoxArtAsync_GridsRequest_IncludesBothDimensionSetsInOneCall()
+    {
+        var (repo, settings, images) = CreateFakes();
+        AddGame(repo, "Super Mario World");
+        var handler = new FakeHttpMessageHandler(req => req.RequestUri!.AbsolutePath.Contains("/search/")
+            ? JsonResponse(HttpStatusCode.OK, SearchFoundJson)
+            : JsonResponse(HttpStatusCode.OK, GridsBothJson));
+        var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
+
+        await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
+
+        // One grids call total, not two — the combined-dimensions design from ADR-23.
+        var gridsRequests = handler.Requests.Where(r => r.RequestUri!.AbsolutePath.Contains("/grids/")).ToList();
+        var gridsRequest = Assert.Single(gridsRequests);
+        Assert.Contains("dimensions=460x215,920x430,600x900,342x482", gridsRequest.RequestUri!.Query);
     }
 
     [Fact]
@@ -217,7 +358,7 @@ public class MetadataServiceTests
             : JsonResponse(HttpStatusCode.OK, GridsFoundJson));
         var service = new MetadataService(new HttpClient(handler), settings, repo, images, NullLogger<MetadataService>.Instance);
 
-        await service.FetchMissingBoxArtAsync(100, 150);
+        await service.FetchMissingBoxArtAsync(100, 150, 80, 120);
 
         var searchRequest = Assert.Single(handler.Requests, r => r.RequestUri!.AbsolutePath.Contains("/search/"));
         var searchPath = Uri.UnescapeDataString(searchRequest.RequestUri!.AbsolutePath);

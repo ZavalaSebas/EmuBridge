@@ -122,7 +122,15 @@ public partial class MainViewModel : ObservableObject
 
             StatusMessage = "Fetching box art...";
             var metadataProgress = new Progress<int>(count => StatusMessage = $"Fetching box art... {count} processed");
-            await _metadataService.FetchMissingBoxArtAsync(Config.CoverWidth, Config.CoverHeight, metadataProgress, _busyCts.Token);
+            // The horizontal-classified grid (targetWidth/Height) is cached at Big Picture's
+            // landscape size, and the vertical-classified grid (verticalTargetWidth/Height) at the
+            // normal grid's portrait size — Big Picture shows horizontal, the normal grid shows
+            // vertical (see ARCHITECTURE.md -> ADR-23 Update; parameter names are still about grid
+            // orientation, not which UI slot uses them).
+            await _metadataService.FetchMissingBoxArtAsync(
+                Config.BigPictureCoverWidth, Config.BigPictureCoverHeight,
+                Config.CoverWidth, Config.CoverHeight,
+                metadataProgress, _busyCts.Token);
 
             await LoadGamesAsync(_busyCts.Token);
             StatusMessage = string.Empty;
@@ -441,11 +449,22 @@ public partial class MainViewModel : ObservableObject
     {
         _boxArtByGameId.TryGetValue(game.Id, out var boxArt);
 
+        var horizontalPath = boxArt?.Status == BoxArtStatus.Cached ? boxArt.LocalPath : null;
+        var verticalPath = boxArt?.VerticalStatus == BoxArtStatus.Cached ? boxArt.VerticalLocalPath : null;
+
+        // Normal grid: vertical preferred (matches its 2:3 portrait tile), horizontal fallback.
+        // Big Picture: horizontal preferred (matches its landscape tile), vertical fallback. Either
+        // way, null only if neither is cached — never the "No Cover" placeholder when some cover
+        // already exists (ARCHITECTURE.md -> ADR-23 Update).
+        var coverPath = verticalPath ?? horizontalPath;
+        var bigPicturePath = horizontalPath ?? verticalPath;
+
         return new GameTile
         {
             GameId = game.Id,
             Name = game.Name,
-            CoverImagePath = boxArt?.Status == BoxArtStatus.Cached ? boxArt.LocalPath : null,
+            CoverImagePath = coverPath,
+            BigPictureCoverImagePath = bigPicturePath,
             IsMissing = game.IsMissing,
             IsFavorite = game.IsFavorite,
             ReleaseYearText = boxArt?.ReleaseYear?.ToString()

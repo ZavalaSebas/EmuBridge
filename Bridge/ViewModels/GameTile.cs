@@ -10,8 +10,15 @@ public class GameTile
 
     /// <summary>Null means: no cached box art yet — the View shows a placeholder. Covers
     /// NotFetched, NotFoundOnProvider, and FetchFailed alike; Phase 1 doesn't distinguish them
-    /// visually (see ARCHITECTURE.md -> ADR-8).</summary>
+    /// visually (see ARCHITECTURE.md -> ADR-8). Always the horizontal grid — used by the normal
+    /// grid's tile template.</summary>
     public string? CoverImagePath { get; init; }
+
+    /// <summary>Vertical grid if cached, falling back to the horizontal <see cref="CoverImagePath"/>
+    /// if not, null if neither is cached — used by Big Picture mode's larger tiles, which are
+    /// portrait-shaped and would otherwise stretch a horizontal source image (see ARCHITECTURE.md
+    /// -> ADR-23).</summary>
+    public string? BigPictureCoverImagePath { get; init; }
 
     public bool IsMissing { get; init; }
     public bool IsFavorite { get; init; }

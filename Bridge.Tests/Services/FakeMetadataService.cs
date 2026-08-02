@@ -11,6 +11,8 @@ internal class FakeMetadataService : IMetadataService
     public Task<MetadataFetchResult> FetchMissingBoxArtAsync(
         int targetWidth,
         int targetHeight,
+        int verticalTargetWidth,
+        int verticalTargetHeight,
         IProgress<int>? progress = null,
         CancellationToken ct = default)
     {

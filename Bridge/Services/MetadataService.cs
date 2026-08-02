@@ -38,6 +38,8 @@ public class MetadataService : IMetadataService
     public async Task<MetadataFetchResult> FetchMissingBoxArtAsync(
         int targetWidth,
         int targetHeight,
+        int verticalTargetWidth,
+        int verticalTargetHeight,
         IProgress<int>? progress = null,
         CancellationToken ct = default)
     {
@@ -57,13 +59,21 @@ public class MetadataService : IMetadataService
         {
             ct.ThrowIfCancellationRequested();
 
+            // Only skip once BOTH orientations reached a terminal state — a game whose horizontal
+            // grid was already cached before ADR-23 has VerticalStatus defaulting to NotFetched, so
+            // it's retroactively reprocessed here rather than left permanently without vertical art.
             var existingBoxArt = await _libraryRepository.GetBoxArtAsync(game.Id, ct);
-            if (existingBoxArt is { Status: BoxArtStatus.Cached or BoxArtStatus.NotFoundOnProvider })
+            if (existingBoxArt is
+                {
+                    Status: BoxArtStatus.Cached or BoxArtStatus.NotFoundOnProvider,
+                    VerticalStatus: BoxArtStatus.Cached or BoxArtStatus.NotFoundOnProvider
+                })
             {
                 continue;
             }
 
-            var outcome = await FetchBoxArtForGameAsync(game, apiKey, targetWidth, targetHeight, ct);
+            var outcome = await FetchBoxArtForGameAsync(
+                game, apiKey, targetWidth, targetHeight, verticalTargetWidth, verticalTargetHeight, existingBoxArt, ct);
 
             switch (outcome)
             {
@@ -110,9 +120,24 @@ public class MetadataService : IMetadataService
         string apiKey,
         int targetWidth,
         int targetHeight,
+        int verticalTargetWidth,
+        int verticalTargetHeight,
+        BoxArt? existingBoxArt,
         CancellationToken ct)
     {
         var searchName = NormalizeGameName(game.Name);
+
+        // Seeded from whatever's already persisted, not blank — a retroactive pass that only needs
+        // to resolve one orientation (ARCHITECTURE.md -> ADR-23) must never clobber the other
+        // orientation's already-Cached state on any exit path below, including the error ones.
+        var status = existingBoxArt?.Status ?? BoxArtStatus.NotFetched;
+        var localPath = existingBoxArt?.LocalPath;
+        var verticalStatus = existingBoxArt?.VerticalStatus ?? BoxArtStatus.NotFetched;
+        var verticalLocalPath = existingBoxArt?.VerticalLocalPath;
+        var releaseYear = existingBoxArt?.ReleaseYear;
+
+        var needsHorizontal = status is not (BoxArtStatus.Cached or BoxArtStatus.NotFoundOnProvider);
+        var needsVertical = verticalStatus is not (BoxArtStatus.Cached or BoxArtStatus.NotFoundOnProvider);
 
         SteamGridDbGame? matchedGame;
         try
@@ -121,64 +146,107 @@ public class MetadataService : IMetadataService
         }
         catch (SteamGridDbRateLimitException)
         {
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.FetchFailed, null, ct);
+            await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
             return LookupOutcome.RateLimited;
         }
         catch (SteamGridDbAuthException)
         {
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.FetchFailed, null, ct);
+            await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
             return LookupOutcome.AuthFailed;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
             _logger.LogWarning(ex, "Failed to search SteamGridDB for {GameName}.", searchName);
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.FetchFailed, null, ct);
+            await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
             return LookupOutcome.Failed;
         }
 
         if (matchedGame is null)
         {
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.NotFoundOnProvider, null, ct);
+            if (needsHorizontal)
+            {
+                status = BoxArtStatus.NotFoundOnProvider;
+                localPath = null;
+            }
+
+            if (needsVertical)
+            {
+                verticalStatus = BoxArtStatus.NotFoundOnProvider;
+                verticalLocalPath = null;
+            }
+
+            await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
             return LookupOutcome.NotFound;
         }
 
-        SteamGridDbGrid? grid;
+        releaseYear = matchedGame.ReleaseYear;
+
+        List<SteamGridDbGrid> grids;
         try
         {
-            grid = await GetFirstGridAsync(matchedGame.Id, apiKey, ct);
+            grids = await GetGridsAsync(matchedGame.Id, apiKey, ct);
         }
         catch (SteamGridDbRateLimitException)
         {
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.FetchFailed, null, ct);
+            await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
             return LookupOutcome.RateLimited;
         }
         catch (SteamGridDbAuthException)
         {
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.FetchFailed, null, ct);
+            await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
             return LookupOutcome.AuthFailed;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
             _logger.LogWarning(ex, "Failed to fetch grids for SteamGridDB game {SteamGridDbId}.", matchedGame.Id);
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.FetchFailed, null, ct);
+            await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
             return LookupOutcome.Failed;
         }
 
+        var anyCached = false;
+        var anyFailed = false;
+
+        if (needsHorizontal)
+        {
+            // Exhaustive, unambiguous split: SteamGridDB filters server-side to only return grids
+            // matching one of the 4 dimension strings requested by GetGridsAsync, and none of those
+            // 4 pairs (460x215/920x430 horizontal, 600x900/342x482 vertical) is square.
+            var horizontalGrid = grids.FirstOrDefault(g => g.Height <= g.Width);
+            (status, localPath, var cached, var failed) = await ResolveOrientationAsync(horizontalGrid, targetWidth, targetHeight, ct);
+            anyCached |= cached;
+            anyFailed |= failed;
+        }
+
+        if (needsVertical)
+        {
+            var verticalGrid = grids.FirstOrDefault(g => g.Height > g.Width);
+            (verticalStatus, verticalLocalPath, var cached, var failed) = await ResolveOrientationAsync(verticalGrid, verticalTargetWidth, verticalTargetHeight, ct);
+            anyCached |= cached;
+            anyFailed |= failed;
+        }
+
+        await PersistBoxArtAsync(game.Id, status, localPath, verticalStatus, verticalLocalPath, releaseYear, ct);
+
+        if (anyCached)
+        {
+            return LookupOutcome.Cached;
+        }
+
+        return anyFailed ? LookupOutcome.Failed : LookupOutcome.NotFound;
+    }
+
+    private async Task<(BoxArtStatus Status, string? LocalPath, bool Cached, bool Failed)> ResolveOrientationAsync(
+        SteamGridDbGrid? grid, int width, int height, CancellationToken ct)
+    {
         if (grid is null)
         {
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.NotFoundOnProvider, null, ct);
-            return LookupOutcome.NotFound;
+            return (BoxArtStatus.NotFoundOnProvider, null, false, false);
         }
 
-        var localPath = await _imageCacheService.GetOrCacheImageAsync(grid.Url, targetWidth, targetHeight, ct);
-        if (localPath is null)
-        {
-            await PersistBoxArtAsync(game.Id, BoxArtStatus.FetchFailed, null, ct);
-            return LookupOutcome.Failed;
-        }
-
-        await PersistBoxArtAsync(game.Id, BoxArtStatus.Cached, localPath, ct, matchedGame.ReleaseYear);
-        return LookupOutcome.Cached;
+        var localPath = await _imageCacheService.GetOrCacheImageAsync(grid.Url, width, height, ct);
+        return localPath is null
+            ? (BoxArtStatus.FetchFailed, null, false, true)
+            : (BoxArtStatus.Cached, localPath, true, false);
     }
 
     private async Task<SteamGridDbGame?> SearchGameAsync(string query, string apiKey, CancellationToken ct)
@@ -196,11 +264,15 @@ public class MetadataService : IMetadataService
         return body?.Data?.FirstOrDefault();
     }
 
-    private async Task<SteamGridDbGrid?> GetFirstGridAsync(int steamGridDbGameId, string apiKey, CancellationToken ct)
+    // Requests both horizontal (460x215/920x430) and vertical (600x900/342x482) dimensions in one
+    // call — a single dimensions-filtered request, not two separate calls — confirmed real values
+    // via SteamGridDB's own API docs (see ARCHITECTURE.md -> ADR-23); the wrapper source itself
+    // doesn't hardcode them, same caveat already noted for the release_date field (ADR-19).
+    private async Task<List<SteamGridDbGrid>> GetGridsAsync(int steamGridDbGameId, string apiKey, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            $"{Config.SteamGridDbBaseUrl}/grids/game/{steamGridDbGameId}");
+            $"{Config.SteamGridDbBaseUrl}/grids/game/{steamGridDbGameId}?dimensions=460x215,920x430,600x900,342x482");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         using var response = await _httpClient.SendAsync(request, ct);
@@ -208,7 +280,7 @@ public class MetadataService : IMetadataService
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadFromJsonAsync<SteamGridDbResponse<List<SteamGridDbGrid>>>(JsonOptions, ct);
-        return body?.Data?.FirstOrDefault();
+        return body?.Data ?? [];
     }
 
     private static void ThrowIfSpecialStatus(HttpResponseMessage response)
@@ -224,7 +296,14 @@ public class MetadataService : IMetadataService
         }
     }
 
-    private async Task PersistBoxArtAsync(Guid gameId, BoxArtStatus status, string? localPath, CancellationToken ct, int? releaseYear = null)
+    private async Task PersistBoxArtAsync(
+        Guid gameId,
+        BoxArtStatus status,
+        string? localPath,
+        BoxArtStatus verticalStatus,
+        string? verticalLocalPath,
+        int? releaseYear,
+        CancellationToken ct)
     {
         await _libraryRepository.UpsertBoxArtAsync(
             new BoxArt
@@ -232,6 +311,8 @@ public class MetadataService : IMetadataService
                 GameId = gameId,
                 Status = status,
                 LocalPath = localPath,
+                VerticalStatus = verticalStatus,
+                VerticalLocalPath = verticalLocalPath,
                 LastAttemptUtc = DateTime.UtcNow,
                 ReleaseYear = releaseYear
             },
@@ -289,5 +370,11 @@ public class MetadataService : IMetadataService
     {
         public int Id { get; set; }
         public string Url { get; set; } = string.Empty;
+
+        // Confirmed real fields on the wrapper's SGDBImage interface (both lowercase `number` in
+        // TypeScript). Used to classify horizontal vs vertical without hardcoding the 4 requested
+        // dimension strings a second time — see ARCHITECTURE.md -> ADR-23.
+        public int Width { get; set; }
+        public int Height { get; set; }
     }
 }

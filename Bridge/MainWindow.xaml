@@ -9,6 +9,9 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        <!-- Bypasses WPF's own process-level bitmap cache — see ARCHITECTURE.md -> ADR-23 (Update)
+             and DEVELOPMENT.md -> Image Loading. -->
+        <conv:CachedImagePathConverter x:Key="CachedImagePathConverter" />
 
         <!-- One shared menu for every tile now (View Details applies to any game; Remove from
              Library stays IsMissing-only, ADR-15) — only one instance is ever open at a time, so
@@ -60,7 +63,7 @@
                         <Border Background="#333333" CornerRadius="4">
                             <TextBlock Text="No Cover" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <Image Source="{Binding CoverImagePath}" Stretch="UniformToFill" />
+                        <Image Source="{Binding CoverImagePath, Converter={StaticResource CachedImagePathConverter}}" Stretch="UniformToFill" />
                         <TextBlock Text="&#9733;" FontSize="20" Foreground="Gold"
                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
                                    Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}" />
@@ -102,12 +105,12 @@
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
-                <StackPanel Width="280">
-                    <Grid Height="420">
+                <StackPanel Width="460">
+                    <Grid Height="215">
                         <Border Background="#333333" CornerRadius="6">
                             <TextBlock Text="No Cover" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <Image Source="{Binding CoverImagePath}" Stretch="UniformToFill" />
+                        <Image Source="{Binding BigPictureCoverImagePath, Converter={StaticResource CachedImagePathConverter}}" Stretch="UniformToFill" />
                         <TextBlock Text="&#9733;" FontSize="28" Foreground="Gold"
                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0"
                                    Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}" />

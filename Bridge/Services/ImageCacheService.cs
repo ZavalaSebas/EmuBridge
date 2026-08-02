@@ -2,6 +2,8 @@ using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Logging;
 
@@ -80,25 +82,42 @@ public class ImageCacheService : IImageCacheService
         return Path.Combine(_cacheDirectory, $"{hash}_{width}x{height}.png");
     }
 
-    // Both dimensions are fixed to the exact target size (see ARCHITECTURE.md — "resize/cache box
-    // art to the exact display pixel size"). A source image with a different aspect ratio will be
-    // stretched rather than cropped — a deliberate Phase 1 simplification; a proper aspect-preserving
-    // crop would need CroppedBitmap on top of this and isn't justified by any current requirement.
+    // Aspect ratio is preserved (Uniform-fit), not stretched to the exact target box — SteamGridDB's
+    // real grid dimensions (460x215/920x430 horizontal, 600x900/342x482 vertical) don't reliably
+    // match Bridge's own tile shapes, and forcing both dimensions visibly distorted the cover.
+    // Letterboxed with a transparent background (not a baked-in solid color) so it stays correct
+    // if the app's placeholder color (currently #333333, hardcoded in XAML) ever changes — the
+    // existing tile Border behind the Image already provides that color. See ARCHITECTURE.md ->
+    // ADR-23 (Update).
     private static void ResizeAndSave(byte[] sourceBytes, int width, int height, string destinationPath)
     {
         using var sourceStream = new MemoryStream(sourceBytes);
 
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.DecodePixelWidth = width;
-        bitmap.DecodePixelHeight = height;
-        bitmap.StreamSource = sourceStream;
-        bitmap.EndInit();
-        bitmap.Freeze();
+        var source = new BitmapImage();
+        source.BeginInit();
+        source.CacheOption = BitmapCacheOption.OnLoad;
+        source.StreamSource = sourceStream;
+        source.EndInit();
+        source.Freeze();
+
+        var scale = Math.Min((double)width / source.PixelWidth, (double)height / source.PixelHeight);
+        var scaledWidth = source.PixelWidth * scale;
+        var scaledHeight = source.PixelHeight * scale;
+        var offsetX = (width - scaledWidth) / 2;
+        var offsetY = (height - scaledHeight) / 2;
+
+        var visual = new DrawingVisual();
+        using (var context = visual.RenderOpen())
+        {
+            context.DrawImage(source, new Rect(offsetX, offsetY, scaledWidth, scaledHeight));
+        }
+
+        var renderTarget = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        renderTarget.Render(visual);
+        renderTarget.Freeze();
 
         var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        encoder.Frames.Add(BitmapFrame.Create(renderTarget));
 
         using var destinationStream = File.Create(destinationPath);
         encoder.Save(destinationStream);

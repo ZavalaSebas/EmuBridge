@@ -78,6 +78,79 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_GameWithBothOrientationsCached_NormalGridPrefersVerticalBigPicturePrefersHorizontal()
+    {
+        // Normal grid tile is portrait (2:3, matches vertical grids); Big Picture's tile is
+        // landscape (~2.14:1, matches horizontal grids) — see ARCHITECTURE.md -> ADR-23 (Update).
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        _repository.BoxArtRecords.Add(new BoxArt
+        {
+            GameId = game.Id,
+            Status = BoxArtStatus.Cached,
+            LocalPath = @"C:\cache\horizontal.png",
+            VerticalStatus = BoxArtStatus.Cached,
+            VerticalLocalPath = @"C:\cache\vertical.png"
+        });
+
+        await _viewModel.InitializeAsync();
+
+        var tile = Assert.Single(_viewModel.Games);
+        Assert.Equal(@"C:\cache\vertical.png", tile.CoverImagePath);
+        Assert.Equal(@"C:\cache\horizontal.png", tile.BigPictureCoverImagePath);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_GameWithNoVerticalBoxArt_NormalGridFallsBackToHorizontal()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        _repository.BoxArtRecords.Add(new BoxArt
+        {
+            GameId = game.Id,
+            Status = BoxArtStatus.Cached,
+            LocalPath = @"C:\cache\horizontal.png",
+            VerticalStatus = BoxArtStatus.NotFoundOnProvider
+        });
+
+        await _viewModel.InitializeAsync();
+
+        var tile = Assert.Single(_viewModel.Games);
+        Assert.Equal(@"C:\cache\horizontal.png", tile.CoverImagePath);
+        Assert.Equal(@"C:\cache\horizontal.png", tile.BigPictureCoverImagePath);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_GameWithNoHorizontalBoxArt_BigPictureFallsBackToVertical()
+    {
+        var game = new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" };
+        _repository.Games.Add(game);
+        _repository.BoxArtRecords.Add(new BoxArt
+        {
+            GameId = game.Id,
+            Status = BoxArtStatus.NotFoundOnProvider,
+            VerticalStatus = BoxArtStatus.Cached,
+            VerticalLocalPath = @"C:\cache\vertical.png"
+        });
+
+        await _viewModel.InitializeAsync();
+
+        var tile = Assert.Single(_viewModel.Games);
+        Assert.Equal(@"C:\cache\vertical.png", tile.CoverImagePath);
+        Assert.Equal(@"C:\cache\vertical.png", tile.BigPictureCoverImagePath);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_GameWithNoBoxArtAtAll_BigPictureCoverImagePathIsNull()
+    {
+        _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes" });
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Null(Assert.Single(_viewModel.Games).BigPictureCoverImagePath);
+    }
+
+    [Fact]
     public async Task InitializeAsync_MissingGame_TileHasIsMissingTrue()
     {
         _repository.Games.Add(new Game { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "mario", PlatformId = "nes", IsMissing = true });
