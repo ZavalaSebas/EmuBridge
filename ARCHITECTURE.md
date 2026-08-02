@@ -724,6 +724,8 @@ Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, 
 
 **Date:** 2026-08-06
 
+**Correction (2026-08-07):** every `v0.3.0` reference below describes the working label at the time this ADR was written, kept as-is rather than rewritten. Two unrelated, already-committed items (Remove from Library, `.bin` fix — ADR-15/16) turned out to have been sitting unreleased since before this work started, and took the actual `v0.3.0` slot retroactively when the release was finally cut. This ADR's work shipped as `v0.4.0` instead — see `PLAN.md` → Roadmap for the full renumbering note.
+
 **Context:**
 `v0.3.0`'s two confirmed Roadmap items (`PLAN.md` → Roadmap) were a core picker UI (for platforms with more than one known-good `KnownEmulatorCore` candidate) and offering Auto-Install inline when `LaunchService` returns `NoEmulatorConfigured`, not just from Settings — both deliberately deferred during Phase 2's build-out (ADR-14) until the mechanism had more proven ground behind it. Investigated before designing either: `KnownEmulators.json` has exactly one `KnownEmulatorCore` per platform, for all 15 seed platforms, confirmed by inspecting the manifest directly — every platform's core was already narrowed to a single best choice during ADR-11's curation (e.g. Snes9x over bsnes-mercury for `snes`). The core picker's premise — a platform with more than one real candidate — doesn't exist anywhere in Bridge's data today.
 

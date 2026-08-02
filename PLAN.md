@@ -124,11 +124,14 @@ These reshape the architecture if resolved late, so they were closed in Phase 0,
 
 ## Scope: Current vs Future
 
-### Current Version (0.2.0) — Shipped
-`v0.1.0` shipped the full Phase 1 (MVP) scope: detect → show → play. `v0.2.0` shipped exactly one item out of Phase 2's scope — automatic emulator detection/download (see above) — not the rest of Phase 2. Keep `<Version>` in `Bridge/Bridge.csproj` consistent with this document, `README.md`, and `docs/index.html` (see DEVELOPMENT.md → Version Management).
+### Current Version (0.3.0) — Shipped
+`v0.1.0` shipped the full Phase 1 (MVP) scope: detect → show → play. `v0.2.0` shipped one item out of Phase 2's scope — automatic emulator detection/download. `v0.3.0` shipped two small, unrelated items that had been sitting committed but unreleased since shortly after `v0.2.0`: removing a `Game` from the library, and the `.bin`/Atari 2600 extension fix. Keep `<Version>` in `Bridge/Bridge.csproj` consistent with this document, `README.md`, and `docs/index.html` (see DEVELOPMENT.md → Version Management).
+
+### Already built, staged for their own release — not "Future," not yet tagged
+Two more chunks of work are code-complete, tested, and interactively confirmed, but not yet cut as their own version (each earns its number only once released, per `## Roadmap` below): offering Auto-Install inline from the launch flow (staged as `v0.4.0`), and the full "Full library" group — game detail panel, favorites, recently played, refined "Library" view (staged as `v0.5.0`). Listed here separately from the real backlog below so this section doesn't imply they're unstarted.
 
 ### Future Versions — Backlog
-The remaining Phase 2 scope (game detail panel, favorites/recently-played, refined "Library" view, "Big Picture" view, per-game emulator configuration, a core picker UI, offering Auto-Install inline from the launch flow), all of Phase 3 (RetroAchievements, cheats/mods, video previews, recommendations, additional views, disc-based system support, emulator core update checks), and all of Phase Polish (transition animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features; storefront integration) is out of scope indefinitely, not just for this version.
+"Big Picture" view, per-game emulator configuration, a core picker UI (no real multi-core case exists yet — see ADR-18), all of Phase 3 (RetroAchievements, cheats/mods, video previews, recommendations, additional views, disc-based system support, emulator core update checks), and all of Phase Polish (transition animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass — including integrating WPF-UI itself, decided early but never installed) remain deferred — not started, not scheduled. The "Won't Have" list (any ROM discovery/acquisition feature; social features; storefront integration) is out of scope indefinitely, not just for this version.
 
 ---
 
@@ -136,12 +139,14 @@ The remaining Phase 2 scope (game detail panel, favorites/recently-played, refin
 
 Tracking approach as of `v0.2.0`: version cuts, not phase completion. `v0.1.0` and `v0.2.0` each shipped a coherent, tested, real-use-verified chunk without waiting for an entire phase to finish — the same pattern continues going forward. Phase 1/2/3/Polish above remain useful as *thematic buckets* (what kind of work something is), not as "when do we ship" gates.
 
-### v0.3.0 — Next confirmed cut
+**Numbering correction (2026-08-07):** two items below (Remove from Library, `.bin` fix — ADR-15/ADR-16) had been sitting committed but unreleased since shortly after `v0.2.0`, discovered only when preparing to cut what this section originally called `v0.3.0`. They're their own story, not part of the auto-install work, so they took the `v0.3.0` slot retroactively (see `CHANGELOG.md` → `[0.3.0]`) — everything below that was originally labeled `v0.3.0` is `v0.4.0` instead. Kept visible, not silently renumbered, so the reasoning trail stays intact.
+
+### v0.4.0 — inline Auto-Install offer
 Originally scoped as 2 small Phase 2 items left over from the auto-install work (2026-08-05); revised the next day once one of them turned out to have no real case behind it yet:
 - ~~Core picker UI when a platform has more than one known-good core candidate~~ — **removed from this cut, 2026-08-06.** Investigated first: `KnownEmulators.json` has exactly one core per platform for all 15 seed platforms today, confirmed by inspecting the manifest — the picker's premise doesn't exist in Bridge's data yet. Building it against only a synthetic fixture would be the same unverified-data risk this project has rejected elsewhere (ADR-11, ADR-13). See ARCHITECTURE.md → ADR-18. Not replaced with a different item — `v0.1.0`/`v0.2.0` already established that a cut is whatever coherent, verified chunk is ready, not a fixed size.
 - ~~Offer Auto-Install inline from the launch flow (`LaunchService` → `NoEmulatorConfigured`), not just from Settings~~ — done, ARCHITECTURE.md → ADR-18
 
-**Why this one, not something else:** it extends the exact mechanism (`EmulatorInstallerService`) that was the prior day's entire focus, with the freshest possible context; it needed no new view — it extends UI that already existed (the Settings Auto-Install button, the launch-failure dialog) — unlike the detail panel/Library view/Big Picture items, which do; and it was genuinely small, matching "one coherent, verified chunk," not a multi-feature bundle.
+**Why this one, not something else:** it extends the exact mechanism (`EmulatorInstallerService`) that was the prior day's entire focus, with the freshest possible context; it needed no new view — it extends UI that already existed (the Settings Auto-Install button, the launch-failure dialog) — unlike the detail panel/Library view/Big Picture items, which do; and it was genuinely small, matching "one coherent, verified chunk," not a multi-feature bundle. Code-complete and interactively confirmed; staged for its own release as `v0.4.0`.
 
 ### Path to v1.0
 
@@ -155,13 +160,13 @@ Originally scoped as 2 small Phase 2 items left over from the auto-install work 
 
 See ARCHITECTURE.md → ADR-17 for the full decision record.
 
-### Product-story groups after v0.3.0 — no version numbers assigned yet
+### Product-story groups after v0.4.0
 
-Not a numbered ladder. `v0.1.0` and `v0.2.0` each represented one coherent story a user would actually notice ("play a game end-to-end," "install an emulator with one click"). `v0.3.0` ended up small by circumstance — the core picker fell out of scope once actually investigated (ARCHITECTURE.md → ADR-18), not by decision — and isn't the pattern to repeat going forward. From here, cuts group by product story, not by counting down a fixed list of small items.
+Not a numbered ladder. `v0.1.0`/`v0.2.0`/`v0.3.0` each represented one coherent story a user would actually notice. From here, cuts group by product story, not by counting down a fixed list of small items.
 
-**A group gets its version number only once it's complete and verified in real use — not now.** Assigning `v0.4.0`/`v0.5.0`/etc. to these groups today would fabricate a precision that doesn't exist yet — the same standard already applied to the Speculative / Future Ideas pool above (Section 13): a group earns its number when it ships, not when it's merely planned.
+**A group gets its version number only once it's complete and verified in real use, not before.** Same standard already applied to the Speculative / Future Ideas pool above (Section 13): a group earns its number when it ships, not when it's merely planned.
 
-- **"Full library"**: ~~game detail panel~~ (ADR-19) + ~~favorites~~ / ~~recently played~~ (ADR-20) + ~~refined "Library" view~~ (ADR-21) — **all 4 items done.** Grouped together because they tell one story — the main library stops feeling like Phase 1's functional-only grid and starts feeling finished; the refined Library view is also what finally surfaces favorites/recently-played as real sort/filter options, not just backend data. **Still no version number** — per the rule above, that's assigned only once the group is also verified in real use, not just code-complete. Awaiting interactive confirmation before this group can be considered ready for a version number.
+- **"Full library" — `v0.5.0`**: ~~game detail panel~~ (ADR-19) + ~~favorites~~ / ~~recently played~~ (ADR-20) + ~~refined "Library" view~~ (ADR-21) — **all 4 items done and interactively confirmed**, per the user's own real-machine testing: sorting in all 3 modes, recently-played prioritizing a same-day launch, the favorites filter in both directions, the tile's release year, and every previously-built feature (context menu, star, missing badge, detail panel) still working under the new ordering. Grouped together because they tell one story — the main library stops feeling like Phase 1's functional-only grid and starts feeling finished; the refined Library view is also what finally surfaces favorites/recently-played as real sort/filter options, not just backend data. Number assigned now that both conditions in the rule above are actually met — complete and verified, not just complete.
 - **After that — "Big Picture"**: the streaming-style view with a recommended-games section. Large enough to be its own story, not folded into the group above.
 - **After that — "Rest of Phase 2"**: per-game emulator configuration, plus the core picker once a real multi-core case exists to design it against (ARCHITECTURE.md → ADR-18).
 - **After that — "Phase Polish"**: the same 6 items already listed above (`## Current State` → Phase Polish), unchanged — just without a version number yet.
