@@ -21,12 +21,12 @@
 
 <h1>Bridge</h1>
 
-<p><strong>Version:</strong> 0.7.1</p>
+<p><strong>Version:</strong> 0.8.0</p>
 
 <p>A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.</p>
 
 <h2>Features</h2>
-<p>Bridge is functional and shipping — v0.7.1. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is effectively complete too — the only remaining piece is a core picker UI, deliberately deferred until a platform actually has more than one known-good core to choose between. v0.3.0 shipped removing a confirmed-gone game from the library and a ROM-detection fix; v0.4.0 added offering Auto-Install inline right from the launch flow; v0.5.0 completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; v0.6.0 completed the "Big Picture" group — a streaming-style mode with real box art per view; v0.7.0 added per-game emulator configuration and hardened the download-verification guard against the libretro nightly channel's real rebuild frequency; v0.7.1 is a same-day patch re-verifying the entire emulator catalog against that same channel — 15 of 15 core entries had drifted from their pin at least once within one working session, all now re-pinned.</p>
+<p>Bridge is functional and shipping — v0.8.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is effectively complete too — the only remaining piece is a core picker UI, deliberately deferred until a platform actually has more than one known-good core to choose between. v0.3.0 shipped removing a confirmed-gone game from the library and a ROM-detection fix; v0.4.0 added offering Auto-Install inline right from the launch flow; v0.5.0 completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; v0.6.0 completed the "Big Picture" group — a streaming-style mode with real box art per view; v0.7.0 added per-game emulator configuration and hardened the download-verification guard against the libretro nightly channel's real rebuild frequency; v0.7.1 was a same-day patch re-verifying the entire emulator catalog against that same channel; v0.8.0 closes the loop with a full catalog-maintenance system — automated drift detection with a human-reviewed pull request, Bridge fetching its own catalog fresh on every startup, and a hardcoded allow-list of trusted download hosts as a second line of defense.</p>
 <ul>
 <li>Scan your ROM folders and automatically detect which system each game belongs to</li>
 <li>Fetch box art automatically from SteamGridDB</li>
@@ -42,8 +42,9 @@
 <li>"Big Picture" mode — a maximized, streaming-style view with a "Try Something New" section surfacing games you haven't played yet</li>
 <li>Real box art per view — vertical/poster-style covers in the normal grid, landscape covers in Big Picture, matching each view's real tile shape</li>
 <li>Library persists between sessions — no full re-scan on every launch</li>
+<li>The built-in emulator catalog stays current on its own — a scheduled check re-verifies it against the real libretro build channel and opens a human-reviewed pull request if anything drifted, and Bridge fetches the latest verified catalog on every startup</li>
 </ul>
-<p><strong>Known limitations:</strong> removing a game from the library only works for entries already marked "missing" — no way to remove a still-present game you no longer want tracked; the game detail panel has no description/blurb, since SteamGridDB (Bridge's only metadata source today) doesn't provide one; the built-in emulator catalog needs occasional manual maintenance to stay in sync with the libretro nightly build channel's real rebuild frequency — download verification always catches and rejects a stale entry rather than installing something unverified, so this affects availability, never safety; a core picker UI, Phase 3 (achievements, cheats, video previews, recommendations), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, UI pass) haven't been started. See <a href="../DEVELOPMENT.md">Development Guide</a> for full detail.</p>
+<p><strong>Known limitations:</strong> removing a game from the library only works for entries already marked "missing" — no way to remove a still-present game you no longer want tracked; the game detail panel has no description/blurb, since SteamGridDB (Bridge's only metadata source today) doesn't provide one; a core picker UI, Phase 3 (achievements, cheats, video previews, recommendations), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, UI pass) haven't been started. See <a href="../DEVELOPMENT.md">Development Guide</a> for full detail.</p>
 
 <h2>Getting Started</h2>
 <p>Coming soon</p>

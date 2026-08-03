@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-07
+
+A complete catalog-maintenance system, built the same day the recurring drift problem it solves was found and confirmed real three separate times. 256 unit tests in Release, 255 in Debug (`Bridge.Tests`); 16 in the new `ManifestDriftCheck.Tests` project (up from 243/242 in `v0.7.1`).
+
 ### Added
 - Automated manifest drift detection — a scheduled GitHub Action re-verifies `KnownEmulators.json` against the real libretro buildbot every 6 hours and opens a pull request with any fix; merge always stays a manual human decision, never automatic. See ARCHITECTURE.md → ADR-25. 16 new tests
 - Bridge now fetches its own emulator catalog fresh from GitHub on every startup, so a merged catalog fix reaches a running install without waiting for a new release. Fire-and-forget with a silent fallback to the build's embedded copy on any failure (no internet, slow network, bad response) — the one deliberate exception to Bridge's usual never-fail-silently rule, since a background refresh failure has nothing actionable to show the user. See ARCHITECTURE.md → ADR-25. 8 new tests

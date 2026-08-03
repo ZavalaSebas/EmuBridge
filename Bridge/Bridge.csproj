@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>0.7.1</Version>
+    <Version>0.8.0</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
 
     <!-- PublishSingleFile only bundles managed assemblies by default — WPF's native interop DLLs
