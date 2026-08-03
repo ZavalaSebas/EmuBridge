@@ -30,17 +30,27 @@ public class DownloadVerificationService : IDownloadVerificationService
 
     private readonly HttpClient _httpClient;
     private readonly string _downloadDirectory;
+    private readonly IReadOnlySet<string> _allowedHosts;
     private readonly ILogger<DownloadVerificationService> _logger;
 
     public DownloadVerificationService(HttpClient httpClient, ILogger<DownloadVerificationService> logger)
-        : this(httpClient, Config.EmulatorDownloadsPath, logger)
+        : this(httpClient, Config.EmulatorDownloadsPath, Config.AllowedDownloadHosts, logger)
     {
     }
 
     public DownloadVerificationService(HttpClient httpClient, string downloadDirectory, ILogger<DownloadVerificationService> logger)
+        : this(httpClient, downloadDirectory, Config.AllowedDownloadHosts, logger)
+    {
+    }
+
+    // Allowed hosts injected, not read from Config directly, so tests can point at a test-only
+    // host (e.g. example.com) without weakening the real production allow-list (Config.cs ->
+    // AllowedDownloadHosts, ARCHITECTURE.md -> ADR-26) to accommodate test fixtures.
+    public DownloadVerificationService(HttpClient httpClient, string downloadDirectory, IReadOnlySet<string> allowedHosts, ILogger<DownloadVerificationService> logger)
     {
         _httpClient = httpClient;
         _downloadDirectory = downloadDirectory;
+        _allowedHosts = allowedHosts;
         _logger = logger;
     }
 
@@ -52,6 +62,12 @@ public class DownloadVerificationService : IDownloadVerificationService
         IProgress<long>? progress = null,
         CancellationToken ct = default)
     {
+        if (!TryValidateSource(sourceUrl, out var host))
+        {
+            _logger.LogError("Refusing to download {FileName} from untrusted source {Url} (host: {Host}) — not in Bridge's allowed download hosts. No connection attempted.", destinationFileName, sourceUrl, host);
+            return UntrustedSourceResult(destinationFileName, host);
+        }
+
         Directory.CreateDirectory(_downloadDirectory);
         var stagingPath = Path.Combine(_downloadDirectory, $"{destinationFileName}.download");
         var finalPath = Path.Combine(_downloadDirectory, destinationFileName);
@@ -194,6 +210,22 @@ public class DownloadVerificationService : IDownloadVerificationService
 
     private static bool IsWithinSizeTolerance(long actual, long expected) => Math.Abs(actual - expected) <= SizeToleranceBytes;
 
+    // https required, not just an allowed host — a plain http:// URL to the same host would
+    // reopen exactly the MITM/tampering risk ADR-11's threat model already covers for the
+    // download itself. host carries either the real parsed host (for the log/error message) or
+    // the raw input when it isn't even a valid absolute URL — either way, never trusted.
+    private bool TryValidateSource(string sourceUrl, out string host)
+    {
+        if (Uri.TryCreate(sourceUrl, UriKind.Absolute, out var uri))
+        {
+            host = uri.Host;
+            return uri.Scheme == Uri.UriSchemeHttps && _allowedHosts.Contains(uri.Host);
+        }
+
+        host = sourceUrl;
+        return false;
+    }
+
     private static async Task<string> ComputeSha256Async(string filePath, CancellationToken ct)
     {
         await using var stream = File.OpenRead(filePath);
@@ -219,5 +251,11 @@ public class DownloadVerificationService : IDownloadVerificationService
     {
         Outcome = DownloadOutcome.SizeExceeded,
         ErrorMessage = $"The download for {destinationFileName} {reason} — this may indicate a compromised or misconfigured source. It was not installed."
+    };
+
+    private static DownloadResult UntrustedSourceResult(string destinationFileName, string host) => new()
+    {
+        Outcome = DownloadOutcome.UntrustedSource,
+        ErrorMessage = $"The download for {destinationFileName} was blocked because its source ({host}) isn't in Bridge's list of trusted download hosts. It was not installed."
     };
 }

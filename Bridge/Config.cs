@@ -17,6 +17,31 @@ public static class Config
     // enforced by Bridge.Tests -> KnownEmulatorsManifestTests.
     public const string UnverifiedManifestPlaceholder = "PLACEHOLDER_NOT_VERIFIED";
 
+    // Live catalog refresh (ARCHITECTURE.md -> ADR-25): fetched fresh on every startup, fire-and-
+    // forget, from the same repo the app itself ships from — never a separate backend. Points at
+    // `main` specifically, never an unreviewed branch: the drift-check PR mechanism (same ADR)
+    // only ever writes to `main` after a human merges it.
+    public const string ManifestUpdateUrl = "https://raw.githubusercontent.com/ZavalaSebas/Bridge/main/Bridge/Resources/KnownEmulators.json";
+
+    // Short deliberately: this fetch must never make startup or an Auto-Install attempt feel
+    // slow. Missing this window just means falling back to the cache or the embedded copy.
+    public static readonly TimeSpan ManifestUpdateTimeout = TimeSpan.FromSeconds(5);
+
+    // Hosts DownloadVerificationService will ever download+extract+run content from, regardless
+    // of where the manifest entry pointing at them came from (embedded or live-fetched, ADR-25).
+    // Deliberately a compiled constant, never manifest data — a compromised KnownEmulators.json
+    // (embedded or fetched) could otherwise redirect a DownloadUrl anywhere and supply a matching
+    // hash for its own malicious payload, since the hash check alone can't catch a source that
+    // controls both the file and the pin. Confirmed against the real catalog, not guessed: every
+    // one of the 15 seed cores plus the RetroArch frontend itself uses exactly this one host.
+    // Adding a new one is deliberately a source-code change, reviewed like any other Bridge
+    // commit — not something the drift-check bot (which only ever updates Sha256/
+    // ExpectedSizeBytes/CapturedAt on already-trusted entries) can add on its own. Distinct from
+    // ManifestUpdateUrl above: that fetch has no variable destination to restrict in the first
+    // place, so no allow-list applies to it.
+    public static readonly IReadOnlySet<string> AllowedDownloadHosts =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "buildbot.libretro.com" };
+
     public const string SteamGridDbBaseUrl = "https://www.steamgriddb.com/api/v2";
 
     // Phase 1 cover grid tile size — a placeholder default (2:3, matching typical box art

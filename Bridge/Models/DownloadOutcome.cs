@@ -5,5 +5,6 @@ public enum DownloadOutcome
     Success,
     HashMismatch,
     SizeExceeded,
-    NetworkError
+    NetworkError,
+    UntrustedSource
 }

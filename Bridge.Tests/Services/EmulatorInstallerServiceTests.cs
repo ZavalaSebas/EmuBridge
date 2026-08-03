@@ -91,7 +91,7 @@ public class EmulatorInstallerServiceTests : IDisposable
     };
 
     private EmulatorInstallerService CreateService(IReadOnlyList<KnownEmulator> catalog)
-        => new(_downloadService, _emulatorService, _installDirectory, catalog, NullLogger<EmulatorInstallerService>.Instance);
+        => new(_downloadService, _emulatorService, _installDirectory, () => catalog, NullLogger<EmulatorInstallerService>.Instance);
 
     [Fact]
     public async Task HasKnownInstallOptionAsync_MatchingVerifiedEntry_ReturnsTrue()

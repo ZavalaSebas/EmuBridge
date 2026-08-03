@@ -1,0 +1,61 @@
+name: Manifest Drift Check
+
+# Detects when Bridge/Resources/KnownEmulators.json has drifted from the real files on
+# buildbot.libretro.com and opens a PR with the fix — never merges automatically. See
+# ARCHITECTURE.md -> ADR-25 for the full design and why merge stays a human decision.
+#
+# Cadence: every 6 hours. Not a guess — buildbot.libretro.com sits behind Cloudflare with heavy
+# caching (confirmed via real response headers during the 2026-08-02 investigation), so a
+# handful of requests a day is negligible load; against that, real evidence the same day showed
+# a core can drift more than once within a couple of hours, so a daily check would leave too
+# wide a window. See ARCHITECTURE.md -> ADR-25 for the full reasoning.
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  drift-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Restore packages
+        run: dotnet restore Bridge.slnx
+
+      # continue-on-error so a verification failure or a structural change (ARCHITECTURE.md ->
+      # ADR-25 — never auto-applied, always needs a human) doesn't skip opening a PR for whatever
+      # routine drift was still found and fixed alongside it. The job is explicitly failed at the
+      # end if this step didn't fully succeed — never silent about it.
+      - name: Check catalog against the real buildbot
+        id: drift_check
+        continue-on-error: true
+        run: >
+          dotnet run --project tools/ManifestDriftCheck -c Release --no-restore --
+          Bridge/Resources/KnownEmulators.json
+          ${{ runner.temp }}/drift-report.md
+
+      # No-op if KnownEmulators.json has no actual diff (git-level, not the tool's own exit
+      # code) — idempotent: a later run with more drift updates this same PR instead of piling
+      # up duplicates.
+      - name: Open PR for routine catalog updates
+        uses: peter-evans/create-pull-request@v8
+        with:
+          add-paths: Bridge/Resources/KnownEmulators.json
+          branch: chore/manifest-drift-check
+          delete-branch: true
+          commit-message: "chore: update KnownEmulators.json catalog (drift check)"
+          title: "chore: KnownEmulators.json drift check"
+          body-path: ${{ runner.temp }}/drift-report.md
+
+      - name: Fail the job if anything needs manual attention
+        if: steps.drift_check.outcome != 'success'
+        run: exit 1

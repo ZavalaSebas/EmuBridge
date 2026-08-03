@@ -56,6 +56,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Fire-and-forget, deliberately not awaited: never delays showing the library, and by
+        // the time a user actually clicks "Auto-Install" (a later, human-initiated action, never
+        // immediate at startup) this has almost always already finished. See ARCHITECTURE.md ->
+        // ADR-25 and IManifestUpdateService's own doc comment for why a failed/slow refresh here
+        // is silent rather than surfaced.
+        _ = Services.GetRequiredService<IManifestUpdateService>().RefreshAsync();
+
         var mainWindow = new MainWindow();
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
         mainViewModel.OpenSettingsRequested = () => OpenSettings(mainWindow);
@@ -133,6 +140,7 @@ public partial class App : Application
         services.AddSingleton<IEmulatorService, EmulatorService>();
         services.AddSingleton<ILaunchService, LaunchService>();
         services.AddSingleton<IDownloadVerificationService, DownloadVerificationService>();
+        services.AddSingleton<IManifestUpdateService, ManifestUpdateService>();
         services.AddSingleton<IEmulatorInstallerService, EmulatorInstallerService>();
         services.AddSingleton<IMessageBoxService, MessageBoxService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();

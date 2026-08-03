@@ -25,8 +25,12 @@ public class DownloadVerificationServiceTests : IDisposable
         }
     }
 
+    // "example.com" only — deliberately not the real Config.AllowedDownloadHosts, so these tests
+    // never accidentally validate against (or drift from) the real production allow-list.
+    private static readonly HashSet<string> TestAllowedHosts = new(StringComparer.OrdinalIgnoreCase) { "example.com" };
+
     private DownloadVerificationService CreateService(FakeHttpMessageHandler handler)
-        => new(new HttpClient(handler), _downloadDirectory, NullLogger<DownloadVerificationService>.Instance);
+        => new(new HttpClient(handler), _downloadDirectory, TestAllowedHosts, NullLogger<DownloadVerificationService>.Instance);
 
     private static string Sha256Hex(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
@@ -171,6 +175,61 @@ public class DownloadVerificationServiceTests : IDisposable
         Assert.Equal(DownloadOutcome.SizeExceeded, result.Outcome);
         Assert.Contains("larger than expected", result.ErrorMessage);
         Assert.Empty(Directory.GetFiles(_downloadDirectory));
+    }
+
+    // Domain allow-list (ARCHITECTURE.md -> ADR-26): the real security boundary against a
+    // compromised manifest supplying its own DownloadUrl + matching Sha256 pair for a malicious
+    // payload — the hash check alone can't catch that, since both values come from the same
+    // untrusted source. Config.AllowedDownloadHosts is a compiled constant, never manifest data.
+    [Fact]
+    public async Task DownloadAndVerifyAsync_HostNotInAllowList_RejectsBeforeAttemptingConnection()
+    {
+        var handler = new FakeHttpMessageHandler(_ => throw new InvalidOperationException("Should never be called — the host isn't allowed."));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("https://not-allowed.example.org/emu.7z", "emu.7z", new string('0', 64), 10);
+
+        Assert.Equal(DownloadOutcome.UntrustedSource, result.Outcome);
+        Assert.Contains("not-allowed.example.org", result.ErrorMessage);
+        Assert.Contains("isn't in Bridge's list of trusted download hosts", result.ErrorMessage);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task DownloadAndVerifyAsync_HttpSchemeWithAllowedHost_RejectsBeforeAttemptingConnection()
+    {
+        var handler = new FakeHttpMessageHandler(_ => throw new InvalidOperationException("Should never be called — http:// is never trusted, even to an allowed host."));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("http://example.com/emu.7z", "emu.7z", new string('0', 64), 10);
+
+        Assert.Equal(DownloadOutcome.UntrustedSource, result.Outcome);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task DownloadAndVerifyAsync_MalformedUrl_RejectsAsUntrustedSourceRatherThanCrashing()
+    {
+        var handler = new FakeHttpMessageHandler(_ => throw new InvalidOperationException("Should never be called."));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("not a url at all", "emu.7z", new string('0', 64), 10);
+
+        Assert.Equal(DownloadOutcome.UntrustedSource, result.Outcome);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task DownloadAndVerifyAsync_HttpsWithAllowedHost_ProceedsNormally()
+    {
+        var bytes = new byte[] { 1, 2, 3, 4, 5 };
+        var handler = new FakeHttpMessageHandler(_ => OkResponse(bytes));
+        var service = CreateService(handler);
+
+        var result = await service.DownloadAndVerifyAsync("https://example.com/emu.7z", "emu.7z", Sha256Hex(bytes), bytes.Length);
+
+        Assert.Equal(DownloadOutcome.Success, result.Outcome);
+        Assert.Single(handler.Requests);
     }
 
     [Fact]

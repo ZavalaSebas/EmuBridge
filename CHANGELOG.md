@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Automated manifest drift detection — a scheduled GitHub Action re-verifies `KnownEmulators.json` against the real libretro buildbot every 6 hours and opens a pull request with any fix; merge always stays a manual human decision, never automatic. See ARCHITECTURE.md → ADR-25. 16 new tests
+- Bridge now fetches its own emulator catalog fresh from GitHub on every startup, so a merged catalog fix reaches a running install without waiting for a new release. Fire-and-forget with a silent fallback to the build's embedded copy on any failure (no internet, slow network, bad response) — the one deliberate exception to Bridge's usual never-fail-silently rule, since a background refresh failure has nothing actionable to show the user. See ARCHITECTURE.md → ADR-25. 8 new tests
+- A hardcoded allow-list of trusted download hosts (`buildbot.libretro.com`, today the only real one) — closes a real gap the live catalog fetch above opened: the existing exact-hash check alone can't tell a legitimate download apart from one where a compromised manifest supplied both a malicious URL and a matching hash for it. The list lives in Bridge's own compiled code, never in the manifest itself, so nothing fetched live can expand what Bridge is willing to download and run; adding a new trusted host requires an actual source change and release. See ARCHITECTURE.md → ADR-26. 5 new tests
+
 ## [0.7.1] - 2026-08-07
 
 A same-day data-only patch, cut on its own rather than bundled with other work — a third real drift incident left an insignia feature (Auto-Install) effectively broken for multiple platforms, the same urgency standard as the `v0.1.0` `.exe` fix. 243 unit tests in Release, 242 in Debug (unchanged from `v0.7.0` — data-only fix, no test changes needed).

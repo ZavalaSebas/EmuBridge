@@ -1,6 +1,4 @@
 using System.IO;
-using System.Reflection;
-using System.Text.Json;
 using Bridge.Models;
 using Microsoft.Extensions.Logging;
 using SharpCompress.Archives;
@@ -18,29 +16,33 @@ public class EmulatorInstallerService : IEmulatorInstallerService
     private readonly IDownloadVerificationService _downloadService;
     private readonly IEmulatorService _emulatorService;
     private readonly string _installDirectory;
-    private readonly IReadOnlyList<KnownEmulator> _catalog;
+    private readonly Func<IReadOnlyList<KnownEmulator>> _catalogProvider;
     private readonly ILogger<EmulatorInstallerService> _logger;
 
-    public EmulatorInstallerService(IDownloadVerificationService downloadService, IEmulatorService emulatorService, ILogger<EmulatorInstallerService> logger)
-        : this(downloadService, emulatorService, Config.EmulatorInstallPath, LoadEmbeddedCatalog(), logger)
+    public EmulatorInstallerService(IDownloadVerificationService downloadService, IEmulatorService emulatorService, IManifestUpdateService manifestUpdateService, ILogger<EmulatorInstallerService> logger)
+        : this(downloadService, emulatorService, Config.EmulatorInstallPath, manifestUpdateService.GetCatalog, logger)
     {
     }
 
-    // Catalog is injected, not loaded internally, so tests can point InstallAsync at real,
-    // small, hand-built test archives instead of the actual KnownEmulators.json data (which
-    // would mean tests break whenever the real catalog changes, and can't exercise failure paths
-    // like a corrupt/wrong archive without an actual multi-hundred-MB download).
+    // The catalog is a provider delegate, not a fixed snapshot, so this always sees whatever
+    // IManifestUpdateService currently considers the best catalog (ARCHITECTURE.md -> ADR-25) —
+    // this service is registered as a singleton, resolved once early at startup, so a fixed list
+    // captured at construction time would never see a background refresh that completes later in
+    // the same session. Also keeps tests able to point InstallAsync at real, small, hand-built
+    // test archives instead of the actual KnownEmulators.json data (which would mean tests break
+    // whenever the real catalog changes, and can't exercise failure paths like a corrupt/wrong
+    // archive without an actual multi-hundred-MB download) — tests just pass `() => catalog`.
     public EmulatorInstallerService(
         IDownloadVerificationService downloadService,
         IEmulatorService emulatorService,
         string installDirectory,
-        IReadOnlyList<KnownEmulator> catalog,
+        Func<IReadOnlyList<KnownEmulator>> catalogProvider,
         ILogger<EmulatorInstallerService> logger)
     {
         _downloadService = downloadService;
         _emulatorService = emulatorService;
         _installDirectory = installDirectory;
-        _catalog = catalog;
+        _catalogProvider = catalogProvider;
         _logger = logger;
     }
 
@@ -214,7 +216,7 @@ public class EmulatorInstallerService : IEmulatorInstallerService
 
     private (KnownEmulator KnownEmulator, KnownEmulatorCore Core)? FindKnownCore(string platformId)
     {
-        foreach (var emulator in _catalog)
+        foreach (var emulator in _catalogProvider())
         {
             var matchingCores = emulator.Cores.Where(c => c.PlatformId == platformId).ToList();
             if (matchingCores.Count == 0)
@@ -237,18 +239,6 @@ public class EmulatorInstallerService : IEmulatorInstallerService
         }
 
         return null;
-    }
-
-    private static List<KnownEmulator> LoadEmbeddedCatalog()
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        using var stream = assembly.GetManifestResourceStream(Config.KnownEmulatorsResourceName);
-        if (stream is null)
-        {
-            return [];
-        }
-
-        return JsonSerializer.Deserialize<List<KnownEmulator>>(stream) ?? [];
     }
 
     private static bool IsUnverified(KnownEmulator emulator) =>
