@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-04
+
+Cheats management per game for RetroArch-backed profiles — three real bugs found and fixed correcting the mechanism along the way, all root-caused against RetroArch's actual source (and, for two of them, its own log output) rather than assumed. 301 unit tests pass in Release, 300 in Debug (`Bridge.Tests`); 16 in `ManifestDriftCheck.Tests` (unchanged).
+
 ### Added
 - Cheats management per game (RetroArch only) — right-click a game → "Cheats..." fetches its `.cht` file on demand from `libretro/libretro-database` (CC BY-SA 4.0, with a per-file attribution link), lets you toggle individual cheats on/off, and persists the file locally so it never re-fetches on later opens. A new "Auto-apply cheats on launch" toggle in Settings (default ON) applies a game's enabled cheats automatically when it starts. Both this and pointing RetroArch at a game's cheat file at all go through RetroArch's own per-game config override mechanism — scoped to games that already have a Bridge-managed cheat file, never a global RetroArch behavior change, and never written to the user's own `retroarch.cfg`. See ARCHITECTURE.md → ADR-27. New `CheatService`/`CheatFileParser`/`CheatsViewModel` and tests.
 
