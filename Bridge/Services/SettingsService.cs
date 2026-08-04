@@ -61,6 +61,23 @@ public class SettingsService : ISettingsService
         await WriteSettingsAsync(settings, ct);
     }
 
+    public async Task<bool> GetAutoApplyCheatsOnLaunchAsync(CancellationToken ct = default)
+    {
+        var settings = await ReadSettingsAsync(ct);
+        // Nullable so "never set" (null) is distinguishable from an explicit false - defaults to
+        // true either way (approved design), but keeps the file's own on-disk state honest about
+        // whether the user ever actually touched this toggle.
+        return settings?.AutoApplyCheatsOnLaunch ?? true;
+    }
+
+    public async Task SetAutoApplyCheatsOnLaunchAsync(bool enabled, CancellationToken ct = default)
+    {
+        var settings = await ReadSettingsAsync(ct) ?? new SettingsFile();
+        settings.AutoApplyCheatsOnLaunch = enabled;
+
+        await WriteSettingsAsync(settings, ct);
+    }
+
     private async Task<SettingsFile?> ReadSettingsAsync(CancellationToken ct)
     {
         if (!File.Exists(_settingsPath))
@@ -95,5 +112,6 @@ public class SettingsService : ISettingsService
     private class SettingsFile
     {
         public string? EncryptedSteamGridDbApiKey { get; set; }
+        public bool? AutoApplyCheatsOnLaunch { get; set; }
     }
 }

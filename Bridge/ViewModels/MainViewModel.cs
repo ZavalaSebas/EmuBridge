@@ -73,6 +73,10 @@ public partial class MainViewModel : ObservableObject
     /// about EmulatorOverrideWindow/EmulatorOverrideViewModel (ARCHITECTURE.md -> ADR-24).</summary>
     public Action<Game>? OpenEmulatorOverrideRequested { get; set; }
 
+    /// <summary>Same wiring shape as OpenEmulatorOverrideRequested — this ViewModel doesn't need to
+    /// know about CheatsWindow/CheatsViewModel (ARCHITECTURE.md -> ADR-27).</summary>
+    public Action<Game>? OpenCheatsRequested { get; set; }
+
     public MainViewModel(
         IRomScannerService romScannerService,
         ILibraryRepository libraryRepository,
@@ -314,6 +318,17 @@ public partial class MainViewModel : ObservableObject
         }
 
         OpenEmulatorOverrideRequested?.Invoke(game);
+    }
+
+    [RelayCommand]
+    private void OpenCheats(GameTile? tile)
+    {
+        if (tile is null || !_gamesById.TryGetValue(tile.GameId, out var game))
+        {
+            return;
+        }
+
+        OpenCheatsRequested?.Invoke(game);
     }
 
     [RelayCommand]

@@ -10,11 +10,15 @@ namespace Bridge.Services;
 public class LaunchService : ILaunchService
 {
     private readonly IEmulatorService _emulatorService;
+    private readonly ICheatService _cheatService;
+    private readonly ISettingsService _settingsService;
     private readonly ILogger<LaunchService> _logger;
 
-    public LaunchService(IEmulatorService emulatorService, ILogger<LaunchService> logger)
+    public LaunchService(IEmulatorService emulatorService, ICheatService cheatService, ISettingsService settingsService, ILogger<LaunchService> logger)
     {
         _emulatorService = emulatorService;
+        _cheatService = cheatService;
+        _settingsService = settingsService;
         _logger = logger;
     }
 
@@ -80,6 +84,27 @@ public class LaunchService : ILaunchService
             WorkingDirectory = Path.GetDirectoryName(profile.ExecutablePath) ?? string.Empty,
             UseShellExecute = false
         };
+
+        // Only for RetroArch-backed profiles (CorePath set), and only when a Bridge-managed cheat
+        // file actually exists for this game (ARCHITECTURE.md -> ADR-27) — never touches the
+        // user's own default cheats directory, and never sets anything for a manually-configured
+        // emulator that has no cheat concept Bridge understands.
+        //
+        // Both settings this needs (cheat_database_path pointing RetroArch at this game's cheat
+        // folder, and the optional apply_cheats_after_load auto-apply) go through RetroArch's own
+        // per-game "override" file, not the LIBRETRO_CHEATS_DIRECTORY env var or --appendconfig -
+        // both of those were confirmed, separately, to leak permanently into the user's real
+        // retroarch.cfg via RetroArch's own config_save_on_exit default. Override files are the
+        // one mechanism RetroArch itself explicitly reloads away before that save happens.
+        if (profile.CorePath is not null)
+        {
+            var cheatDirectory = _cheatService.GetCheatDirectoryIfExists(game);
+            if (cheatDirectory is not null)
+            {
+                var autoApply = await _settingsService.GetAutoApplyCheatsOnLaunchAsync(ct);
+                await _cheatService.ApplyCheatLaunchOverridesAsync(game, profile.ExecutablePath, cheatDirectory, autoApply, ct);
+            }
+        }
 
         // Explicit late check: everything above (file-existence checks, argument expansion) takes
         // real time, so re-check right here, immediately before the process actually launches,

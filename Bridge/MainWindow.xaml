@@ -39,6 +39,9 @@
             <MenuItem Header="Configure Emulator..."
                       Command="{Binding PlacementTarget.Tag.ConfigureEmulatorCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                       CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="Cheats..."
+                      Command="{Binding PlacementTarget.Tag.OpenCheatsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
             <MenuItem Header="Remove from Library"
                       Visibility="{Binding PlacementTarget.DataContext.IsMissing, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibilityConverter}}"
                       Command="{Binding PlacementTarget.Tag.DeleteGameCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"

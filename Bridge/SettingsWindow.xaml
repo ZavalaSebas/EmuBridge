@@ -15,6 +15,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Emulators section -->
@@ -71,7 +72,14 @@
             </Grid>
         </GroupBox>
 
-        <Grid Grid.Row="2" Margin="0,8,0,0">
+        <!-- Cheats section -->
+        <GroupBox Grid.Row="2" Header="Cheats" Margin="0,12,0,0">
+            <CheckBox Margin="6" Content="Auto-apply cheats on launch"
+                      IsChecked="{Binding AutoApplyCheatsOnLaunch}"
+                      Command="{Binding SaveAutoApplyCheatsOnLaunchCommand}" />
+        </GroupBox>
+
+        <Grid Grid.Row="3" Margin="0,8,0,0">
             <!-- Busy: auto-install progress -->
             <Grid Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>

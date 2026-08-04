@@ -73,4 +73,19 @@ public static class Config
     // Extracted, ready-to-run emulator installs (ADR-14) — distinct from EmulatorDownloadsPath,
     // which only holds the raw downloaded archives before/after verification.
     public static string EmulatorInstallPath => Path.Combine(AppDataPath, "Emulators");
+
+    // Per-game .cht files CheatService fetches/manages (ARCHITECTURE.md -> ADR-27) — one
+    // subfolder per GameId, containing exactly the one file for that game (never the user's own
+    // RetroArch cheats folder, which Bridge never touches directly). LaunchService points
+    // RetroArch at a game's subfolder here via cheat_database_path in RetroArch's own per-game
+    // override file, only when a file actually exists for it — see
+    // CheatService.ApplyCheatLaunchOverridesAsync.
+    public static string CheatsPath => Path.Combine(AppDataPath, "Cheats");
+
+    // libretro/libretro-database, CC BY-SA 4.0 (confirmed against the repo's real LICENSE file
+    // and GitHub's own SPDX detection — see ARCHITECTURE.md -> ADR-27). raw.githubusercontent.com
+    // for the actual fetch; the github.com/.../blob/ form is used separately for the human-facing
+    // attribution link (Section 3.a's "link to the licensed material"), never for the fetch itself.
+    public const string CheatDatabaseRawBaseUrl = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht";
+    public const string CheatDatabaseBlobBaseUrl = "https://github.com/libretro/libretro-database/blob/master/cht";
 }

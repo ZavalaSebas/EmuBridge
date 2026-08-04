@@ -34,6 +34,14 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _steamGridDbApiKey = string.Empty;
 
+    // Mechanism 2 (ARCHITECTURE.md -> ADR-27) - default true, matching the approved design. Only
+    // affects launches where a Bridge-managed cheat file already exists for that specific game
+    // (LaunchService's own gate); this toggle just decides whether that already-narrow case also
+    // gets auto-applied via RetroArch's own per-game override file, never a global RetroArch
+    // behavior change.
+    [ObservableProperty]
+    private bool _autoApplyCheatsOnLaunch;
+
     [ObservableProperty]
     private string _statusMessage = string.Empty;
 
@@ -60,6 +68,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         await LoadPlatformsAsync(ct);
         SteamGridDbApiKey = await _settingsService.GetSteamGridDbApiKeyAsync(ct) ?? string.Empty;
+        AutoApplyCheatsOnLaunch = await _settingsService.GetAutoApplyCheatsOnLaunchAsync(ct);
     }
 
     partial void OnSelectedPlatformChanged(PlatformConfigItem? value)
@@ -189,6 +198,16 @@ public partial class SettingsViewModel : ObservableObject
 
         await _settingsService.SetSteamGridDbApiKeyAsync(SteamGridDbApiKey);
         StatusMessage = "API key saved.";
+    }
+
+    // Bound to the CheckBox's Command (not an OnAutoApplyCheatsOnLaunchChanged partial hook) so
+    // that InitializeAsync's own load of the persisted value never triggers a spurious write back
+    // to disk - a Command only fires on a real user click, same idiom as CheatItem's
+    // ToggleCheatCommand.
+    [RelayCommand]
+    private async Task SaveAutoApplyCheatsOnLaunchAsync()
+    {
+        await _settingsService.SetAutoApplyCheatsOnLaunchAsync(AutoApplyCheatsOnLaunch);
     }
 
     private async Task LoadPlatformsAsync(CancellationToken ct = default)

@@ -68,6 +68,7 @@ public partial class App : Application
         mainViewModel.OpenSettingsRequested = () => OpenSettings(mainWindow);
         mainViewModel.OpenGameDetailsRequested = game => OpenGameDetails(mainWindow, game);
         mainViewModel.OpenEmulatorOverrideRequested = game => OpenEmulatorOverride(mainWindow, game);
+        mainViewModel.OpenCheatsRequested = game => OpenCheats(mainWindow, game);
         mainWindow.DataContext = mainViewModel;
 
         MainWindow = mainWindow;
@@ -108,6 +109,18 @@ public partial class App : Application
         overrideWindow.ShowDialog();
     }
 
+    private void OpenCheats(Window owner, Game game)
+    {
+        var viewModel = Services.GetRequiredService<CheatsViewModel>();
+        viewModel.SetGame(game);
+        var cheatsWindow = new CheatsWindow
+        {
+            Owner = owner,
+            DataContext = viewModel
+        };
+        cheatsWindow.ShowDialog();
+    }
+
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging(builder =>
@@ -142,6 +155,7 @@ public partial class App : Application
         services.AddSingleton<IDownloadVerificationService, DownloadVerificationService>();
         services.AddSingleton<IManifestUpdateService, ManifestUpdateService>();
         services.AddSingleton<IEmulatorInstallerService, EmulatorInstallerService>();
+        services.AddSingleton<ICheatService, CheatService>();
         services.AddSingleton<IMessageBoxService, MessageBoxService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
         services.AddSingleton<IFilePickerService, FilePickerService>();
@@ -159,6 +173,7 @@ public partial class App : Application
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<GameDetailViewModel>();
         services.AddTransient<EmulatorOverrideViewModel>();
+        services.AddTransient<CheatsViewModel>();
     }
 
     protected override void OnExit(ExitEventArgs e)

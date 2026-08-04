@@ -86,11 +86,12 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 - Real box art per view — vertical/poster-style covers in the normal grid, landscape covers in Big Picture, matching each view's real tile shape instead of stretching one orientation to fit both
 - Library persists between sessions — no full re-scan on every launch
 - The built-in emulator catalog stays current on its own — a scheduled check re-verifies it against the real libretro build channel and opens a human-reviewed pull request if anything drifted, and Bridge fetches the latest verified catalog on every startup so a fix reaches you without waiting for a new release
+- Cheats for RetroArch-based platforms (right-click a game → "Cheats...") — fetched on demand from the same public cheat database RetroArch itself uses, with an optional "Auto-apply cheats on launch" toggle so enabled cheats apply automatically without a manual step in RetroArch's own menu
 
 **Known limitations** (see [DEVELOPMENT.md](DEVELOPMENT.md#known-limitations) for full detail):
 - Removing a game from the library only works for entries already marked "missing" — there's no way to remove a game that's still present but you no longer want tracked
 - The game detail panel has no description/blurb — SteamGridDB (Bridge's only metadata source today) doesn't provide one
-- A core picker UI, Phase 3 (achievements, cheats, video previews, recommendations), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
+- A core picker UI, the rest of Phase 3 (achievements, mods, video previews, recommendations, disc-based systems), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
 
 ---
 
