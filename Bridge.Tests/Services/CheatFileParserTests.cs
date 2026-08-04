@@ -125,8 +125,13 @@ public class CheatFileParserTests
 
         // Exactly one line differs from the source (the patched cheat0_enable line) - proves the
         // patch is truly targeted, not a full reserialize that happens to produce equal content.
-        var originalLines = RealNesCheatFile.Split('\n');
-        var updatedLines = updated.Split('\n');
+        // Normalizes CRLF to LF before splitting - RealNesCheatFile's embedded newlines depend on
+        // how this very .cs file got checked out (this project's own git history shows LF-stored
+        // content getting checked out as CRLF depending on the runner), so a naive Split('\n')
+        // alone leaves a stray trailing '\r' on every line except the last. Same \r?\n? tolerance
+        // CheatFileParser's own regex patterns already use for the identical real-world reason.
+        var originalLines = RealNesCheatFile.Replace("\r\n", "\n").Split('\n');
+        var updatedLines = updated.Replace("\r\n", "\n").Split('\n');
         Assert.Equal(originalLines.Length, updatedLines.Length);
         var differingLines = originalLines.Zip(updatedLines).Where(pair => pair.First != pair.Second).ToList();
         var onlyDiff = Assert.Single(differingLines);
