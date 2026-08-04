@@ -763,7 +763,7 @@ Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, 
 - ✅ The unknown-vs-real-platform distinction for `NoEmulatorConfigured` — previously only encoded in `ErrorMessage` text — is now also a real branch point in `MainViewModel`, without needing to change `LaunchService`'s contract
 - ✅ The latent scan/install race is closed generally, not just avoided for this one feature — `RefreshLibraryCommand_WhileInstallInProgress_DoesNotStartScan` and `LaunchGameCommand_WhileBusy_DoesNotLaunch` lock in both directions
 - ✅ Auto-relaunch after a successful inline install is covered by a real two-call `FakeLaunchService` sequence (`ResultQueue`), not just asserted in prose
-- ❌ Core picker remains genuinely undesigned — deferring it doesn't reduce `EmulatorInstallerService.FindKnownCore`'s existing silent-first-match behavior if a second core is ever added without the picker also landing; still only a logged warning (`EmulatorInstallerService.cs:232`)
+- ❌ Core picker remains genuinely undesigned — deferring it doesn't reduce `EmulatorInstallerService.FindKnownCore`'s existing silent-first-match behavior if a second core is ever added without the picker also landing; still only a logged warning (`EmulatorInstallerService.cs:232`). Tracked in `PLAN.md` → Speculative / Future Ideas, not as open Phase 2 scope, since 2026-08-04 — Phase 2 shipped complete without it.
 - ✅ Interactively confirmed on a real running instance — main flow, decline, the "unknown"-platform case never offering, and no `IsBusy` conflict between launch and scan, all confirmed. See `PLAN.md` → Roadmap → `v0.4.0`.
 
 **Alternatives considered:**
