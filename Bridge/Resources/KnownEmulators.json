@@ -21,8 +21,8 @@
         "Id": "snes9x",
         "PlatformId": "snes",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/snes9x_libretro.dll.zip",
-        "Sha256": "F896A43E3D4246C94617356FFEA944BCDDFB3CD69145B1B69003B9FD4BB6E3D0",
-        "ExpectedSizeBytes": 1332267,
+        "Sha256": "20D891BA08F70AADB233D5D93EE6D1C8CA6A0DCACAB42CBBA0A6AD735685531B",
+        "ExpectedSizeBytes": 1331839,
         "CoreFileName": "snes9x_libretro.dll",
         "CapturedAt": "2026-08-04"
       },
@@ -30,7 +30,7 @@
         "Id": "sameboy",
         "PlatformId": "gb",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/sameboy_libretro.dll.zip",
-        "Sha256": "8B1279E38E2A8790580EE91C2589CBFA9469D06BC5DDE620AD78D65D7179573D",
+        "Sha256": "842901DCA3C5D3750A9E438D47C2B029113841D1843BC08DB889BECF80BFFC03",
         "ExpectedSizeBytes": 127314,
         "CoreFileName": "sameboy_libretro.dll",
         "CapturedAt": "2026-08-04"
@@ -39,7 +39,7 @@
         "Id": "sameboy_gbc",
         "PlatformId": "gbc",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/sameboy_libretro.dll.zip",
-        "Sha256": "8B1279E38E2A8790580EE91C2589CBFA9469D06BC5DDE620AD78D65D7179573D",
+        "Sha256": "842901DCA3C5D3750A9E438D47C2B029113841D1843BC08DB889BECF80BFFC03",
         "ExpectedSizeBytes": 127314,
         "CoreFileName": "sameboy_libretro.dll",
         "CapturedAt": "2026-08-04"
@@ -48,8 +48,8 @@
         "Id": "mgba",
         "PlatformId": "gba",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mgba_libretro.dll.zip",
-        "Sha256": "269C8AABA3A05C295A55EF8DDF23FE89D98DC600DF7A992AA0557B0597A8ADEC",
-        "ExpectedSizeBytes": 490569,
+        "Sha256": "9EF020B9397917DD1D27860B3EC5170730EC9DFBD6B3F82A82FB13750B73351E",
+        "ExpectedSizeBytes": 529871,
         "CoreFileName": "mgba_libretro.dll",
         "CapturedAt": "2026-08-04"
       },
