@@ -763,8 +763,8 @@ Today's audit work (ADR-15/ADR-16, the "Phase 2 complete" overclaim correction, 
 - ✅ The unknown-vs-real-platform distinction for `NoEmulatorConfigured` — previously only encoded in `ErrorMessage` text — is now also a real branch point in `MainViewModel`, without needing to change `LaunchService`'s contract
 - ✅ The latent scan/install race is closed generally, not just avoided for this one feature — `RefreshLibraryCommand_WhileInstallInProgress_DoesNotStartScan` and `LaunchGameCommand_WhileBusy_DoesNotLaunch` lock in both directions
 - ✅ Auto-relaunch after a successful inline install is covered by a real two-call `FakeLaunchService` sequence (`ResultQueue`), not just asserted in prose
-- ❌ Core picker remains genuinely undesigned — deferring it doesn't reduce `EmulatorInstallerService.FindKnownCore`'s existing silent-first-match behavior if a second core is ever added without the picker also landing; still only a logged warning (`EmulatorInstallerService.cs:230`)
-- ❌ No visual/interactive confirmation yet that the inline offer dialog and the shared progress bar actually render and behave correctly in a real running window — same category of gap already noted for ADR-14/ADR-15 before their first real click; covered here by `MainViewModelTests` at the ViewModel level, not by watching it on screen
+- ❌ Core picker remains genuinely undesigned — deferring it doesn't reduce `EmulatorInstallerService.FindKnownCore`'s existing silent-first-match behavior if a second core is ever added without the picker also landing; still only a logged warning (`EmulatorInstallerService.cs:232`)
+- ✅ Interactively confirmed on a real running instance — main flow, decline, the "unknown"-platform case never offering, and no `IsBusy` conflict between launch and scan, all confirmed. See `PLAN.md` → Roadmap → `v0.4.0`.
 
 **Alternatives considered:**
 
@@ -799,7 +799,7 @@ The "Full library" Roadmap group's first item is the game detail panel `BRIDGE_P
 - ✅ The `[JsonPropertyName]` gap was caught by writing a real test with a realistic snake_case JSON fixture (`FetchMissingBoxArtAsync_SearchResultHasReleaseDate_PersistsReleaseYear`), not by inspection alone — the same class of bug ADR-11's `ExecutableRelativePath` was, caught this time before a real user's first click, not after
 - ✅ `GameTileContextMenu`'s `Tag`-carries-the-whole-ViewModel generalization means the next context-menu item (if any) needs no further plumbing changes to `MainWindow.xaml`
 - ❌ Description and screenshots remain genuinely unbuilt — the original foundation-document bullet is only partially delivered; revisiting either requires a new Open-Decision-weight choice of external metadata API, not scoped here
-- ❌ No visual/interactive confirmation yet that "View Details" renders and behaves correctly in a real running window — same category of gap already noted for ADR-14/ADR-15/ADR-18 before their first real click; covered here by `MainViewModelTests`/`GameDetailViewModelTests`/`MetadataServiceTests` at the ViewModel/service level, not by watching it on screen
+- ✅ Interactively confirmed on a real running instance — cover, name, year, and platform render correctly, "Description: not available" shows as expected, context menu works. See `DEVELOPMENT.md` → Current Status.
 
 **Alternatives considered:**
 
@@ -881,7 +881,7 @@ Deliberately **not** in scope, matching what was actually asked rather than expa
 - ✅ The "hide missing" rejection is a real, evidenced decision (a specific interaction conflict with `ADR-15`), not a guess or a default-to-simpler choice
 - ✅ `RebuildGameTiles()` being the single path both `LoadGamesAsync` and the property-changed hooks call means a future sort/filter addition doesn't need a second implementation
 - ❌ `LibrarySortMode`'s `ComboBox` items store friendly display text a second time (in XAML `Content`), separate from the enum's own member names — acceptable for 3 fixed items, would need a real converter or view-model-exposed display list if this ever needed to be more dynamic
-- ❌ No visual/interactive confirmation yet that sort/filter/the release-year tile line render and behave correctly in a real running window — same category of gap already noted before every other UI feature's first real click this phase; covered here by `MainViewModelTests` at the ViewModel level, not by watching it on screen
+- ✅ Interactively confirmed on a real running instance — sorting in all 3 modes, recently-played prioritizing a same-day launch, the favorites filter in both directions, and the tile's release year, with every previously-built feature (context menu, star, missing badge, detail panel) still working under the new ordering. See `DEVELOPMENT.md` → Current Status.
 
 **Alternatives considered:**
 
@@ -961,7 +961,7 @@ The non-uniform-stretch finding itself is tracked separately in `DEVELOPMENT.md`
 - ✅ `BoxArtStatus` reused rather than duplicated — no new enum for a state machine that's identical per orientation
 - ✅ The square-dimension edge case was verified by direct arithmetic on the real requested values, not assumed away
 - ❌ The retroactive backfill isn't free — a pre-existing game costs one extra *search* call (grids was always going to run) the first time it's reprocessed after this ships, since no `SteamGridDbGameId` is cached anywhere to skip re-searching by name; acceptable as a one-time cost, not recurring
-- ❌ No visual/interactive confirmation yet that Big Picture's tiles actually render vertical art correctly in a real running window — same category of gap noted at every other UI feature's first click this phase; covered here by `MetadataServiceTests`/`MainViewModelTests` at the service/ViewModel level, not by watching it on screen
+- ✅ Interactively confirmed on a real running instance — see the Updates below, which found and fixed 3 real bugs during that same confirmation pass, with the final result confirmed by direct file comparison in both the normal grid and Big Picture
 
 **Alternatives considered:**
 

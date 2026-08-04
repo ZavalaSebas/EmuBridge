@@ -96,7 +96,7 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 
 ## Architecture
 
-Bridge is organized around eight focused services — scanning (`RomScannerService`), metadata lookup (`MetadataService`), image caching (`ImageCacheService`), settings (`SettingsService`), emulator configuration (`EmulatorService`), launching (`LaunchService`), verified downloads (`DownloadVerificationService`), and automatic emulator installation (`EmulatorInstallerService`) — following a standard Services/Models/ViewModels/Views separation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full breakdown and the reasoning behind each decision.
+Bridge is organized around nine focused services — scanning (`RomScannerService`), metadata lookup (`MetadataService`), image caching (`ImageCacheService`), settings (`SettingsService`), emulator configuration (`EmulatorService`), launching (`LaunchService`), verified downloads (`DownloadVerificationService`), automatic emulator installation (`EmulatorInstallerService`), and catalog freshness (`ManifestUpdateService`) — following a standard Services/Models/ViewModels/Views separation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full breakdown and the reasoning behind each decision.
 
 ---
 

@@ -4,7 +4,7 @@ This document serves as a guide to this specific project AND as a reference for 
 
 ---
 
-## Current Status (as of 2026-08-07)
+## Current Status (as of 2026-08-03)
 
 Phase 1 (v0.1.0) shipped as a tagged GitHub Release. Phase 2 work has started: `EmulatorConfig` was replaced by an `Emulator`/`EmulatorProfile` split (one physical install can now back many per-platform launch configs — see ARCHITECTURE.md → ADR-11) plus a `DownloadVerificationService` (pinned-hash + exact-size verified downloads, staging-then-verify, never-fail-silently on mismatch) and a `KnownEmulators.json` catalog. Existing legacy `EmulatorConfig` data migrates automatically on first open. **The install orchestration is built, proven end-to-end, and has now been interactively tested for real across all 15 of 15 seed platforms** — `EmulatorInstallerService` downloads, extracts (`SharpCompress`, pure managed), and registers a working `Emulator`/`EmulatorProfile` for a platform, exposed via a new "Auto-Install" button in `SettingsWindow` (see ARCHITECTURE.md → ADR-14). 187 unit tests pass in Release, 186 in Debug — the Release-only manifest guard test passes because all 15 `KnownEmulatorCore` entries are fully verified data-wise, and now every one of them is also proven by a real Auto-Install click that launched a game. No seed platform remains data-verified-only.
 
@@ -64,11 +64,11 @@ When making changes, consider:
 
 | Principle | Application |
 |-----------|-------------|
-| **Precisión sobre velocidad** | Un solo error factual hace que todo el documento pierda credibilidad |
-| **Mínimo cambio** | Corrige únicamente inconsistencias objetivas; no reorganices por preferencia |
-| **Preserva contexto histórico** | Si algo cambió, marca el estado anterior como "was/used to" |
-| **Código = Verdad** | Si la docs dice una cosa y el código otra, la docs está wrong — arréglala |
-| **Testeado** | Si no está documentado, no existe para un nuevo contributor |
+| **Accuracy over speed** | A single factual error makes the entire document lose credibility |
+| **Minimal change** | Fix only objective inconsistencies; don't reorganize by preference |
+| **Preserve historical context** | If something changed, mark the prior state as "was/used to" |
+| **Code = Truth** | If the docs say one thing and the code says another, the docs are wrong — fix them |
+| **Tested** | If it isn't documented, it doesn't exist for a new contributor |
 
 ---
 
@@ -359,7 +359,7 @@ Same as every release since `v0.3.0` — `release.yml` fired correctly, the down
 ### Version Bump
 
 - [ ] Update `<Version>` in `Bridge/Bridge.csproj`
-- [ ] Update `CHANGELOG.md` with new version and changes
+- [ ] Update `CHANGELOG.md` with new version and changes — date the entry from the real bump commit (`git log -1 --date=short --format=%ad <sha>`), never typed by hand from an assumed "today"
 - [ ] Commit with subject `bump vX.Y.Z — <short summary>` and body with `### Added / Fixed / Changed` sections (the commit body becomes the GitHub Release body)
 
 ### Commit & Push
@@ -793,9 +793,11 @@ Before writing code for a new feature, follow this process:
    - Cancellation behavior (if applicable)
    - What happens in boundary cases (empty data, network failure, concurrent access)
 3. **Write the design down before writing code** — scope, approach, and edge cases should be explicit and reviewable before implementation starts.
-4. **Review the actual code at each step** — read the diff, run the tests, verify edge cases were actually handled. Do not accept a summary of "it's done" as verification.
-5. **Tests cover the background states from the design** — not just the happy path. Every state documented in step 2 should have a corresponding test.
-6. **Cross-check**: does this change require documentation updates? Consult the [Documentation Sync Map](#documentation-sync-map) before closing.
+4. **Obtain explicit approval before implementation begins** — the written design is reviewed and approved before the first line of implementation code is written, not after.
+5. **Review the actual code at each step** — read the diff, run the tests, verify edge cases were actually handled. Do not accept a summary of "it's done" as verification.
+6. **Tests cover the background states from the design** — not just the happy path. Every state documented in step 2 should have a corresponding test.
+7. **Confirm interactively in the running app before marking the feature complete** — actually run the build and exercise the feature end-to-end. A passing test suite is not a substitute for this step; a feature is not complete until it has been seen working in a real running instance.
+8. **Cross-check**: does this change require documentation updates? Consult the [Documentation Sync Map](#documentation-sync-map) before closing.
 
 ---
 

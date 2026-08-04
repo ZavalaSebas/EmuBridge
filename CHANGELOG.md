@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-08-07
+### Fixed
+- Automated manifest drift-check (ADR-25) ran on its scheduled 6-hour cycle and opened its first real pull request, re-verifying all 15 `KnownEmulators.json` core entries against the real libretro buildbot channel and re-pinning 15 of 15 (`Sha256`/`ExpectedSizeBytes`/`CapturedAt`) — no structural anomalies found. Confirms the mechanism (ADR-25/ADR-26) works unattended, end-to-end, against a real drift event, not just in a manual dry run. See PR #1 (`chore/manifest-drift-check`), merged 2026-08-04.
+
+## [0.8.0] - 2026-08-03
 
 A complete catalog-maintenance system, built the same day the recurring drift problem it solves was found and confirmed real three separate times. 256 unit tests in Release, 255 in Debug (`Bridge.Tests`); 16 in the new `ManifestDriftCheck.Tests` project (up from 243/242 in `v0.7.1`).
 
@@ -16,14 +19,14 @@ A complete catalog-maintenance system, built the same day the recurring drift pr
 - Bridge now fetches its own emulator catalog fresh from GitHub on every startup, so a merged catalog fix reaches a running install without waiting for a new release. Fire-and-forget with a silent fallback to the build's embedded copy on any failure (no internet, slow network, bad response) — the one deliberate exception to Bridge's usual never-fail-silently rule, since a background refresh failure has nothing actionable to show the user. See ARCHITECTURE.md → ADR-25. 8 new tests
 - A hardcoded allow-list of trusted download hosts (`buildbot.libretro.com`, today the only real one) — closes a real gap the live catalog fetch above opened: the existing exact-hash check alone can't tell a legitimate download apart from one where a compromised manifest supplied both a malicious URL and a matching hash for it. The list lives in Bridge's own compiled code, never in the manifest itself, so nothing fetched live can expand what Bridge is willing to download and run; adding a new trusted host requires an actual source change and release. See ARCHITECTURE.md → ADR-26. 5 new tests
 
-## [0.7.1] - 2026-08-07
+## [0.7.1] - 2026-08-02
 
 A same-day data-only patch, cut on its own rather than bundled with other work — a third real drift incident left an insignia feature (Auto-Install) effectively broken for multiple platforms, the same urgency standard as the `v0.1.0` `.exe` fix. 243 unit tests in Release, 242 in Debug (unchanged from `v0.7.0` — data-only fix, no test changes needed).
 
 ### Fixed
 - A third real emulator-catalog drift incident, post-`v0.7.0`: `fceumm`, `snes9x`, and `mgba` had each drifted from their pinned hash (same compressed size, different content — the same pattern as `stella`'s fix in `v0.7.0`). Found by sweeping all 15 catalog entries in one pass instead of investigating the one reported core in isolation, since the report suggested more than one core could be affected. All 3 re-verified with the established double-hash method and re-pinned together. See ARCHITECTURE.md → ADR-11 (2026-08-02 update). With this, all 15 of 15 catalog core entries have now drifted from their pin at least once in one working session — the underlying maintenance gap (`DEVELOPMENT.md` → Known Limitations) has been escalated to next priority in `PLAN.md` → Roadmap, no longer a low-priority "someday" item
 
-## [0.7.0] - 2026-08-07
+## [0.7.0] - 2026-08-02
 
 "Rest of Phase 2": per-game emulator configuration, plus a real download-verification hardening pass found while re-testing it. 243 unit tests in Release, 242 in Debug (up from 209 in `v0.6.0`).
 
@@ -34,7 +37,7 @@ A same-day data-only patch, cut on its own rather than bundled with other work �
 - Auto-Install could reject a core download as an "unexpected size" even though nothing was wrong — the libretro nightly build channel rebuilds regularly, and a routine rebuild can shift a core's size by a few bytes with no functional change. 11 of the catalog's 15 core entries had already drifted from their pinned size at the time this was found. Re-verified and re-pinned all 11 against the real, current files, and changed the size guard from exact equality to a small (±32 byte) tolerance, calibrated from the real drift observed — the SHA256 hash check, the actual security boundary, is untouched and still exact. See ARCHITECTURE.md → ADR-11 (2026-08-02 update). 4 new tests
 - `stella` (Atari 2600) failed Auto-Install a second time, same session, with a hash mismatch rather than a size mismatch — the nightly channel rebuilt it again, landing on the exact same compressed size as the prior pin but genuinely different content. Confirmed real (not a bug in today's tolerance change: size matched exactly, so tolerance never applied; the hash check, always exact, correctly caught a real content difference) and re-pinned. See ARCHITECTURE.md → ADR-11 (2026-08-02 update) and `DEVELOPMENT.md` → Known Limitations for the underlying recurring-maintenance gap this confirms
 
-## [0.6.0] - 2026-08-07
+## [0.6.0] - 2026-08-02
 
 The "Big Picture" group, complete: a streaming-style mode with a maximized window, landscape tiles, a "Try Something New" section, and real box art per view (vertical for the normal grid, horizontal for Big Picture) instead of one orientation stretched to fit both. Three real bugs were found and fixed during interactive testing, each investigated with real evidence before any fix — see ARCHITECTURE.md → ADR-22/ADR-23 for the full design and investigation record. 209 unit tests in Release, 208 in Debug (up from 187 in `v0.5.0`).
 
@@ -46,7 +49,7 @@ The "Big Picture" group, complete: a streaming-style mode with a maximized windo
 - Box art outside Big Picture (the normal library grid) could be visibly stretched non-uniformly. Root cause: `ImageCacheService.ResizeAndSave` forced both target dimensions regardless of the source image's real aspect ratio — always distorting a SteamGridDB horizontal grid (e.g. 460x215) squeezed into the grid's portrait tile shape. A regression made worse by the vertical-art work above: narrowing the horizontal fetch to a real dimensions filter removed the lucky cases where an unfiltered "first result" happened to already be portrait-shaped. Fixed by preserving aspect ratio (Uniform-fit, letterboxed with a transparent background rather than a baked-in color) instead of stretching. A center-crop alternative was evaluated with real numbers and rejected — it would discard roughly a third of the source width, risking cutting off the title text most box art places near the edges. See ARCHITECTURE.md → ADR-23 (Update). 3 new tests
 - Cover art could still show stale/wrong content for a game after its cached image file was deleted and rewritten at the same path (e.g. during the investigation above, or a real "Remove from Library" followed by the same game reappearing in a later rescan) — both `MainViewModel` and the XAML binding were provably correct, but WPF's own implicit `string`→`BitmapImage` conversion caches decoded bitmaps by URI at the process level, separate from and invisible to `ImageCacheService`'s file cache, and kept serving the first bitmap it ever decoded for that path. Fixed with an explicit `CachedImagePathConverter` (`BitmapCreateOptions.IgnoreImageCache`) applied to both the normal grid and Big Picture's image bindings. See ARCHITECTURE.md → ADR-23 (Update), `DEVELOPMENT.md` → Image Loading. 4 new tests
 
-## [0.5.0] - 2026-08-07
+## [0.5.0] - 2026-08-02
 
 The "Full library" group, complete: the main library stops feeling like Phase 1's functional-only grid and starts feeling finished. All 4 items are interactively confirmed on the user's real machine, not just unit-tested. 187 unit tests in Release, 186 in Debug (up from 161 in `v0.4.0`).
 
@@ -56,14 +59,14 @@ The "Full library" group, complete: the main library stops feeling like Phase 1'
 - Recently played, data only — `Game.LastPlayedUtc` is now set whenever a launch actually starts (`LaunchOutcome.Started`), not when the emulator session ends. No UI reads it yet; captured now so no game played before the future "Library" view ships reads as "never played" forever. See ARCHITECTURE.md → ADR-20 (Update). 4 new tests
 - Refined "Library" view — sort (Name / Recently Played / Favorites First), a Favorites-only filter, and the release year shown directly on each tile, finally putting the "Full library" group's earlier data (favorites, recently played, release year) to use in the grid itself. No animation — that's Phase Polish's scope. A "hide missing" filter was investigated and deliberately not built: it would block access to the existing "Remove from Library" action for exactly the entries a user would most want hidden. See ARCHITECTURE.md → ADR-21. 6 new tests
 
-## [0.4.0] - 2026-08-07
+## [0.4.0] - 2026-08-02
 
 Offering Auto-Install inline from the launch flow itself — the item originally scoped as `v0.3.0`, retroactively renumbered when two smaller unrelated items (Remove from Library, `.bin` fix) turned out to have taken that slot first. See `PLAN.md` → Roadmap for the full renumbering note. 161 unit tests in Release, 160 in Debug (up from 152 in `v0.3.0`).
 
 ### Added
 - Offer Auto-Install inline when launching a game whose platform has no emulator configured yet (`LaunchService` → `NoEmulatorConfigured`), not just from Settings — only for a real, recognized platform with a verified catalog entry, never for the unidentified `"unknown"` platform. Reuses `EmulatorInstallerService` and its existing progress-reporting mechanism; on a successful install, the game relaunches automatically instead of requiring a second click. Also closes a related latent bug: `IsBusy` is now shared between the scan and install flows (previously `LaunchGameAsync` had no busy guard at all), so the two can no longer race each other. See ARCHITECTURE.md → ADR-18. 9 new tests
 
-## [0.3.0] - 2026-08-07
+## [0.3.0] - 2026-08-02
 
 Two small items left over from the `v0.2.0` auto-install work, cut as their own release rather than bundled silently into whatever shipped next — a real capability gap (no way to remove a confirmed-gone game) and a real data gap (`.bin` Atari 2600 ROMs undetected), unrelated to each other and to the auto-install mechanism itself. Retroactively version-bumped: both had been sitting committed but unreleased since shortly after `v0.2.0`. 152 unit tests in Release, 151 in Debug (up from 137 in `v0.2.0`).
 
@@ -73,7 +76,7 @@ Two small items left over from the `v0.2.0` auto-install work, cut as their own 
 ### Fixed
 - Atari 2600 ROMs using the common headerless `.bin` extension weren't detected — `SeedSystems.json`'s `atari2600.Extensions` only had `.a26`. The JSON fix alone wouldn't have reached any already-seeded `bridge.db`, confirmed by reading `LibraryRepository.SeedPlatformsIfEmpty`: seeding is one-shot, gated on the whole `Platform` collection being non-empty. A new `ReconcileSeedPlatformExtensions()` now runs on every database open, unioning each seed platform's extensions into whatever's already stored (additive only — never removes anything) and inserting any seed platform whose row is missing entirely, closing the same gap for future seed changes generally, not just this one extension. See ARCHITECTURE.md → ADR-16. 3 new tests simulate real pre-existing (pre-fix) data, not just a fresh database.
 
-## [0.2.0] - 2026-08-05
+## [0.2.0] - 2026-07-31
 
 Phase 2 emulator auto-install: fully automatic download, verification, and installation of emulators/cores, replacing Phase 1's fully-manual per-system executable configuration. Catalog covers all 15 seed platforms, and every one of them has been interactively confirmed end-to-end — a real Auto-Install click that installed the emulator and launched a game. 137 unit tests in Release, 136 in Debug (up from 83 in `v0.1.0`).
 
