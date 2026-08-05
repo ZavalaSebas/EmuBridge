@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Renamed the project from Bridge to EmuBridge, code and GitHub repo alike, to free the "Bridge" name for a future, larger version of the app. Existing installs migrate their `%LOCALAPPDATA%\Bridge` data automatically on first launch after updating — box art cache and auto-installed emulator paths are rewritten in place. See ARCHITECTURE.md → ADR-30.
+
 ## [0.10.0] - 2026-08-04
 
 TheGamesDB as a second, additive metadata source for the game detail panel — chosen against real evidence from a deliberately hard coverage test (13/15 titles), not a flagship-only sample. 327 unit tests pass in Release, 326 in Debug (`EmuBridge.Tests`); 16 in `ManifestDriftCheck.Tests` (unchanged).

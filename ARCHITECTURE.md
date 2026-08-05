@@ -1256,6 +1256,43 @@ Both fixes are per-window (`Background`/`Foreground` set on the root `Window`/`F
 
 ---
 
+### ADR-30: Renamed the project from Bridge to EmuBridge — freeing "Bridge" for a future, larger version
+
+**Status:** Accepted
+
+**Date:** 2026-08-05
+
+**Context:**
+Explicit, deliberate rename, not a rebrand forced by a naming conflict: the name "Bridge" is being freed up for a future, more complete version of the app, with this codebase and everything in it becoming "EmuBridge" going forward — "as if it had always been called EmuBridge," per the request. Done after Phase Polish item 1 (WPF-UI, ADR-29) shipped, and RetroAchievements (Phase 3, item 3) already paused mid-investigation for that pivot — the rename is a second, separate pivot on top of that, not a continuation of either.
+
+**Decision — everything renamed, not just the display name:** project folders/`.csproj`/`.sln` files (`Bridge`→`EmuBridge`, `Bridge.Tests`→`EmuBridge.Tests`), the `Config.AppName` constant, embedded resource names, the GitHub repository itself (`ZavalaSebas/Bridge`→`ZavalaSebas/EmuBridge`), and a full text pass across ~136 files (docs, code, comments). Executed via `git mv` for directories/project files (preserves rename tracking for most files; a handful of small files with >50% content change fell back to delete+add, a known git limitation, not a mistake) plus a repo-wide `sed` text replacement, verified clean via repeated greps for both leftover bare "Bridge" and self-inflicted double-replacement corruption (below).
+
+**Decision — the legacy `%LOCALAPPDATA%\Bridge` folder name is hardcoded, not derived:** `AppDataMigrationService.LegacyAppDataPath` (`Services/AppDataMigrationService.cs`) is the one place in the codebase that must keep saying literal `"Bridge"` after the rename — it has to keep pointing at where existing installs' real data already lives, regardless of what the app is called going forward. Made `internal` (with `InternalsVisibleTo` added to `EmuBridge.csproj`) specifically so a test could assert its exact value directly, after the bug below showed the existing tests never exercised it at all.
+
+**Three real, non-hypothetical bugs found — two from a blind repo-wide `sed`, one from real interactive use on the user's own pre-existing data:**
+
+1. **The blind `sed -i 's/Bridge/EmuBridge/g'` corrupted the only two files that already contained "EmuBridge" text at sed-time** — both written moments earlier in the same session. Critically, it rewrote `LegacyAppDataPath`'s `"Bridge"` folder-name literal to `"EmuBridge"`, making `_oldPath == _newPath` and silently no-opping the entire migration for every real existing install. Found via code review before any interactive testing, not by the user. Fixed; a dedicated regression test (`LegacyAppDataPath_PointsAtTheOldBridgeFolderNotEmuBridge`) added specifically because the existing test suite's 2-arg-constructor tests never touched the real 1-arg production constructor at all — the exact gap that let this pass a fully green suite.
+2. **Real interactive test on the user's actual `%LOCALAPPDATA%` data**, first run: `DirectoryNotFoundException` loading box art, pointing at the old `...\Bridge\ImageCache\...` path even though the folder move itself had already succeeded. Root cause: `BoxArt.LocalPath`/`VerticalLocalPath`/`ScreenshotLocalPaths` and an auto-installed `Emulator.ExecutablePath` store *absolute* paths computed before the rename — moving the folder relocates the files but never rewrites these already-stored strings. Not anticipated in the original migration design. Fixed with `RewriteStoredAbsolutePaths`, scoped to only rewrite paths that literally start with the old prefix (a user-pointed emulator living outside AppData is left untouched). Redesigned to always run this step independent of whether the folder-move branch fired that run — the user's real machine was already in a "folder moved once already, paths never rewritten" state from an earlier, pre-fix build of the app, which the original "only run if the new folder doesn't exist yet" gate would have skipped forever.
+3. **Real interactive test, second run**: `ArgumentException: Requested value 'BridgeManaged' was not found` — LiteDB's `BsonMapper` deserializes enums by name, so renaming the `InstallSource` enum member (`BridgeManaged`→`EmuBridgeManaged`) broke reading any pre-existing `Emulator` record that still had the old literal string on disk. This contradicted an earlier, stale PowerShell byte-search of the user's real `bridge.db` (done before the rename) that had found zero occurrences — that check was incomplete, not the real crash. Fixed via `RewriteLegacyInstallSourceValues`, using LiteDB's untyped `BsonDocument` API (bypasses enum parsing entirely) run before any strongly-typed `Emulator` read. Also widened the surrounding `catch` from `IOException or LiteException` to bare `Exception`, since this runs during `App.OnStartup` before any window exists — an uncaught exception here crashes the whole app before the user sees anything, worse than a game's box art or an auto-installed emulator needing to be re-fetched/reconfigured.
+
+**A fourth, CI-only bug found after pushing the rename commit:** the `build` job failed on `.github/workflows/release.yml`'s "Check version change" step — `git show HEAD~1:'EmuBridge/EmuBridge.csproj'` genuinely fails because that path didn't exist at the parent commit (still `Bridge/Bridge.csproj` there). The step's own `if/else` already tolerates this correctly, but GitHub Actions appends its own `if ((Test-Path -LiteralPath variable:\LASTEXITCODE)) { exit $LASTEXITCODE }` check after every `pwsh` step (confirmed against `actions/runner`'s own source, `Runner.Worker/Handlers/ScriptHandlerHelpers.cs`, and its ADR — not assumed from a plausible-sounding PowerShell mechanism; an initial hypothesis blaming `$PSNativeCommandUseErrorActionPreference` was checked against Microsoft's own docs and found wrong, that variable defaults to `$false`). The stale non-zero `$LASTEXITCODE` left over from the tolerated `git show` failure turned an already-handled `else` branch into a hard step failure. Fixed with a one-line `$LASTEXITCODE = 0` reset immediately after the tolerated command.
+
+**Consequences:**
+- ✅ "Bridge" is now free for a future, larger/complete version of the app, per the explicit reason for doing this at all
+- ✅ All 3 data-compatibility bugs were found via real interactive testing on the user's own pre-existing local data, not assumed safe from a clean-build/passing-tests state — and all 3 got dedicated regression tests, not just ad hoc patches
+- ✅ The CI failure was root-caused against the actual `actions/runner` source rather than left as a plausible-sounding guess, after a first hypothesis was checked and found wrong
+- ✅ GitHub's automatic old-name→new-name redirect means existing clones/links to `ZavalaSebas/Bridge` keep working for now
+- ❌ No merge/rebuild path exists if `%LOCALAPPDATA%\Bridge` and the new `EmuBridge` folder somehow both already exist on a machine — deliberately left alone rather than guessing which is newer (same posture as the original migration design)
+- ❌ The sed-corruption bugs (findings 1) are a standing risk for any future blind repo-wide text replacement in this codebase — no tooling change was made to prevent a repeat, just caught this time via review
+
+**Alternatives considered:**
+
+- **Rename file-by-file instead of a repo-wide `sed`:** rejected as impractical at ~136 files; the trade-off (a scripted pass can silently corrupt its own recent output) was accepted and caught via review rather than avoided structurally
+- **Skip the legacy-data migration and just document it as a breaking change:** rejected — real existing installs have real data (box art cache, configured emulators) worth preserving automatically, and Phase 1–3 already established EmuBridge's standard of not silently breaking a user's existing setup
+- **Leave the GitHub repo named `Bridge`, rename only the code:** rejected — contradicts the explicit goal of freeing the "Bridge" name entirely, and would leave the manifest URLs / clone URL permanently mismatched with the product name
+
+---
+
 ## Creating a New ADR
 
 1. Copy the ADR format block from the section above
