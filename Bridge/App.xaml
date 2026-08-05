@@ -2,13 +2,25 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Bridge"
-             xmlns:conv="clr-namespace:Bridge.Converters">
+             xmlns:conv="clr-namespace:Bridge.Converters"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <Application.Resources>
-        <!-- Application-level, not MainWindow.xaml's own Window.Resources: needed by a binding on
-             MainWindow's own WindowState attribute, and a StaticResource defined in a Window's own
-             Resources isn't resolvable from that same Window's opening-tag attributes (Resources is
-             parsed as a later property element) — Application.Resources loads before any Window,
-             so it's already in scope by the time MainWindow's XAML is parsed. -->
-        <conv:BoolToWindowStateConverter x:Key="BoolToWindowStateConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Theme="Dark" here is just the design-time/fallback value required by the
+                     markup — App.xaml.cs's OnStartup immediately overrides it via
+                     ApplicationThemeManager.ApplySystemTheme() (Phase Polish -> "Integrate WPF-UI",
+                     PLAN.md), so the app always matches the real Windows theme, not a hardcoded one. -->
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Application-level, not MainWindow.xaml's own Window.Resources: needed by a binding on
+                 MainWindow's own WindowState attribute, and a StaticResource defined in a Window's own
+                 Resources isn't resolvable from that same Window's opening-tag attributes (Resources is
+                 parsed as a later property element) — Application.Resources loads before any Window,
+                 so it's already in scope by the time MainWindow's XAML is parsed. -->
+            <conv:BoolToWindowStateConverter x:Key="BoolToWindowStateConverter" />
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -6,6 +6,7 @@ using Bridge.Services;
 using Bridge.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Wpf.Ui.Appearance;
 
 namespace Bridge;
 
@@ -55,6 +56,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Overrides App.xaml's Theme="Dark" fallback with whatever Windows is actually set to —
+        // "follow the system theme" was the explicit choice for this item (Phase Polish ->
+        // "Integrate WPF-UI"), not a fixed Light/Dark default. Theme customization/personalization
+        // is its own, later Phase Polish item — this doesn't add a user-facing toggle.
+        ApplicationThemeManager.ApplySystemTheme();
 
         // Fire-and-forget, deliberately not awaited: never delays showing the library, and by
         // the time a user actually clicks "Auto-Install" (a later, human-initiated action, never
