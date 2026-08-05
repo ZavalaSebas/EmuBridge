@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Security.Cryptography;
-using Bridge.Models;
+using EmuBridge.Models;
 using SharpCompress.Archives;
 
 namespace ManifestDriftCheck;

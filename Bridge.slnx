@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="Bridge/Bridge.csproj" />
-  <Project Path="Bridge.Tests/Bridge.Tests.csproj" />
-  <Project Path="tools/ManifestDriftCheck/ManifestDriftCheck.csproj" />
-  <Project Path="tools/ManifestDriftCheck.Tests/ManifestDriftCheck.Tests.csproj" />
-</Solution>

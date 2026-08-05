@@ -23,16 +23,16 @@ jobs:
           dotnet-version: 10.x
 
       - name: Restore packages
-        run: dotnet restore Bridge.slnx
+        run: dotnet restore EmuBridge.slnx
 
       - name: Build
-        run: dotnet build Bridge.slnx -c Release --no-restore
+        run: dotnet build EmuBridge.slnx -c Release --no-restore
 
       - name: Extract version
         id: version
         shell: pwsh
         run: |
-          $content = Get-Content 'Bridge/Bridge.csproj' -Raw
+          $content = Get-Content 'EmuBridge/EmuBridge.csproj' -Raw
           $version = [regex]::Match($content, '<Version>(.*?)</Version>').Groups[1].Value
           echo "version=$version" >> $env:GITHUB_OUTPUT
 
@@ -40,7 +40,7 @@ jobs:
         id: check
         shell: pwsh
         run: |
-          $old = git show HEAD~1:'Bridge/Bridge.csproj' 2>$null
+          $old = git show HEAD~1:'EmuBridge/EmuBridge.csproj' 2>$null
           if ($old) {
             $oldVer = [regex]::Match($old, '<Version>(.*?)</Version>').Groups[1].Value
             $newVer = '${{ steps.version.outputs.version }}'
@@ -68,12 +68,12 @@ jobs:
           dotnet-version: 10.x
 
       - name: Restore packages
-        run: dotnet restore Bridge.slnx
+        run: dotnet restore EmuBridge.slnx
 
       # No --no-build: this job runs on its own fresh runner, not the build job's — there's no
       # build output to reuse here, so --no-build always failed with "test source file not found".
       - name: Test
-        run: dotnet test Bridge.slnx -c Release --verbosity normal
+        run: dotnet test EmuBridge.slnx -c Release --verbosity normal
 
   codeql:
     needs: build
@@ -90,7 +90,7 @@ jobs:
           languages: 'csharp'
 
       - name: Build
-        run: dotnet build Bridge.slnx -c Release
+        run: dotnet build EmuBridge.slnx -c Release
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -106,7 +106,7 @@ jobs:
           dotnet-version: 10.x
 
       - name: Restore packages
-        run: dotnet restore Bridge.slnx
+        run: dotnet restore EmuBridge.slnx
 
       - name: Audit NuGet packages
         run: dotnet nuget audit
@@ -129,7 +129,7 @@ jobs:
 
       - name: Publish
         run: >
-          dotnet publish Bridge/Bridge.csproj
+          dotnet publish EmuBridge/EmuBridge.csproj
           -c Release -r win-x64 --self-contained true
           -p:PublishSingleFile=true
           -o ./publish
@@ -139,7 +139,7 @@ jobs:
         run: |
           $commit = (git log -1 --pretty=%B) -join "`n"
           @"
-          ## Bridge v${{ needs.build.outputs.version }}
+          ## EmuBridge v${{ needs.build.outputs.version }}
 
           $commit
           "@ | Set-Content "${{ runner.temp }}/release_body.md"
@@ -159,4 +159,4 @@ jobs:
         with:
           tag_name: v${{ needs.build.outputs.version }}
           body_path: ${{ runner.temp }}/release_body.md
-          files: publish/Bridge.exe
+          files: publish/EmuBridge.exe

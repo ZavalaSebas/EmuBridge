@@ -1,6 +1,6 @@
-# Contributing to Bridge
+# Contributing to EmuBridge
 
-Thank you for your interest in contributing to Bridge.
+Thank you for your interest in contributing to EmuBridge.
 
 ---
 

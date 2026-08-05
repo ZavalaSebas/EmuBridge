@@ -1,4 +1,4 @@
-# Bridge — Project Guide
+# EmuBridge — Project Guide
 
 This document serves as a guide to this specific project AND as a reference for the architecture, workflow, and decisions made during planning.
 
@@ -10,13 +10,13 @@ Phase 1 (v0.1.0) shipped as a tagged GitHub Release. Phase 2 work has started: `
 
 **Phase 1's original "never actually run" gap is now fully resolved, on two separate tracks.** First, launch itself: the published `.exe` was launched and observed multiple times from this environment during the 2026-08-01 investigation (diagnostic logging confirming full startup completion, `MainWindow` construction, `mainWindow.Show()` returning, the process staying alive) — that investigation is precisely what surfaced ADR-12's native-DLL bundling bug, which F5-only testing never would have caught. Second, and separately: per the user's own direct report on their real machine (not reproduced by Claude, not required to be) — added a ROM folder, Pokémon Emerald was correctly detected, configured mGBA in `SettingsWindow` with `"{RomPath}"`, ran a rescan, launched the game successfully. Together these cover FR-01/02/03/06/07/09 with genuine interactive use, not just a passing test suite or a debugger-attached run. FR-08 (persistence across a real app restart) is now confirmed too — a full close-and-reopen, per the user's own direct report, showed the library and emulator configuration intact. FR-04/FR-05 (SteamGridDB box art lookup + caching) are confirmed as well, from the same Auto-Install interactive session: box art was seen actually rendered in the cover grid after a rescan — a stricter bar than just confirming a cached file exists on disk, since it also exercises the resize-for-display path. See `PLAN.md` → FR milestone table.
 
-**The new "Auto-Install" button's first real interactive click found a real bug, immediately.** `KnownEmulator.ExecutableRelativePath` (`"retroarch.exe"`) was wrong — sourced from third-party documentation (ADR-11) claiming the portable `.7z` extracts flat, which it doesn't (real structure: `RetroArch-Win64/retroarch.exe`). Every automated test had passed because the hand-built test fixture matched the same wrong assumption, not reality. Root-caused by extracting the actual downloaded-and-verified `.7z` (left behind in `%LocalAppData%\Bridge\Downloads\` — ADR-14's failure handling only cleans up the extraction *target*, not the verified *source* archive) with Bridge's own `SharpCompress` code path and listing its real entries. Fixed in the manifest; the test fixture rebuilt to match the real nested structure. See ARCHITECTURE.md → ADR-11's 2026-08-03 update.
+**The new "Auto-Install" button's first real interactive click found a real bug, immediately.** `KnownEmulator.ExecutableRelativePath` (`"retroarch.exe"`) was wrong — sourced from third-party documentation (ADR-11) claiming the portable `.7z` extracts flat, which it doesn't (real structure: `RetroArch-Win64/retroarch.exe`). Every automated test had passed because the hand-built test fixture matched the same wrong assumption, not reality. Root-caused by extracting the actual downloaded-and-verified `.7z` (left behind in `%LocalAppData%\EmuBridge\Downloads\` — ADR-14's failure handling only cleans up the extraction *target*, not the verified *source* archive) with EmuBridge's own `SharpCompress` code path and listing its real entries. Fixed in the manifest; the test fixture rebuilt to match the real nested structure. See ARCHITECTURE.md → ADR-11's 2026-08-03 update.
 
 **Phase 2's catalog is complete for all 15 seed platforms, and the install mechanism is now interactively proven for all 15 of them.** `EmulatorInstallerService`, the download-verification chain, and the catalog itself are all built, tested, and — for every seed platform — confirmed working through a real interactive install that launched an actual game, per the user's own direct report, across three sessions: `nes` first, then 11 more (`lynx` → Holani, `wonderswan` → Beetle Cygne, `gb`/`gbc` → SameBoy, `genesis`/`sms`/`gamegear` → Genesis Plus GX, `gba` → mGBA, `pcengine` → Beetle PCE, `n64` → Mupen64Plus-Next, `nds` → melonDS DS), then the final 3 (`snes` → Snes9x, `atari2600` → Stella, `atari7800` → ProSystem). **The "data-verified but not click-tested" gap this section tracked throughout Phase 2's build-out no longer exists for any seed platform.** See ARCHITECTURE.md → ADR-11/ADR-14 → Consequences (2026-08-05 update).
 
 **Two things were investigated during that same interactive session and confirmed with real evidence, not assumed.** First: several Sega ROMs (Genesis/SMS/Game Gear) appeared to use "the same core" during Auto-Install — confirmed as the documented design (ARCHITECTURE.md → ADR-11's 2026-08-04 update), not a system-detection bug: `KnownEmulators.json` has three separate `KnownEmulatorCore` entries, one per platform, that all happen to point at the identical Genesis Plus GX binary/hash, because that core genuinely covers all three systems. Second: two real Atari 2600 ROMs (`.bin` extension) in the user's actual `%UserProfile%\Downloads\ROMS` folder went undetected. Following the Bug Investigation Process: the "weird casing" hypothesis was ruled out by direct code inspection (`RomScannerService`'s extension matching is fully case-insensitive), and the real cause was confirmed by inspecting `SeedSystems.json` directly — `atari2600` only lists `"a26"`, never `"bin"`, so the files fall through to the existing `unknown`-platform fallback (ADR-6), not a scanner bug. Both were fixed the same day — see ARCHITECTURE.md → ADR-15/ADR-16.
 
-**A full Documentation Audit Checklist pass (2026-08-06)**, triggered by a stale "Phase 1 — Not Started" header left over from Phase 0 scaffolding, found and fixed 9 real drift issues across `PLAN.md`/`ARCHITECTURE.md`/`DEVELOPMENT.md` — most notably, WPF-UI (lepo.co) was documented in 3 places as Bridge's theming library despite never being integrated; Bridge ships on stock WPF today, and WPF-UI is now an explicit Phase Polish item instead of assumed done. See `PLAN.md` → Timeline item 27 for the full list.
+**A full Documentation Audit Checklist pass (2026-08-06)**, triggered by a stale "Phase 1 — Not Started" header left over from Phase 0 scaffolding, found and fixed 9 real drift issues across `PLAN.md`/`ARCHITECTURE.md`/`DEVELOPMENT.md` — most notably, WPF-UI (lepo.co) was documented in 3 places as EmuBridge's theming library despite never being integrated; EmuBridge ships on stock WPF today, and WPF-UI is now an explicit Phase Polish item instead of assumed done. See `PLAN.md` → Timeline item 27 for the full list.
 
 **`v0.3.0`'s inline Auto-Install offer is built, unit-tested, and interactively confirmed** (per the user's own direct report: main flow, decline, "unknown" never offering, and no `IsBusy` conflict between launch and scan, all confirmed on their real machine). Launching a game with no emulator configured for a real (non-`"unknown"`) platform that has a verified catalog entry now offers to install automatically, and relaunches the game on success instead of requiring a second click — see ARCHITECTURE.md → ADR-18. The core picker, `v0.3.0`'s other originally-scoped item, was investigated and deliberately deferred: no platform in `KnownEmulators.json` has more than one core today, so there's no real case to build the picker against yet. The Roadmap itself was also revised (`PLAN.md` → Roadmap): the fixed `v0.4.0`→`v0.9.0` ladder is now unnumbered product-story groups, each earning a version only once it ships.
 
@@ -30,17 +30,17 @@ Phase 1 (v0.1.0) shipped as a tagged GitHub Release. Phase 2 work has started: `
 
 **Three versions are being cut in sequence (2026-08-07), not one.** Preparing to release found that `v0.3.0` — as originally scoped, offering Auto-Install inline — had never actually been version-bumped, and neither had two smaller, unrelated items (Remove from Library, `.bin` fix) that landed right after `v0.2.0` and had been sitting committed but unreleased since. Rather than bundle unrelated stories into one release, all three are being cut separately, in chronological order: `v0.3.0` = Remove from Library + `.bin` fix (retroactive), `v0.4.0` = inline Auto-Install, `v0.5.0` = the "Full library" group. See `PLAN.md` → Roadmap for the full renumbering note and `CHANGELOG.md` for each version's real contents.
 
-**The "Big Picture" group — a streaming-style mode plus a "Try Something New" section — is built, unit-tested, and interactively confirmed on the user's real machine.** Investigated first: no genre/tag/similarity data exists for real recommendations (ADR-19), so any "recommended" content had to come from real fields already on `Game`/`BoxArt`. Investigation surfaced a real overlap before design went further — the criterion under discussion matched `PLAN.md`'s own Speculative Ideas entry "What to play next," not yet promoted per this session's own Roadmap governance rule (a Speculative idea needs its own definition pass before entering a group that ships). Flagged to the user rather than folded in silently; promotion approved with a concrete definition. `IsBigPictureMode` toggles the same `MainWindow`/`MainViewModel` into a maximized, larger-tile presentation — no separate window, since it's the same library, not a different data surface — plus "Try Something New": never-played, still-present games, alphabetical, capped at 10, hidden entirely when there are no candidates, named honestly rather than "Recommended for You" since there's no real scoring behind it. Keyboard/gamepad navigation was investigated and explicitly deferred to Phase Polish — confirmed no gamepad-handling code exists anywhere in Bridge today. 193 unit tests pass in Release, 192 in Debug. **The first real interactive run found a genuine bug**, the same category caught at every other feature's first click this phase: `MainWindow`'s `WindowState` bound to a `StaticResource` declared in that same `Window`'s own `Window.Resources` — fails at runtime (`XamlParseException`), because `Window.Resources` isn't in scope yet when the `Window` tag's own attributes are evaluated; the build+test pass couldn't catch it, since it only surfaces when the BAML actually loads. Fixed by moving the converter to `Application.Resources` in `App.xaml`, which loads before any `Window`. Re-confirmed after the fix: toggle maximizes/restores correctly, "Try Something New" filters correctly, click still launches, context menu works on the larger tiles. See ARCHITECTURE.md → ADR-22. No version number yet — that's a separate step, the actual release cut.
+**The "Big Picture" group — a streaming-style mode plus a "Try Something New" section — is built, unit-tested, and interactively confirmed on the user's real machine.** Investigated first: no genre/tag/similarity data exists for real recommendations (ADR-19), so any "recommended" content had to come from real fields already on `Game`/`BoxArt`. Investigation surfaced a real overlap before design went further — the criterion under discussion matched `PLAN.md`'s own Speculative Ideas entry "What to play next," not yet promoted per this session's own Roadmap governance rule (a Speculative idea needs its own definition pass before entering a group that ships). Flagged to the user rather than folded in silently; promotion approved with a concrete definition. `IsBigPictureMode` toggles the same `MainWindow`/`MainViewModel` into a maximized, larger-tile presentation — no separate window, since it's the same library, not a different data surface — plus "Try Something New": never-played, still-present games, alphabetical, capped at 10, hidden entirely when there are no candidates, named honestly rather than "Recommended for You" since there's no real scoring behind it. Keyboard/gamepad navigation was investigated and explicitly deferred to Phase Polish — confirmed no gamepad-handling code exists anywhere in EmuBridge today. 193 unit tests pass in Release, 192 in Debug. **The first real interactive run found a genuine bug**, the same category caught at every other feature's first click this phase: `MainWindow`'s `WindowState` bound to a `StaticResource` declared in that same `Window`'s own `Window.Resources` — fails at runtime (`XamlParseException`), because `Window.Resources` isn't in scope yet when the `Window` tag's own attributes are evaluated; the build+test pass couldn't catch it, since it only surfaces when the BAML actually loads. Fixed by moving the converter to `Application.Resources` in `App.xaml`, which loads before any `Window`. Re-confirmed after the fix: toggle maximizes/restores correctly, "Try Something New" filters correctly, click still launches, context menu works on the larger tiles. See ARCHITECTURE.md → ADR-22. No version number yet — that's a separate step, the actual release cut.
 
-**Big Picture's tiles now use real vertical/poster-style box art instead of a stretched horizontal cover.** Investigated first against the official `node-steamgriddb` wrapper source (same standard as ADR-8/19): confirmed `dimensions` is a real filter on the same `/grids/game/{id}` endpoint already called, not a separate asset type; real dimension values (`460x215`/`920x430` horizontal, `600x900`/`342x482` vertical) confirmed via SteamGridDB's own API docs. Found, in passing, that Bridge's box art cache was already being stretched non-uniformly today — the unfiltered grids call could return either orientation and cache it at a fixed portrait size regardless — documented as its own `DEVELOPMENT.md` → Known Limitations row rather than fixed in this item, to keep scope to one feature at a time. One combined request classifies horizontal vs. vertical by real `width`/`height` on the response, zero new HTTP calls; `BoxArt` gained `VerticalLocalPath`/`VerticalStatus` (reusing `BoxArtStatus`, not a new enum). Retroactivity was a real requirement, not a gap: the skip guard now requires both orientations resolved before skipping a game, so every game cached before this shipped gets its vertical art backfilled on the next scan without re-downloading the horizontal cover it already has — confirmed by a dedicated test. 8 new tests; 201 unit tests pass in Release, 200 in Debug. See ARCHITECTURE.md → ADR-23.
+**Big Picture's tiles now use real vertical/poster-style box art instead of a stretched horizontal cover.** Investigated first against the official `node-steamgriddb` wrapper source (same standard as ADR-8/19): confirmed `dimensions` is a real filter on the same `/grids/game/{id}` endpoint already called, not a separate asset type; real dimension values (`460x215`/`920x430` horizontal, `600x900`/`342x482` vertical) confirmed via SteamGridDB's own API docs. Found, in passing, that EmuBridge's box art cache was already being stretched non-uniformly today — the unfiltered grids call could return either orientation and cache it at a fixed portrait size regardless — documented as its own `DEVELOPMENT.md` → Known Limitations row rather than fixed in this item, to keep scope to one feature at a time. One combined request classifies horizontal vs. vertical by real `width`/`height` on the response, zero new HTTP calls; `BoxArt` gained `VerticalLocalPath`/`VerticalStatus` (reusing `BoxArtStatus`, not a new enum). Retroactivity was a real requirement, not a gap: the skip guard now requires both orientations resolved before skipping a game, so every game cached before this shipped gets its vertical art backfilled on the next scan without re-downloading the horizontal cover it already has — confirmed by a dedicated test. 8 new tests; 201 unit tests pass in Release, 200 in Debug. See ARCHITECTURE.md → ADR-23.
 
 **"Rest of Phase 2" — per-game emulator override — is built and unit-tested.** Investigated first, against the real code: confirmed `LaunchService`'s resolution chain keyed purely on `PlatformId`, with no `GameId` anywhere in it — saving a "per-game" config today would have silently overwritten the shared platform-wide profile for every game on that platform. Concrete motivating case: 20 SNES games sharing one `Snes9x` profile, one needing a different argument. Found and fixed, in passing, a misleading code comment in `LibraryRepository.EnsureIndexes()` that claimed a loosening the actual `FindOne`/upsert logic didn't perform. `EmulatorProfile` gained a nullable `GameId` (`null` = platform default, unchanged; a real `Guid` = a per-game override), resolved with fallback to the platform default so the new window's fields are never blank for an already-configured platform. UI reuses the proven `GameDetailWindow` pattern via a new dedicated `EmulatorOverrideWindow`, opened from a new "Configure Emulator..." context-menu item — evaluated against the same 3-way cost comparison used for Big Picture (ADR-22) and against folding into `GameDetailWindow` itself, both rejected as more expensive or a worse fit than a dedicated window. No Auto-Install in this flow — deliberately kept separate from installing a new emulator. Removing a game now also deletes its per-game `EmulatorProfile` row; confirmed by exhaustive `grep` that no other entity references `EmulatorProfile.Id`, so — unlike `BoxArt`'s deduped cache files — this is a safe direct delete with no "still referenced elsewhere" check needed. 30 new tests across `EmulatorServiceTests`, `LibraryRepositoryTests`, `LaunchServiceTests`, the new `EmulatorOverrideViewModelTests`, and `MainViewModelTests`; 239 unit tests pass in Release, 238 in Debug. See ARCHITECTURE.md → ADR-24.
 
 **A real Auto-Install failure, re-testing after the per-game override work above, exposed a genuine design gap in the download size guard — investigated with the Bug Investigation Process, not assumed.** SameBoy's core download was rejected as an "unexpected size" before downloading anything. A real `HEAD` request to the exact pinned URL confirmed a genuine 1-byte drift (not a code bug); checking all 13 unique download URLs in the catalog directly found **11 of 15 core entries (73%) had already drifted** from their `2026-07-31` pinned size, by −3 to +2 bytes — the libretro nightly channel rebuilding, exactly the rolling-channel behavior ARCHITECTURE.md → ADR-11 already documented, just not yet accounted for in the size guard's design. `DownloadVerificationService`'s comparison code itself checked out correct against this evidence — exact equality, working as designed, just designed for the wrong assumption. All 11 drifted entries were re-downloaded and re-verified with the same double-hash rigor (`sha256sum` + `certutil -hashfile`) as every other manifest entry, restoring the catalog to today's reality. Then the actual fix: `SizeToleranceBytes = 32`, calibrated from the real drift just measured (max 3 bytes observed, ~10x headroom), applied consistently to all three places the old exact check lived — the `Content-Length` pre-check, the streaming loop's disk-usage ceiling, and the final post-download check — not just the first one, since widening only the pre-check would let a slightly-oversized response start downloading only to be truncated by a still-exact streaming ceiling. SHA256 stays exact, untouched — the real verification boundary; size is, and remains, only the cheap pre-flight gate. 4 new boundary tests assert the literal edge (32 bytes over/under succeeds, 33 fails), through both the `Content-Length` and no-`Content-Length` code paths. 243 unit tests pass in Release, 242 in Debug. See ARCHITECTURE.md → ADR-11 (2026-08-02 update).
 
-**The recurring-maintenance gap the sections above kept re-discovering is now closed by a real, running mechanism, not just documented as a limitation.** Two pieces (ARCHITECTURE.md → ADR-25), built after a scope evaluation of the whole Phase 3 backlog (`PLAN.md` → Current State → Phase 3) confirmed this belonged first, ahead of any new feature. First, `.github/workflows/manifest-drift-check.yml` — a scheduled GitHub Action (every 6 hours, calibrated from real evidence, not a guess) runs the same real download/hash/structure-check procedure already done by hand three times, via a new `tools/ManifestDriftCheck` console project (never shipped in `Bridge.exe`), and opens a pull request with the fix. Merge is never automatic — the whole point, confirmed again this session, is that a compromised source must never be trusted without a human clicking approve; a bounded future auto-merge criterion is recorded in `PLAN.md` → Speculative Ideas, explicitly not built yet. Confirmed against real documentation that `GITHUB_TOKEN` alone is sufficient (no new PAT), though the repo's own "Allow GitHub Actions to create and approve pull requests" setting needs enabling once — checked directly via the GitHub API, currently off (the default for any repo created after February 2023). Second, `IManifestUpdateService` fetches Bridge's own `KnownEmulators.json` from `main` on every startup, fire-and-forget, so a fix merged today can reach a running install without waiting for a new tagged release — reconciled explicitly against ADR-11's original rejection of a live-fetched manifest (see ADR-25 for the full reasoning: this doesn't bypass human review, it only changes when a build sees the result). A failed or slow fetch falls back silently to the embedded copy — the one deliberate, explicitly documented exception to Bridge's own never-fail-silently rule, since there's nothing actionable to show a user about a background refresh they never asked for. `EmulatorInstallerService`'s catalog changed from a fixed snapshot to a live provider delegate so a singleton resolved early at startup still sees a later-completed refresh. Real end-to-end proof, not just tests: running the tool against a live copy of today's manifest found 14 of 15 entries had drifted *again* since the last manual recapture earlier this same session, applied the fix, then re-ran against its own output and got a clean 0-drift, idempotent result — confirms the JSON patching is correct, not just unit-tested in isolation. 24 new tests (8 in `Bridge.Tests` for `ManifestUpdateService`, 16 in the new `ManifestDriftCheck.Tests`). 251 unit tests pass in Release, 250 in Debug (`Bridge.Tests`); 16 pass in the new `ManifestDriftCheck.Tests` project.
+**The recurring-maintenance gap the sections above kept re-discovering is now closed by a real, running mechanism, not just documented as a limitation.** Two pieces (ARCHITECTURE.md → ADR-25), built after a scope evaluation of the whole Phase 3 backlog (`PLAN.md` → Current State → Phase 3) confirmed this belonged first, ahead of any new feature. First, `.github/workflows/manifest-drift-check.yml` — a scheduled GitHub Action (every 6 hours, calibrated from real evidence, not a guess) runs the same real download/hash/structure-check procedure already done by hand three times, via a new `tools/ManifestDriftCheck` console project (never shipped in `EmuBridge.exe`), and opens a pull request with the fix. Merge is never automatic — the whole point, confirmed again this session, is that a compromised source must never be trusted without a human clicking approve; a bounded future auto-merge criterion is recorded in `PLAN.md` → Speculative Ideas, explicitly not built yet. Confirmed against real documentation that `GITHUB_TOKEN` alone is sufficient (no new PAT), though the repo's own "Allow GitHub Actions to create and approve pull requests" setting needs enabling once — checked directly via the GitHub API, currently off (the default for any repo created after February 2023). Second, `IManifestUpdateService` fetches EmuBridge's own `KnownEmulators.json` from `main` on every startup, fire-and-forget, so a fix merged today can reach a running install without waiting for a new tagged release — reconciled explicitly against ADR-11's original rejection of a live-fetched manifest (see ADR-25 for the full reasoning: this doesn't bypass human review, it only changes when a build sees the result). A failed or slow fetch falls back silently to the embedded copy — the one deliberate, explicitly documented exception to EmuBridge's own never-fail-silently rule, since there's nothing actionable to show a user about a background refresh they never asked for. `EmulatorInstallerService`'s catalog changed from a fixed snapshot to a live provider delegate so a singleton resolved early at startup still sees a later-completed refresh. Real end-to-end proof, not just tests: running the tool against a live copy of today's manifest found 14 of 15 entries had drifted *again* since the last manual recapture earlier this same session, applied the fix, then re-ran against its own output and got a clean 0-drift, idempotent result — confirms the JSON patching is correct, not just unit-tested in isolation. 24 new tests (8 in `EmuBridge.Tests` for `ManifestUpdateService`, 16 in the new `ManifestDriftCheck.Tests`). 251 unit tests pass in Release, 250 in Debug (`EmuBridge.Tests`); 16 pass in the new `ManifestDriftCheck.Tests` project.
 
-**A closer look at ADR-25's live-fetch design found the hash check alone doesn't actually close the trust gap it was argued to close — fixed the same session, before shipping, not after.** The user caught it: ADR-25 argued a compromised `main` couldn't hurt Bridge because `DownloadVerificationService`'s exact SHA256 check would still catch a bad download — but that reasoning has a hole. If the manifest itself is the compromised thing, an attacker supplies both the malicious `DownloadUrl` *and* a matching `Sha256` for their own payload — the hash check passes trivially against a hash from the same untrusted source. `Config.AllowedDownloadHosts` closes it for real: a hardcoded, compiled-in allow-list (today just `buildbot.libretro.com`, confirmed against all 16 real catalog entries) checked in `DownloadVerificationService` before any connection is attempted — deliberately never manifest data, so nothing fetched live (or embedded) can ever expand what it's allowed to point at. Adding a new trusted host requires an actual Bridge source change and release, explicitly out of reach of the drift-check bot, which only ever touches `Sha256`/`ExpectedSizeBytes`/`CapturedAt` on already-trusted entries. Kept deliberately separate from `IManifestUpdateService`'s own fetch (`raw.githubusercontent.com`) — that URL is already a single fixed constant with no variability to constrain, and blending the two lists would blur "what Bridge will run" against "what Bridge will read as data." See ARCHITECTURE.md → ADR-26. 5 new tests (4 in `DownloadVerificationServiceTests`, 1 new manifest-wide guard in `KnownEmulatorsManifestTests` mirroring the existing placeholder guard). 256 unit tests pass in Release, 255 in Debug (`Bridge.Tests`); 16 pass in `ManifestDriftCheck.Tests`, unchanged.
+**A closer look at ADR-25's live-fetch design found the hash check alone doesn't actually close the trust gap it was argued to close — fixed the same session, before shipping, not after.** The user caught it: ADR-25 argued a compromised `main` couldn't hurt EmuBridge because `DownloadVerificationService`'s exact SHA256 check would still catch a bad download — but that reasoning has a hole. If the manifest itself is the compromised thing, an attacker supplies both the malicious `DownloadUrl` *and* a matching `Sha256` for their own payload — the hash check passes trivially against a hash from the same untrusted source. `Config.AllowedDownloadHosts` closes it for real: a hardcoded, compiled-in allow-list (today just `buildbot.libretro.com`, confirmed against all 16 real catalog entries) checked in `DownloadVerificationService` before any connection is attempted — deliberately never manifest data, so nothing fetched live (or embedded) can ever expand what it's allowed to point at. Adding a new trusted host requires an actual EmuBridge source change and release, explicitly out of reach of the drift-check bot, which only ever touches `Sha256`/`ExpectedSizeBytes`/`CapturedAt` on already-trusted entries. Kept deliberately separate from `IManifestUpdateService`'s own fetch (`raw.githubusercontent.com`) — that URL is already a single fixed constant with no variability to constrain, and blending the two lists would blur "what EmuBridge will run" against "what EmuBridge will read as data." See ARCHITECTURE.md → ADR-26. 5 new tests (4 in `DownloadVerificationServiceTests`, 1 new manifest-wide guard in `KnownEmulatorsManifestTests` mirroring the existing placeholder guard). 256 unit tests pass in Release, 255 in Debug (`EmuBridge.Tests`); 16 pass in `ManifestDriftCheck.Tests`, unchanged.
 
 ---
 
@@ -72,28 +72,28 @@ When making changes, consider:
 
 ---
 
-## Why Bridge?
+## Why EmuBridge?
 
-Bridge exists to remove the manual setup friction of retro emulation — sorting ROMs by system, finding the right emulator/core per console, learning each emulator's launch syntax, and separately hunting for box art. It combines Playnite's centralized-library architecture with EmulationStation's presentation style, scoped specifically to emulation (no storefront integration). Bridge manages ROMs and emulators the user already owns — it never includes, facilitates, or links to ROM acquisition.
+EmuBridge exists to remove the manual setup friction of retro emulation — sorting ROMs by system, finding the right emulator/core per console, learning each emulator's launch syntax, and separately hunting for box art. It combines Playnite's centralized-library architecture with EmulationStation's presentation style, scoped specifically to emulation (no storefront integration). EmuBridge manages ROMs and emulators the user already owns — it never includes, facilitates, or links to ROM acquisition.
 
 ---
 
 ## Architecture
 
-Bridge's service design, technology stack rationale, and key design decisions (including the WPF vs. WinUI 3 evaluation and the image-caching/animation performance notes) live in [ARCHITECTURE.md](ARCHITECTURE.md), not here — this document was split from ARCHITECTURE.md from the start given the scope of this project. Consult it before making a change that affects how a service is designed or why a dependency was chosen.
+EmuBridge's service design, technology stack rationale, and key design decisions (including the WPF vs. WinUI 3 evaluation and the image-caching/animation performance notes) live in [ARCHITECTURE.md](ARCHITECTURE.md), not here — this document was split from ARCHITECTURE.md from the start given the scope of this project. Consult it before making a change that affects how a service is designed or why a dependency was chosen.
 
 ---
 
 ## Project Structure
 
 ```
-Bridge/
-├── Bridge/                     # Main WPF project
+EmuBridge/
+├── EmuBridge/                     # Main WPF project
 │   ├── Converters/
 │   │   ├── InverseBooleanConverter.cs
 │   │   └── InverseBooleanToVisibilityConverter.cs
 │   ├── Exceptions/
-│   │   └── BridgeException.cs
+│   │   └── EmuBridgeException.cs
 │   ├── Models/
 │   │   ├── Platform.cs
 │   │   ├── Game.cs
@@ -134,7 +134,7 @@ Bridge/
 │   ├── SettingsWindow.xaml / .xaml.cs
 │   ├── GameDetailWindow.xaml / .xaml.cs   # "View Details" context menu item, see ADR-19
 │   └── Config.cs
-├── Bridge.Tests/
+├── EmuBridge.Tests/
 │   ├── ViewModels/
 │   │   ├── MainViewModelTests.cs
 │   │   ├── SettingsViewModelTests.cs
@@ -166,14 +166,14 @@ Bridge/
 │       ├── FakeHttpMessageHandler.cs
 │       └── SynchronousProgress.cs   # shared IProgress<T> test double — avoids Progress<T>'s async-dispatch flakiness
 ├── docs/
-└── Bridge.slnx
+└── EmuBridge.slnx
 ```
 
 ---
 
 ## Version Management
 
-**Single source of truth**: `<Version>` in `Bridge/Bridge.csproj`
+**Single source of truth**: `<Version>` in `EmuBridge/EmuBridge.csproj`
 
 ```xml
 <Version>0.1.0</Version>
@@ -211,7 +211,7 @@ Show a welcome dialog on first launch or after a version change:
 // In Config.cs
 public const string WelcomeSentinelFile = "welcome_sentinel.txt";
 public static readonly string AppDataPath =
-    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridge");
+    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EmuBridge");
 
 // Sentinel check
 public static bool ShouldShowWelcome()
@@ -238,8 +238,8 @@ When the user dismisses the dialog with "Don't show again", write the current ve
 ```csharp
 public static class Config
 {
-    public const string AppName = "Bridge";
-    public const string GitHubApiUrl = "https://api.github.com/repos/ZavalaSebas/Bridge/releases/latest";
+    public const string AppName = "EmuBridge";
+    public const string GitHubApiUrl = "https://api.github.com/repos/ZavalaSebas/EmuBridge/releases/latest";
     public const int RequestTimeoutSeconds = 10;
     // ... etc
 }
@@ -272,7 +272,7 @@ MAJOR.MINOR.PATCH
 
 ### Rules
 
-1. **Start at 0.x.y** — while in development, MAJOR is 0. Bridge starts at `0.1.0`.
+1. **Start at 0.x.y** — while in development, MAJOR is 0. EmuBridge starts at `0.1.0`.
 2. **Once 1.0.0** — public API is stable
 3. **Never reuse versions** — if you delete a release, don't reuse that version number
 4. **Update CHANGELOG.md** — document what changed in each version
@@ -284,8 +284,8 @@ MAJOR.MINOR.PATCH
 On push to `main`, `.github/workflows/release.yml` runs:
 
 1. **Check version change** — compares `<Version>` in HEAD vs HEAD~1
-2. **Build** — `dotnet build Bridge.slnx -c Release`
-3. **Test** — `dotnet test Bridge.slnx -c Release` (no `--no-build` — the `test` job runs on its own fresh runner with no shared build output from `build`; see the `v0.2.0` section below for why this line drifted from the real workflow once already)
+2. **Build** — `dotnet build EmuBridge.slnx -c Release`
+3. **Test** — `dotnet test EmuBridge.slnx -c Release` (no `--no-build` — the `test` job runs on its own fresh runner with no shared build output from `build`; see the `v0.2.0` section below for why this line drifted from the real workflow once already)
 4. **CodeQL** — security scanning
 5. **NuGet Audit** — vulnerability check
 6. **Release** (only if version changed):
@@ -297,7 +297,7 @@ On push to `main`, `.github/workflows/release.yml` runs:
 
 - `fetch-depth: 0` — required so `git show HEAD~1:path` can access the parent commit
 - `permissions: contents: write` — required for release creation
-- Csproj path: `Bridge/Bridge.csproj`
+- Csproj path: `EmuBridge/EmuBridge.csproj`
 - Release body comes from the **commit body** — write it with `### Added/Fixed/Changed` sections
 
 ### Additional Quality Gates (optional)
@@ -315,7 +315,7 @@ These are **not enabled by default** — add them only when the team size or pro
 
 ### v0.1.0: no associated GitHub Actions run
 
-`v0.1.0`'s tag and GitHub Release were created **manually** (`git tag` + `gh release create`), not by `release.yml`. This is expected, not a bug: the workflow's version-change check (`git show HEAD~1:Bridge/Bridge.csproj` vs `HEAD`) compares against the *previous* commit's `<Version>`, and `0.1.0` was the scaffolded starting value — the bump commit didn't change it, so `changed` evaluated `false` and the `release` job never ran. This is a one-time gap specific to a "genesis" version with no real prior version to diff against.
+`v0.1.0`'s tag and GitHub Release were created **manually** (`git tag` + `gh release create`), not by `release.yml`. This is expected, not a bug: the workflow's version-change check (`git show HEAD~1:EmuBridge/EmuBridge.csproj` vs `HEAD`) compares against the *previous* commit's `<Version>`, and `0.1.0` was the scaffolded starting value — the bump commit didn't change it, so `changed` evaluated `false` and the `release` job never ran. This is a one-time gap specific to a "genesis" version with no real prior version to diff against.
 
 **Correction:** the original version of this note predicted every release from `0.2.0` onward would trigger the automated `release` job normally. That held for the version-change detection itself, but `v0.2.0` still ended up manual too — for a real, different reason. See the next section.
 
@@ -323,7 +323,7 @@ These are **not enabled by default** — add them only when the team size or pro
 
 `v0.2.0`'s tag and GitHub Release were **also** created manually — not the same "genesis version" non-issue as `v0.1.0`, but a real, structural limitation of the version-change check discovered in the process.
 
-The bump commit (`61ae5f5`) had a genuine version change (`0.1.0` → `0.2.0`) and pushed successfully, but its CI run failed: the `test` job's `dotnet test Bridge.slnx -c Release --no-build` had never actually worked (confirmed by checking `v0.1.0`'s bump-commit CI run too — identical failure, just never surfaced because `v0.1.0`'s release was already being created manually for the genesis reason above, so nobody was depending on that job passing). `--no-build` requires build output from an earlier step in the *same job*, but the `test` job runs on its own fresh GitHub Actions runner with no shared filesystem with the `build` job — there was never anything to reuse. Fixed by dropping `--no-build` (`test` now builds itself; evaluated and rejected sharing build artifacts via `upload-artifact`/`download-artifact` instead, since this repo is public — CI minutes are free — and `codeql` already dominates the pipeline's wall-clock time, so the duplicate build costs nothing in practice).
+The bump commit (`61ae5f5`) had a genuine version change (`0.1.0` → `0.2.0`) and pushed successfully, but its CI run failed: the `test` job's `dotnet test EmuBridge.slnx -c Release --no-build` had never actually worked (confirmed by checking `v0.1.0`'s bump-commit CI run too — identical failure, just never surfaced because `v0.1.0`'s release was already being created manually for the genesis reason above, so nobody was depending on that job passing). `--no-build` requires build output from an earlier step in the *same job*, but the `test` job runs on its own fresh GitHub Actions runner with no shared filesystem with the `build` job — there was never anything to reuse. Fixed by dropping `--no-build` (`test` now builds itself; evaluated and rejected sharing build artifacts via `upload-artifact`/`download-artifact` instead, since this repo is public — CI minutes are free — and `codeql` already dominates the pipeline's wall-clock time, so the duplicate build costs nothing in practice).
 
 The fix landed in a **second, separate commit** (`ddaf02a`), after the version bump. This is where the structural limitation bites: the version-change check is a one-shot comparison of `HEAD~1` vs `HEAD` for whichever commit triggered the run. By the time the CI fix was verified (in its own, non-version-changing commit), `HEAD~1` was the bump commit itself — same version as `HEAD`, so `changed` evaluates `false` on every subsequent push, permanently, for that release. Re-running the original failed workflow run doesn't help either: GitHub Actions re-runs a job using the workflow YAML as it existed at the commit that triggered it, not the current `main`, so re-running the bump commit's run would hit the exact same `--no-build` bug again.
 
@@ -335,15 +335,15 @@ Unlike `v0.1.0`/`v0.2.0`, `v0.3.0`'s tag and GitHub Release were created **by `r
 
 ### v0.4.0: automated release, same verification, same result
 
-Same as `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly (confirming download integrity), and that exact file, isolated in an empty folder, ran cleanly (stable memory, empty `stderr`, closed on request rather than crashing). No new findings this time; the pattern established at `v0.3.0` held. https://github.com/ZavalaSebas/Bridge/releases/tag/v0.4.0
+Same as `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly (confirming download integrity), and that exact file, isolated in an empty folder, ran cleanly (stable memory, empty `stderr`, closed on request rather than crashing). No new findings this time; the pattern established at `v0.3.0` held. https://github.com/ZavalaSebas/EmuBridge/releases/tag/v0.4.0
 
 ### v0.5.0: automated release, same verification, same result
 
-Same as `v0.3.0`/`v0.4.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly, and that exact file, isolated in an empty folder, ran cleanly. This closes the retroactive 3-version sequence (`v0.3.0`, `v0.4.0`, `v0.5.0`) covering everything built but not yet released as of the Documentation Audit that started this stretch of work. https://github.com/ZavalaSebas/Bridge/releases/tag/v0.5.0
+Same as `v0.3.0`/`v0.4.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly, and that exact file, isolated in an empty folder, ran cleanly. This closes the retroactive 3-version sequence (`v0.3.0`, `v0.4.0`, `v0.5.0`) covering everything built but not yet released as of the Documentation Audit that started this stretch of work. https://github.com/ZavalaSebas/EmuBridge/releases/tag/v0.5.0
 
 ### v0.6.0: automated release, same verification, same result
 
-Same as every release since `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly, and that exact file, isolated in an empty folder, ran cleanly. Ships the "Big Picture" group, including the 3 real bugs found and fixed during its own interactive testing (see ARCHITECTURE.md → ADR-23 for the full investigation record). https://github.com/ZavalaSebas/Bridge/releases/tag/v0.6.0
+Same as every release since `v0.3.0` — `release.yml` fired correctly, the downloaded asset's hash matched GitHub's own reported digest exactly, and that exact file, isolated in an empty folder, ran cleanly. Ships the "Big Picture" group, including the 3 real bugs found and fixed during its own interactive testing (see ARCHITECTURE.md → ADR-23 for the full investigation record). https://github.com/ZavalaSebas/EmuBridge/releases/tag/v0.6.0
 
 ---
 
@@ -352,13 +352,13 @@ Same as every release since `v0.3.0` — `release.yml` fired correctly, the down
 ### Pre-release
 
 - [ ] All features for this version are complete
-- [ ] All tests pass locally: `dotnet test Bridge.slnx -c Release`
+- [ ] All tests pass locally: `dotnet test EmuBridge.slnx -c Release`
 - [ ] No compiler warnings (or warnings documented)
 - [ ] Code reviewed (if working with others)
 
 ### Version Bump
 
-- [ ] Update `<Version>` in `Bridge/Bridge.csproj`
+- [ ] Update `<Version>` in `EmuBridge/EmuBridge.csproj`
 - [ ] Update `CHANGELOG.md` with new version and changes — date the entry from the real bump commit (`git log -1 --date=short --format=%ad <sha>`), never typed by hand from an assumed "today"
 - [ ] Commit with subject `bump vX.Y.Z — <short summary>` and body with `### Added / Fixed / Changed` sections (the commit body becomes the GitHub Release body)
 
@@ -373,7 +373,7 @@ Same as every release since `v0.3.0` — `release.yml` fired correctly, the down
 
 - [ ] Verify GitHub Actions workflow completed
 - [ ] Check release page on GitHub
-- [ ] **Test the downloaded `.exe` in isolation** — copy *only* the downloaded `.exe` into an empty folder and run it from there, nothing else present. Checking the asset's byte size, or running it from a folder that still has other publish output sitting next to it, is not sufficient — see ARCHITECTURE.md → ADR-12: the `v0.1.0` release shipped completely broken (WPF's native interop DLLs missing from the bundle) and the only verification done at the time was confirming `Bridge.exe`'s size matched, which caught nothing.
+- [ ] **Test the downloaded `.exe` in isolation** — copy *only* the downloaded `.exe` into an empty folder and run it from there, nothing else present. Checking the asset's byte size, or running it from a folder that still has other publish output sitting next to it, is not sufficient — see ARCHITECTURE.md → ADR-12: the `v0.1.0` release shipped completely broken (WPF's native interop DLLs missing from the bundle) and the only verification done at the time was confirming `EmuBridge.exe`'s size matched, which caught nothing.
 - [ ] Update documentation if needed
 
 **Hash verification means something different for an automated release than a manual one — found for real during `v0.3.0`.** `PublishSingleFile` isn't byte-reproducible across separate `dotnet publish` invocations (embedded timestamps/GUIDs differ), so a local build's hash will **not** match what CI's own independent `dotnet publish` (in the `release` job, on a fresh runner) uploads — even when both are byte-size-identical and functionally correct. Comparing a local build's hash against an automated release's asset will always "fail" and is not a meaningful check. What actually verifies an automated release: (1) confirm the *downloaded* asset's hash matches what GitHub itself reports for that asset (`gh release view --json assets` → `digest` field, or recompute independently — this catches a corrupted/tampered upload, not a rebuild difference), and (2) isolate-test that same downloaded asset per the step above. The local-build-hash-matches-uploaded-asset check only applies to the **manual** release path (`v0.1.0`/`v0.2.0`'s process below), where the exact file already tested locally is the one `gh release create` uploads — there, a mismatch would mean something real went wrong.
@@ -385,7 +385,7 @@ When a critical bug is found in a released version and cannot wait for the next 
 1. **Identify the tag** of the broken release — `git tag --list 'v*' | sort -V`
 2. **Create branch** from that tag: `git switch -c hotfix/v1.1.1 v1.1.0` — branch name `hotfix/v1.1.1` on the left, existing tag `v1.1.0` (the broken release) on the right
 3. **Fix the bug** — apply only the minimal changes needed; no unrelated refactors
-4. **Bump `<Version>`** in `Bridge/Bridge.csproj` — increment PATCH only (e.g. `1.0.0` → `1.0.1`)
+4. **Bump `<Version>`** in `EmuBridge/EmuBridge.csproj` — increment PATCH only (e.g. `1.0.0` → `1.0.1`)
 5. **Update `CHANGELOG.md`** — add entry under new version with `### Fixed`
 6. **Commit** with subject `bump vX.Y.Z — <short summary>` and body describing the fix
 7. **Push branch**: `git push origin hotfix/v1.1.1`
@@ -412,7 +412,7 @@ When you make a change, consult this table to know which documents to update:
 | **An error-handling pattern** (custom exception, global handler change) | `DEVELOPMENT.md` (Error Handling) | Add the new exception class or update the requirements / examples |
 | **The contribution workflow itself** (PR process, branch naming, review policy) | `CONTRIBUTING.md` (Workflow) | Update the numbered steps, commit format, or branch naming conventions |
 
-> Note: the upstream `project-template/DEVELOPMENT.template.md` also has a "bootstrapping a new project from this template → `NEW_PROJECT_CHECKLIST.md`" row here. It's intentionally omitted in Bridge's copy — Bridge is a consumer of the template, not itself a template other projects bootstrap from, and `NEW_PROJECT_CHECKLIST.md` doesn't live in this repo (see `project-template/`).
+> Note: the upstream `project-template/DEVELOPMENT.template.md` also has a "bootstrapping a new project from this template → `NEW_PROJECT_CHECKLIST.md`" row here. It's intentionally omitted in EmuBridge's copy — EmuBridge is a consumer of the template, not itself a template other projects bootstrap from, and `NEW_PROJECT_CHECKLIST.md` doesn't live in this repo (see `project-template/`).
 
 **Rule:** Before marking a code change as complete, review this table and decide whether any document needs updating accordingly. Document updates are part of the change, not an afterthought — include them before closing the work.
 
@@ -437,7 +437,7 @@ Over time, documentation drifts from reality. Run this audit periodically (or wh
 
 ## Tests
 
-Run locally with: `dotnet test Bridge.slnx -c Release`
+Run locally with: `dotnet test EmuBridge.slnx -c Release`
 
 Unit tests cover services (`RomScannerService`, `MetadataService`, `EmulatorService`, `LaunchService`) in isolation, mocking external dependencies (filesystem, SteamGridDB HTTP client, process launch). ViewModels are tested via their public commands and observable properties, not their bound Views.
 
@@ -449,7 +449,7 @@ Unit tests cover services (`RomScannerService`, `MetadataService`, `EmulatorServ
 - No test dependencies — each test is independent
 - Arrange → Act → Assert pattern
 - Test class name = Service/Class name + "Tests" (e.g., `MyServiceTests`)
-- Namespace mirrors source: `Bridge.Tests.Services.MyServiceTests`
+- Namespace mirrors source: `EmuBridge.Tests.Services.MyServiceTests`
 
 ---
 
@@ -512,10 +512,10 @@ public class MyService
 Define domain-specific exceptions in `Exceptions/` folder:
 
 ```csharp
-public class BridgeException : Exception
+public class EmuBridgeException : Exception
 {
-    public BridgeException(string message) : base(message) { }
-    public BridgeException(string message, Exception inner) : base(message, inner) { }
+    public EmuBridgeException(string message) : base(message) { }
+    public EmuBridgeException(string message, Exception inner) : base(message, inner) { }
 }
 ```
 
@@ -528,7 +528,7 @@ When investigating a bug, the goal is to find the *actual* cause — not the fir
 1. **Formulate a specific, testable hypothesis** — not "it might be X", but "if X is the cause, then when I do Y, Z should happen".
 2. **Test that hypothesis with real evidence** (logs, temporary instrumentation, actual execution) — never accept a hypothesis because it "sounds logical" or because the code "looks similar" to a working reference.
 
-   > **For any claim about a third-party system's behavior specifically** (RetroArch, SteamGridDB, or any other external tool/API Bridge integrates with): the manual, official docs, and third-party forums/wikis are not evidence on their own — verify against that system's actual source code when it's available, and confirm with a real, empirical run on a real machine before relying on the claim. This has cost real time in this project more than once: ADR-11 (2026-08-03) shipped `ExecutableRelativePath` based on consistent forum/wiki claims that RetroArch's portable `.7z` extracts flat — it doesn't, caught only by a real Auto-Install failure and direct inspection of the actual archive. The cheats feature (ADR-27) repeated the same failure mode twice in one session: a config key name guessed from a related constant/field name (`cheat_apply_after_load`, `directory_menu_config`) rather than checked against RetroArch's real source, both times silently doing nothing since RetroArch ignores unknown config keys rather than erroring. The second time was only caught by directly reading RetroArch's own log output after temporarily enabling `log_to_file`/`log_verbosity` for the investigation. Source-plus-empirical-test is the standard for these claims now, not a courtesy — a third recurrence of this exact failure mode should not happen.
+   > **For any claim about a third-party system's behavior specifically** (RetroArch, SteamGridDB, or any other external tool/API EmuBridge integrates with): the manual, official docs, and third-party forums/wikis are not evidence on their own — verify against that system's actual source code when it's available, and confirm with a real, empirical run on a real machine before relying on the claim. This has cost real time in this project more than once: ADR-11 (2026-08-03) shipped `ExecutableRelativePath` based on consistent forum/wiki claims that RetroArch's portable `.7z` extracts flat — it doesn't, caught only by a real Auto-Install failure and direct inspection of the actual archive. The cheats feature (ADR-27) repeated the same failure mode twice in one session: a config key name guessed from a related constant/field name (`cheat_apply_after_load`, `directory_menu_config`) rather than checked against RetroArch's real source, both times silently doing nothing since RetroArch ignores unknown config keys rather than erroring. The second time was only caught by directly reading RetroArch's own log output after temporarily enabling `log_to_file`/`log_verbosity` for the investigation. Source-plus-empirical-test is the standard for these claims now, not a courtesy — a third recurrence of this exact failure mode should not happen.
 
 3. **If the hypothesis is ruled out by evidence, say so explicitly and move on** — do not leave it as a "possible cause" without resolution.
 4. **When an explanation is accepted, confirm it with a direct test before applying the fix** — do not fix based on theory alone.
@@ -680,7 +680,7 @@ public static class Config
 {
     // URLs
     public const string ApiUrl = "https://api.example.com";
-    public const string UserAgent = "Bridge/0.1.0";
+    public const string UserAgent = "EmuBridge/0.1.0";
 
     // Timeouts
     public const int RequestTimeoutSeconds = 10;
@@ -688,7 +688,7 @@ public static class Config
     // Paths
     public static string AppDataPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Bridge");
+        "EmuBridge");
 }
 ```
 
@@ -704,20 +704,20 @@ public static class Config
 
 | File | Purpose |
 |------|---------|
-| `Bridge/Config.cs` | Centralized constants: `AppDataPath`, `LibraryDbPath`, `SettingsPath`, `ImageCachePath`, `UnknownPlatformId`, SteamGridDB base URL, seed resource name |
-| `Bridge/App.xaml.cs` | DI composition root (all services + ViewModels registered), explicit `MainWindow` construction (no `StartupUri`), `DispatcherUnhandledException` global handler — implemented (see ADR-10) |
-| `Bridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to platform, tracks missing ROMs; validates and adds scan folders (`Directory.Exists`, fails early) — implemented, tested |
-| `Bridge/Services/LibraryRepository.cs` | LiteDB-backed persistence: platforms (seeded), games, scan folders, box art — implemented, tested |
-| `Bridge/Resources/SeedSystems.json` | 15 built-in platforms (cartridge/handheld only — see ARCHITECTURE.md → ADR-7), embedded resource |
-| `Bridge/Services/MetadataService.cs` | SteamGridDB search + grids lookup, batch box-art fetch, stop-early on rate-limit/auth failure — implemented, tested (see ADR-8) |
-| `Bridge/Services/ImageCacheService.cs` | Downloads, resizes (WPF-native decode), and caches box art locally at display resolution — implemented, tested |
-| `Bridge/Services/SettingsService.cs` | DPAPI-encrypted SteamGridDB API key storage in `settings.json` — implemented, tested (see ADR-5) |
-| `Bridge/Services/EmulatorService.cs` | Validates and persists an `EmulatorProfile` against its `Emulator` (exe exists, `{RomPath}` present, `PlatformId` valid); resolves the join for callers — implemented, tested (see ADR-9, ADR-11) |
-| `Bridge/Services/ArgumentTemplate.cs` | Shared `{Token}` resolver (`Validate`/`Expand`), used by both `EmulatorService` and `LaunchService` — implemented, tested |
-| `Bridge/Services/LaunchService.cs` | Re-checks ROM/emulator existence, expands arguments, launches the process, exposes exit as a `Task` — implemented, tested (see ADR-9) |
-| `Bridge/Services/DownloadVerificationService.cs` | Downloads to a staging path, verifies exact size (pre-check + streaming cutoff) and SHA256 before treating a file as installed; deletes and reports specifically on any mismatch — implemented, tested (see ADR-11) |
-| `Bridge/Services/EmulatorInstallerService.cs` | Orchestrates auto-install: downloads+extracts (`SharpCompress`) a known emulator/core, registers the resulting `Emulator`/`EmulatorProfile` via `EmulatorService` — implemented, tested end-to-end with real archive fixtures (see ADR-14) |
-| `Bridge/Resources/KnownEmulators.json` | Curated, hand-verified emulator/core catalog — RetroArch entry and all 15 of 15 platform cores verified, each with a real, interactive Auto-Install confirmation that launched a game — see ADR-11/ADR-14 |
+| `EmuBridge/Config.cs` | Centralized constants: `AppDataPath`, `LibraryDbPath`, `SettingsPath`, `ImageCachePath`, `UnknownPlatformId`, SteamGridDB base URL, seed resource name |
+| `EmuBridge/App.xaml.cs` | DI composition root (all services + ViewModels registered), explicit `MainWindow` construction (no `StartupUri`), `DispatcherUnhandledException` global handler — implemented (see ADR-10) |
+| `EmuBridge/Services/RomScannerService.cs` | Scans configured folders, detects ROM files, maps extension to platform, tracks missing ROMs; validates and adds scan folders (`Directory.Exists`, fails early) — implemented, tested |
+| `EmuBridge/Services/LibraryRepository.cs` | LiteDB-backed persistence: platforms (seeded), games, scan folders, box art — implemented, tested |
+| `EmuBridge/Resources/SeedSystems.json` | 15 built-in platforms (cartridge/handheld only — see ARCHITECTURE.md → ADR-7), embedded resource |
+| `EmuBridge/Services/MetadataService.cs` | SteamGridDB search + grids lookup, batch box-art fetch, stop-early on rate-limit/auth failure — implemented, tested (see ADR-8) |
+| `EmuBridge/Services/ImageCacheService.cs` | Downloads, resizes (WPF-native decode), and caches box art locally at display resolution — implemented, tested |
+| `EmuBridge/Services/SettingsService.cs` | DPAPI-encrypted SteamGridDB API key storage in `settings.json` — implemented, tested (see ADR-5) |
+| `EmuBridge/Services/EmulatorService.cs` | Validates and persists an `EmulatorProfile` against its `Emulator` (exe exists, `{RomPath}` present, `PlatformId` valid); resolves the join for callers — implemented, tested (see ADR-9, ADR-11) |
+| `EmuBridge/Services/ArgumentTemplate.cs` | Shared `{Token}` resolver (`Validate`/`Expand`), used by both `EmulatorService` and `LaunchService` — implemented, tested |
+| `EmuBridge/Services/LaunchService.cs` | Re-checks ROM/emulator existence, expands arguments, launches the process, exposes exit as a `Task` — implemented, tested (see ADR-9) |
+| `EmuBridge/Services/DownloadVerificationService.cs` | Downloads to a staging path, verifies exact size (pre-check + streaming cutoff) and SHA256 before treating a file as installed; deletes and reports specifically on any mismatch — implemented, tested (see ADR-11) |
+| `EmuBridge/Services/EmulatorInstallerService.cs` | Orchestrates auto-install: downloads+extracts (`SharpCompress`) a known emulator/core, registers the resulting `Emulator`/`EmulatorProfile` via `EmulatorService` — implemented, tested end-to-end with real archive fixtures (see ADR-14) |
+| `EmuBridge/Resources/KnownEmulators.json` | Curated, hand-verified emulator/core catalog — RetroArch entry and all 15 of 15 platform cores verified, each with a real, interactive Auto-Install confirmation that launched a game — see ADR-11/ADR-14 |
 
 ---
 
@@ -725,14 +725,14 @@ public static class Config
 
 | Limitation | Reason | Workaround |
 |------------|--------|------------|
-| `LaunchService`'s Phase 1 exit detection does not correctly detect when the emulator has closed if the launched process is a wrapper/launcher that spawns the real emulator process and exits itself (e.g. an updater shim, a single-instance relaunch, or a `.bat`/`.cmd` wrapper) — Bridge would return control to the launcher while the actual emulator is still running. | Phase 1 tracks the process handle returned directly by `Process.Start()` (see PLAN.md → Open Decisions #5, ARCHITECTURE.md → ADR-1), chosen deliberately over Windows Job Object process-tree tracking to avoid P/Invoke complexity before the wrapper/launcher problem is confirmed to occur frequently in practice. Directly related to the process-exit-detection bug class found in OrbSpoofer. | If this proves frequent for real emulators being configured, implement process-tree tracking via Windows Job Objects (`CreateJobObject`/`AssignProcessToJobObject`) — see ARCHITECTURE.md → ADR-1 for the noted improvement path. |
+| `LaunchService`'s Phase 1 exit detection does not correctly detect when the emulator has closed if the launched process is a wrapper/launcher that spawns the real emulator process and exits itself (e.g. an updater shim, a single-instance relaunch, or a `.bat`/`.cmd` wrapper) — EmuBridge would return control to the launcher while the actual emulator is still running. | Phase 1 tracks the process handle returned directly by `Process.Start()` (see PLAN.md → Open Decisions #5, ARCHITECTURE.md → ADR-1), chosen deliberately over Windows Job Object process-tree tracking to avoid P/Invoke complexity before the wrapper/launcher problem is confirmed to occur frequently in practice. Directly related to the process-exit-detection bug class found in OrbSpoofer. | If this proves frequent for real emulators being configured, implement process-tree tracking via Windows Job Objects (`CreateJobObject`/`AssignProcessToJobObject`) — see ARCHITECTURE.md → ADR-1 for the noted improvement path. |
 | `RomScannerService`'s per-file permission-denied handling (`UnauthorizedAccessException`/`IOException` caught on an individual file during scanning — see ARCHITECTURE.md → ADR-6) is implemented but not covered by an automated test. | Reliably simulating a permission-denied file in a portable, fast unit test requires manipulating Windows ACLs, which is fragile and slow — not worth the cost for Phase 1. The other error-handling cases (missing folder, empty file) are covered; this one specifically isn't. | Verify manually if this code path changes (create a file, deny read access via `icacls`, run a scan, confirm it's skipped and logged) rather than relying on the automated suite for this specific path. Revisit with a filesystem abstraction (e.g. `IFileSystem`) if untestable-I/O-error coverage becomes a recurring need beyond this one case. |
 | `MetadataService` has no "safe to retry at" timestamp for a SteamGridDB rate-limit (429) stop — it can only say "stopped early, remaining games pending for the next batch run, whenever that is." | Confirmed by checking the actual `Retry-After`-style handling in three independent sources — the official Node.js wrapper's source code (`SteamGridDB/node-steamgriddb`), the community .NET wrapper (`craftersmine/SteamGridDB.NET`), and general web search — none document or read a rate-limit-retry header from SteamGridDB. Not assumed; actively looked for and not found. Fabricating an arbitrary wait time was explicitly rejected in favor of documenting this as a real gap. | If SteamGridDB ever adds a documented rate-limit header, or if inspecting real 429 responses at runtime turns up an undocumented one, wire it into `MetadataFetchResult` then. Until confirmed, don't guess a backoff duration. |
 | `CheatService.RetroArchCoreNames`' `atari2600` (`"Stella"`) and `lynx` (`"Holani"`) entries are medium-confidence, not fully verified against the exact binaries `KnownEmulators.json` pins — see ARCHITECTURE.md → ADR-27. | Two real sources disagree for each: the official `libretro-core-info` entries say `"Stella"`/`"Holani"`, but each core's own current source self-reports differently (`"Stella 2023"` via `getCoreName()`; lowercase `"holani"` via `SystemInfo::new()`). The officially-published name was used for both, since that's what RetroArch's own database ships/expects, but neither was confirmed against the exact installed binary. | If a real report comes in that Atari 2600 or Lynx cheats/overrides silently don't apply, confirm the actual installed core's self-reported `library_name` directly (same method already used to verify every other platform in `RetroArchCoreNames`) rather than re-guessing from published docs. |
-| `wonderswan` has no cheat coverage at all — `CheatService.LoadCheatsAsync` reports `PlatformNotSupported` for it rather than attempting a fetch. | Confirmed by listing the real `libretro/libretro-database` `cht/` directory directly (not guessed from a naming convention) — no `wonderswan` folder exists there. A gap in the upstream source Bridge fetches from, not something Bridge's own code can work around. See ARCHITECTURE.md → ADR-27. | Revisit only if `libretro/libretro-database` adds Wonderswan cheat coverage upstream — nothing to build on Bridge's side until then. |
-| `release.yml`'s "Update version in docs" step rewrites `docs/index.html`'s displayed version inside the CI runner's own checkout, but the workflow never commits or pushes that change back to `main` — there is no git step after it. The version actually shown on the live docs page depends entirely on someone manually updating `docs/index.html` (and `README.md`'s badge) as part of each version-cut commit, with no automated check that catches it if that step is ever skipped. | Found while reviewing `release.yml` during the `v0.9.0` version cut, comparing its steps against what the Release Checklist actually requires by hand. Not a hypothetical — the step's own output has no observable effect on the repository beyond that single CI run. | Either add a commit-and-push step to `release.yml` right after "Update version in docs" (so the bump is fully automated), or add a CI check that fails the `release` job if `docs/index.html`'s version doesn't already match `Bridge.csproj` at push time (catching a forgotten manual update). Until one of those lands, treat the manual `docs/index.html`/`README.md` update as a mandatory, unchecked step of every version cut. |
+| `wonderswan` has no cheat coverage at all — `CheatService.LoadCheatsAsync` reports `PlatformNotSupported` for it rather than attempting a fetch. | Confirmed by listing the real `libretro/libretro-database` `cht/` directory directly (not guessed from a naming convention) — no `wonderswan` folder exists there. A gap in the upstream source EmuBridge fetches from, not something EmuBridge's own code can work around. See ARCHITECTURE.md → ADR-27. | Revisit only if `libretro/libretro-database` adds Wonderswan cheat coverage upstream — nothing to build on EmuBridge's side until then. |
+| `release.yml`'s "Update version in docs" step rewrites `docs/index.html`'s displayed version inside the CI runner's own checkout, but the workflow never commits or pushes that change back to `main` — there is no git step after it. The version actually shown on the live docs page depends entirely on someone manually updating `docs/index.html` (and `README.md`'s badge) as part of each version-cut commit, with no automated check that catches it if that step is ever skipped. | Found while reviewing `release.yml` during the `v0.9.0` version cut, comparing its steps against what the Release Checklist actually requires by hand. Not a hypothetical — the step's own output has no observable effect on the repository beyond that single CI run. | Either add a commit-and-push step to `release.yml` right after "Update version in docs" (so the bump is fully automated), or add a CI check that fails the `release` job if `docs/index.html`'s version doesn't already match `EmuBridge.csproj` at push time (catching a forgotten manual update). Until one of those lands, treat the manual `docs/index.html`/`README.md` update as a mandatory, unchecked step of every version cut. |
 | `release.yml`'s `nuget-audit` job has never run a real audit — `dotnet nuget audit` fails on the runner with `error: Unrecognized command or argument 'audit'` (reports `NuGet Command Line 7.6.0.0`, which doesn't support that subcommand), confirmed identically in at least two separate CI runs (`13e67bb` and `30940435786`, both during the `v0.9.0` version cut). | `continue-on-error: true` on that step (`release.yml` line 113) masks the failure as a green job, hiding the fact that no real dependency-vulnerability audit has ever actually run in CI — the job's name has been misleading since it was added. | Investigate the correct command/syntax for the runner's installed tooling (may need a newer SDK, or the intended command differs from what's there now — e.g. a NuGet.Config-driven approach or a different tool entirely), fix the step so it actually audits, then remove `continue-on-error` once the real command works so a genuine vulnerability finding blocks the pipeline instead of passing silently. |
-| Bridge embeds 2 third-party API keys directly in the app (SteamGridDB, and now TheGamesDB) — each requires manual registration and, if one is ever leaked or needs revoking, coordinated rotation across every existing install (there's no remote key-rotation mechanism; a new key only takes effect via a new release). | No key-free architecture gives equivalent coverage today — every metadata/box-art source evaluated (SteamGridDB, TheGamesDB, IGDB, RAWG, ScreenScraper) requires some form of project-level or user-level credential; see the metadata-source-decision research (2026-08-04) in `PLAN.md` → Timeline. | Not blocking. Revisit if a real key-free source ever appears, or evaluate letting the end user supply their own key instead of an embedded one (reduces Bridge's own key-exposure risk, at the cost of more onboarding friction — same tradeoff already noted for ScreenScraper's optional per-user account). No decision made — intent recorded only. |
+| EmuBridge embeds 2 third-party API keys directly in the app (SteamGridDB, and now TheGamesDB) — each requires manual registration and, if one is ever leaked or needs revoking, coordinated rotation across every existing install (there's no remote key-rotation mechanism; a new key only takes effect via a new release). | No key-free architecture gives equivalent coverage today — every metadata/box-art source evaluated (SteamGridDB, TheGamesDB, IGDB, RAWG, ScreenScraper) requires some form of project-level or user-level credential; see the metadata-source-decision research (2026-08-04) in `PLAN.md` → Timeline. | Not blocking. Revisit if a real key-free source ever appears, or evaluate letting the end user supply their own key instead of an embedded one (reduces EmuBridge's own key-exposure risk, at the cost of more onboarding friction — same tradeoff already noted for ScreenScraper's optional per-user account). No decision made — intent recorded only. |
 Populate further rows as additional limitations are discovered during development.
 
 ---
@@ -824,20 +824,20 @@ Before writing code for a new feature, follow this process:
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/ZavalaSebas/Bridge.git
-cd Bridge
+git clone https://github.com/ZavalaSebas/EmuBridge.git
+cd EmuBridge
 
 # 2. Restore packages
 dotnet restore
 
 # 3. Build
-dotnet build Bridge.slnx -c Release
+dotnet build EmuBridge.slnx -c Release
 
 # 4. Run tests
-dotnet test Bridge.slnx -c Release
+dotnet test EmuBridge.slnx -c Release
 
 # 5. Run the app
-dotnet run --project Bridge/Bridge.csproj
+dotnet run --project EmuBridge/EmuBridge.csproj
 ```
 
 ---
@@ -904,10 +904,10 @@ Show a credits window with the app name, version, author credit, and legal discl
 
 ```xml
 <!-- Views/CreditsWindow.xaml -->
-<Window x:Class="Bridge.Views.CreditsWindow"
+<Window x:Class="EmuBridge.Views.CreditsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="About Bridge"
+        Title="About EmuBridge"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         Width="420" Height="320"
@@ -915,7 +915,7 @@ Show a credits window with the app name, version, author credit, and legal discl
 
     <Grid Margin="24">
         <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="Bridge"
+            <TextBlock Text="EmuBridge"
                        FontSize="22" FontWeight="SemiBold"
                        TextAlignment="Center" />
             <TextBlock Text="Version 0.1.0"
@@ -937,7 +937,7 @@ Show a credits window with the app name, version, author credit, and legal discl
 This software is provided &quot;as is&quot;, without warranty of any kind, express or implied. Use at your own risk.
 
 See the
-<Hyperlink NavigateUri="https://github.com/ZavalaSebas/Bridge/blob/main/LICENSE"
+<Hyperlink NavigateUri="https://github.com/ZavalaSebas/EmuBridge/blob/main/LICENSE"
           RequestNavigate="LicenseLink_Click">LICENSE</Hyperlink>
 file for details.
             </TextBlock>
@@ -958,7 +958,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Documents;
 
-namespace Bridge.Views;
+namespace EmuBridge.Views;
 
 public partial class CreditsWindow : Window
 {

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="EmuBridge/EmuBridge.csproj" />
+  <Project Path="EmuBridge.Tests/EmuBridge.Tests.csproj" />
+  <Project Path="tools/ManifestDriftCheck/ManifestDriftCheck.csproj" />
+  <Project Path="tools/ManifestDriftCheck.Tests/ManifestDriftCheck.Tests.csproj" />
+</Solution>

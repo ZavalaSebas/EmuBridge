@@ -1,6 +1,6 @@
 using System.Net.Http;
 using System.Text.Json;
-using Bridge.Models;
+using EmuBridge.Models;
 using ManifestDriftCheck;
 
 if (args.Length < 2)

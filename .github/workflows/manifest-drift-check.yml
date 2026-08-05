@@ -1,6 +1,6 @@
 name: Manifest Drift Check
 
-# Detects when Bridge/Resources/KnownEmulators.json has drifted from the real files on
+# Detects when EmuBridge/Resources/KnownEmulators.json has drifted from the real files on
 # buildbot.libretro.com and opens a PR with the fix — never merges automatically. See
 # ARCHITECTURE.md -> ADR-25 for the full design and why merge stays a human decision.
 #
@@ -29,7 +29,7 @@ jobs:
           dotnet-version: 10.x
 
       - name: Restore packages
-        run: dotnet restore Bridge.slnx
+        run: dotnet restore EmuBridge.slnx
 
       # continue-on-error so a verification failure or a structural change (ARCHITECTURE.md ->
       # ADR-25 — never auto-applied, always needs a human) doesn't skip opening a PR for whatever
@@ -40,7 +40,7 @@ jobs:
         continue-on-error: true
         run: >
           dotnet run --project tools/ManifestDriftCheck -c Release --no-restore --
-          Bridge/Resources/KnownEmulators.json
+          EmuBridge/Resources/KnownEmulators.json
           ${{ runner.temp }}/drift-report.md
 
       # No-op if KnownEmulators.json has no actual diff (git-level, not the tool's own exit
@@ -49,7 +49,7 @@ jobs:
       - name: Open PR for routine catalog updates
         uses: peter-evans/create-pull-request@v8
         with:
-          add-paths: Bridge/Resources/KnownEmulators.json
+          add-paths: EmuBridge/Resources/KnownEmulators.json
           branch: chore/manifest-drift-check
           delete-branch: true
           commit-message: "chore: update KnownEmulators.json catalog (drift check)"

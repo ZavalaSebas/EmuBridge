@@ -2,7 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
-using Bridge.Models;
+using EmuBridge.Models;
 
 namespace ManifestDriftCheck.Tests;
 

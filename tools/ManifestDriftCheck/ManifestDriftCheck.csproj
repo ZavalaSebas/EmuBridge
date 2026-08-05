@@ -8,8 +8,8 @@
     <RootNamespace>ManifestDriftCheck</RootNamespace>
 
     <!-- CI-only implementation detail of the manifest-drift-check GitHub Action (ARCHITECTURE.md
-         -> ADR-25) — never invoked manually by a maintainer, never shipped in Bridge.exe. Lives
-         under tools/ specifically so it never enters Bridge.csproj's publish output. -->
+         -> ADR-25) — never invoked manually by a maintainer, never shipped in EmuBridge.exe. Lives
+         under tools/ specifically so it never enters EmuBridge.csproj's publish output. -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Bridge\Bridge.csproj" />
+    <ProjectReference Include="..\..\EmuBridge\EmuBridge.csproj" />
   </ItemGroup>
 
 </Project>

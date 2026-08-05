@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <Version>0.10.0</Version>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+
+    <!-- PublishSingleFile only bundles managed assemblies by default — WPF's native interop DLLs
+         (D3DCompiler_47_cor3.dll, PenImc_cor3.dll, PresentationNative_cor3.dll,
+         vcruntime140_cor3.dll, wpfgfx_cor3.dll) would otherwise ship as required loose files next
+         to the .exe, which is how the v0.1.0 release asset shipped broken (see ARCHITECTURE.md ->
+         ADR-12). Extracted to %TEMP%/.net on every startup — the same cost already weighed and
+         rejected for SQLite in ADR-3, accepted here because WPF itself requires it; there is no
+         zero-extraction alternative for a WPF app the way there was for storage. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="LiteDB" Version="5.0.21" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.10" />
+    <PackageReference Include="SharpCompress" Version="0.50.2" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\SeedSystems.json" />
+    <EmbeddedResource Include="Resources\KnownEmulators.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- So EmuBridge.Tests can assert AppDataMigrationService.LegacyAppDataPath's exact value
+         directly, rather than only exercising it indirectly through the constructor. -->
+    <InternalsVisibleTo Include="EmuBridge.Tests" />
+  </ItemGroup>
+
+</Project>
