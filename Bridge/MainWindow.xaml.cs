@@ -1,9 +1,10 @@
 using System.Windows;
 using Bridge.ViewModels;
+using Wpf.Ui.Controls;
 
 namespace Bridge;
 
-public partial class MainWindow : Window
+public partial class MainWindow : FluentWindow
 {
     public MainWindow()
     {

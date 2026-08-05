@@ -1,10 +1,12 @@
-<Window x:Class="Bridge.MainWindow"
+<ui:FluentWindow x:Class="Bridge.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Bridge.ViewModels"
         xmlns:conv="clr-namespace:Bridge.Converters"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="Bridge" Height="650" Width="950"
-        Background="{DynamicResource ApplicationBackgroundBrush}"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}"
         WindowState="{Binding IsBigPictureMode, Converter={StaticResource BoolToWindowStateConverter}}">
 
@@ -146,12 +148,15 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <ui:TitleBar Grid.Row="0" Title="Bridge" />
+
         <!-- Toolbar -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8">
             <Button Content="Add Folder" Command="{Binding AddFolderCommand}"
                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
                     Margin="0,0,8,0" Padding="10,4" />
@@ -173,7 +178,7 @@
         </StackPanel>
 
         <!-- Content -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <!-- Empty state: no scan folders configured yet -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
                         Visibility="{Binding HasNoScanFolders, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -266,7 +271,7 @@
         </Grid>
 
         <!-- Status bar: scan/box-art progress -->
-        <Grid Grid.Row="2" Margin="8" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+        <Grid Grid.Row="3" Margin="8" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -278,4 +283,4 @@
             <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelCommand}" Padding="10,4" Margin="8,0,0,0" />
         </Grid>
     </Grid>
-</Window>
+</ui:FluentWindow>
