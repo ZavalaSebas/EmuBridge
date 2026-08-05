@@ -41,6 +41,7 @@ jobs:
         shell: pwsh
         run: |
           $old = git show HEAD~1:'EmuBridge/EmuBridge.csproj' 2>$null
+          $LASTEXITCODE = 0
           if ($old) {
             $oldVer = [regex]::Match($old, '<Version>(.*?)</Version>').Groups[1].Value
             $newVer = '${{ steps.version.outputs.version }}'
