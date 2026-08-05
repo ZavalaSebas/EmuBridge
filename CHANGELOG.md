@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-04
+
+TheGamesDB as a second, additive metadata source for the game detail panel — chosen against real evidence from a deliberately hard coverage test (13/15 titles), not a flagship-only sample. 327 unit tests pass in Release, 326 in Debug (`Bridge.Tests`); 16 in `ManifestDriftCheck.Tests` (unchanged).
+
 ### Added
 - TheGamesDB as a second metadata source (RetroArch and other emulators alike) — the game detail panel now shows real descriptions and screenshots, filling the gap SteamGridDB structurally can't (SteamGridDB keeps owning box art, unchanged). Chosen after evaluating IGDB/TheGamesDB/RAWG/ScreenScraper/LaunchBox Games Database against primary sources and a real, deliberately hard coverage test (13/15 titles, including 2 ROM hacks and 3 region-exclusives) rather than a flagship-only sample. New API key setting in Settings (project-level, same DPAPI-encrypted pattern as SteamGridDB). Fetched on demand when a game's detail view opens, not during the library scan, to conserve the real ~1000/month key allowance. See ARCHITECTURE.md → ADR-28.
 

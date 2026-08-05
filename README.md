@@ -7,7 +7,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white&labelColor=1a1a2e)](https://dotnet.microsoft.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows-00a4ef?style=flat-square&logo=windows&logoColor=white&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge)
-[![Version](https://img.shields.io/badge/Version-0.9.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
+[![Version](https://img.shields.io/badge/Version-0.10.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/Bridge/releases)
 
 A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.
 
@@ -70,7 +70,7 @@ dotnet publish Bridge -c Release -r win-x64 --self-contained true -p:PublishSing
 
 ## Features
 
-> Bridge is functional and shipping — v0.9.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is complete too. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completed the "Big Picture" group — a streaming-style mode with real box art per view; `v0.7.0` added per-game emulator configuration and hardened the download-verification guard against the libretro nightly channel's real rebuild frequency; `v0.7.1` was a same-day patch re-verifying the entire emulator catalog against that same channel; `v0.8.0` closed the loop with a full catalog-maintenance system — automated drift detection with a human-reviewed pull request, Bridge fetching its own catalog fresh on every startup, and a hardcoded allow-list of trusted download hosts as a second line of defense; `v0.9.0` is the first item of Phase 3 — cheats management per game for RetroArch-based platforms.
+> Bridge is functional and shipping — v0.10.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is complete too. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completed the "Big Picture" group — a streaming-style mode with real box art per view; `v0.7.0` added per-game emulator configuration and hardened the download-verification guard against the libretro nightly channel's real rebuild frequency; `v0.7.1` was a same-day patch re-verifying the entire emulator catalog against that same channel; `v0.8.0` closed the loop with a full catalog-maintenance system — automated drift detection with a human-reviewed pull request, Bridge fetching its own catalog fresh on every startup, and a hardcoded allow-list of trusted download hosts as a second line of defense; `v0.9.0` was the first item of Phase 3 — cheats management per game for RetroArch-based platforms; `v0.10.0` is Phase 3's second item — TheGamesDB as a second, additive metadata source for the game detail panel's description and screenshots.
 
 - Scan your ROM folders and automatically detect which system each game belongs to
 - Fetch box art automatically from SteamGridDB
