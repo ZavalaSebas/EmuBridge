@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- TheGamesDB as a second metadata source (RetroArch and other emulators alike) — the game detail panel now shows real descriptions and screenshots, filling the gap SteamGridDB structurally can't (SteamGridDB keeps owning box art, unchanged). Chosen after evaluating IGDB/TheGamesDB/RAWG/ScreenScraper/LaunchBox Games Database against primary sources and a real, deliberately hard coverage test (13/15 titles, including 2 ROM hacks and 3 region-exclusives) rather than a flagship-only sample. New API key setting in Settings (project-level, same DPAPI-encrypted pattern as SteamGridDB). Fetched on demand when a game's detail view opens, not during the library scan, to conserve the real ~1000/month key allowance. See ARCHITECTURE.md → ADR-28.
+
 ## [0.9.0] - 2026-08-04
 
 Cheats management per game for RetroArch-backed profiles — three real bugs found and fixed correcting the mechanism along the way, all root-caused against RetroArch's actual source (and, for two of them, its own log output) rather than assumed. 301 unit tests pass in Release, 300 in Debug (`Bridge.Tests`); 16 in `ManifestDriftCheck.Tests` (unchanged).

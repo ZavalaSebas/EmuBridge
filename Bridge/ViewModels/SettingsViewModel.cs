@@ -34,6 +34,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _steamGridDbApiKey = string.Empty;
 
+    [ObservableProperty]
+    private string _theGamesDbApiKey = string.Empty;
+
     // Mechanism 2 (ARCHITECTURE.md -> ADR-27) - default true, matching the approved design. Only
     // affects launches where a Bridge-managed cheat file already exists for that specific game
     // (LaunchService's own gate); this toggle just decides whether that already-narrow case also
@@ -68,6 +71,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         await LoadPlatformsAsync(ct);
         SteamGridDbApiKey = await _settingsService.GetSteamGridDbApiKeyAsync(ct) ?? string.Empty;
+        TheGamesDbApiKey = await _settingsService.GetTheGamesDbApiKeyAsync(ct) ?? string.Empty;
         AutoApplyCheatsOnLaunch = await _settingsService.GetAutoApplyCheatsOnLaunchAsync(ct);
     }
 
@@ -197,6 +201,18 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         await _settingsService.SetSteamGridDbApiKeyAsync(SteamGridDbApiKey);
+        StatusMessage = "API key saved.";
+    }
+
+    [RelayCommand]
+    private async Task SaveTheGamesDbApiKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TheGamesDbApiKey))
+        {
+            return;
+        }
+
+        await _settingsService.SetTheGamesDbApiKeyAsync(TheGamesDbApiKey);
         StatusMessage = "API key saved.";
     }
 

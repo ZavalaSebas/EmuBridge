@@ -25,14 +25,48 @@ public class SettingsService : ISettingsService
     public async Task<string?> GetSteamGridDbApiKeyAsync(CancellationToken ct = default)
     {
         var settings = await ReadSettingsAsync(ct);
-        if (string.IsNullOrEmpty(settings?.EncryptedSteamGridDbApiKey))
+        return DecryptOrNull(settings?.EncryptedSteamGridDbApiKey, "SteamGridDB");
+    }
+
+    public async Task SetSteamGridDbApiKeyAsync(string apiKey, CancellationToken ct = default)
+    {
+        var settings = await ReadSettingsAsync(ct) ?? new SettingsFile();
+        settings.EncryptedSteamGridDbApiKey = Encrypt(apiKey);
+
+        await WriteSettingsAsync(settings, ct);
+    }
+
+    public async Task<string?> GetTheGamesDbApiKeyAsync(CancellationToken ct = default)
+    {
+        var settings = await ReadSettingsAsync(ct);
+        return DecryptOrNull(settings?.EncryptedTheGamesDbApiKey, "TheGamesDB");
+    }
+
+    public async Task SetTheGamesDbApiKeyAsync(string apiKey, CancellationToken ct = default)
+    {
+        var settings = await ReadSettingsAsync(ct) ?? new SettingsFile();
+        settings.EncryptedTheGamesDbApiKey = Encrypt(apiKey);
+
+        await WriteSettingsAsync(settings, ct);
+    }
+
+    private static string Encrypt(string plainText)
+    {
+        var plainBytes = Encoding.UTF8.GetBytes(plainText);
+        var encryptedBytes = ProtectedData.Protect(plainBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
+        return Convert.ToBase64String(encryptedBytes);
+    }
+
+    private string? DecryptOrNull(string? encrypted, string keyName)
+    {
+        if (string.IsNullOrEmpty(encrypted))
         {
             return null;
         }
 
         try
         {
-            var encryptedBytes = Convert.FromBase64String(settings.EncryptedSteamGridDbApiKey);
+            var encryptedBytes = Convert.FromBase64String(encrypted);
             var decryptedBytes = ProtectedData.Unprotect(encryptedBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(decryptedBytes);
         }
@@ -40,25 +74,15 @@ public class SettingsService : ISettingsService
         {
             _logger.LogWarning(
                 ex,
-                "Could not decrypt the stored SteamGridDB API key — it may have been created under a different Windows account. Treating as not configured.");
+                "Could not decrypt the stored {KeyName} API key — it may have been created under a different Windows account. Treating as not configured.",
+                keyName);
             return null;
         }
         catch (FormatException ex)
         {
-            _logger.LogWarning(ex, "Stored SteamGridDB API key is not valid base64; treating as not configured.");
+            _logger.LogWarning(ex, "Stored {KeyName} API key is not valid base64; treating as not configured.", keyName);
             return null;
         }
-    }
-
-    public async Task SetSteamGridDbApiKeyAsync(string apiKey, CancellationToken ct = default)
-    {
-        var plainBytes = Encoding.UTF8.GetBytes(apiKey);
-        var encryptedBytes = ProtectedData.Protect(plainBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
-
-        var settings = await ReadSettingsAsync(ct) ?? new SettingsFile();
-        settings.EncryptedSteamGridDbApiKey = Convert.ToBase64String(encryptedBytes);
-
-        await WriteSettingsAsync(settings, ct);
     }
 
     public async Task<bool> GetAutoApplyCheatsOnLaunchAsync(CancellationToken ct = default)
@@ -112,6 +136,7 @@ public class SettingsService : ISettingsService
     private class SettingsFile
     {
         public string? EncryptedSteamGridDbApiKey { get; set; }
+        public string? EncryptedTheGamesDbApiKey { get; set; }
         public bool? AutoApplyCheatsOnLaunch { get; set; }
     }
 }

@@ -1,8 +1,12 @@
 <Window x:Class="Bridge.GameDetailWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="{Binding Name}" Height="440" Width="360"
+        Title="{Binding Name}" Height="640" Width="420"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Window.Resources>
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
@@ -11,6 +15,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -26,13 +31,32 @@
         <TextBlock Grid.Row="2" Text="{Binding PlatformName}" Foreground="Gray" Margin="0,4,0,0" />
         <TextBlock Grid.Row="3" Text="{Binding ReleaseYearText}" Margin="0,4,0,0" />
 
-        <!-- Static, not bound: SteamGridDB (the only metadata source Bridge has today) has no
-             description/blurb field at all — confirmed against the real API, not assumed. Shown
-             explicitly rather than left blank, same "never silent" standard as everywhere else. -->
-        <TextBlock Grid.Row="4" Text="Description: not available" Foreground="Gray"
-                   Margin="0,12,0,0" VerticalAlignment="Top" TextWrapping="Wrap" />
+        <!-- Bound to TheGamesDbService's outcome (metadata-source decision, 2026-08-04) — falls
+             back to the same explicit "Description: not available" text ADR-19 established for
+             every case where there's nothing real to show, never left hidden or blank. -->
+        <ScrollViewer Grid.Row="4" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+            <TextBlock Text="{Binding DescriptionText}" Foreground="Gray"
+                       VerticalAlignment="Top" TextWrapping="Wrap" />
+        </ScrollViewer>
 
-        <Button Grid.Row="5" Content="Close" IsCancel="True" HorizontalAlignment="Right"
+        <ScrollViewer Grid.Row="5" Height="110" Margin="0,12,0,0"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                      Visibility="{Binding HasScreenshots, Converter={StaticResource BoolToVisibilityConverter}}">
+            <ItemsControl ItemsSource="{Binding ScreenshotPaths}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Image Source="{Binding}" Height="100" Margin="0,0,6,0" Stretch="Uniform" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <Button Grid.Row="6" Content="Close" IsCancel="True" HorizontalAlignment="Right"
                 Padding="20,6" Margin="0,12,0,0" />
     </Grid>
 </Window>

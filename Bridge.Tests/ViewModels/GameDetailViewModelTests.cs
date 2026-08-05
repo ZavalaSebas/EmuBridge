@@ -1,4 +1,5 @@
 using Bridge.Models;
+using Bridge.Services;
 using Bridge.Tests.Services;
 using Bridge.ViewModels;
 
@@ -7,12 +8,13 @@ namespace Bridge.Tests.ViewModels;
 public class GameDetailViewModelTests
 {
     private readonly FakeLibraryRepository _repository = new();
+    private readonly FakeTheGamesDbService _theGamesDbService = new();
     private readonly GameDetailViewModel _viewModel;
 
     public GameDetailViewModelTests()
     {
         _repository.Platforms.Add(new Platform { Id = "nes", Name = "Nintendo Entertainment System", Extensions = ["nes"] });
-        _viewModel = new GameDetailViewModel(_repository);
+        _viewModel = new GameDetailViewModel(_repository, _theGamesDbService);
     }
 
     private Game AddGame() => new() { Id = Guid.NewGuid(), Path = @"C:\roms\mario.nes", Name = "Super Mario Bros. 3", PlatformId = "nes" };
@@ -113,5 +115,101 @@ public class GameDetailViewModelTests
         await _viewModel.InitializeAsync();
 
         Assert.Equal(string.Empty, _viewModel.Name);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_TheGamesDbCachedWithDescription_ShowsRealDescriptionText()
+    {
+        var game = AddGame();
+        _repository.BoxArtRecords.Add(new BoxArt { GameId = game.Id, DescriptionStatus = BoxArtStatus.Cached, Description = "A grand adventure." });
+        _theGamesDbService.NextOutcome = TheGamesDbOutcome.Cached;
+        _viewModel.SetGame(game);
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal("Description: A grand adventure.", _viewModel.DescriptionText);
+    }
+
+    [Theory]
+    [InlineData(TheGamesDbOutcome.NotFound)]
+    [InlineData(TheGamesDbOutcome.NoKeyConfigured)]
+    [InlineData(TheGamesDbOutcome.Failed)]
+    public async Task InitializeAsync_TheGamesDbOutcomeWithNoDescription_ShowsNotAvailable(TheGamesDbOutcome outcome)
+    {
+        var game = AddGame();
+        _theGamesDbService.NextOutcome = outcome;
+        _viewModel.SetGame(game);
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal("Description: not available", _viewModel.DescriptionText);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_TheGamesDbRateLimited_ShowsResetTimeInDescription()
+    {
+        var game = AddGame();
+        var resetUtc = DateTime.UtcNow.AddHours(1);
+        _repository.BoxArtRecords.Add(new BoxArt { GameId = game.Id, DescriptionStatus = BoxArtStatus.FetchFailed, DescriptionRateLimitResetUtc = resetUtc });
+        _theGamesDbService.NextOutcome = TheGamesDbOutcome.RateLimited;
+        _viewModel.SetGame(game);
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Contains("rate limit reached", _viewModel.DescriptionText);
+        Assert.Contains(resetUtc.ToLocalTime().ToString("t"), _viewModel.DescriptionText);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_TheGamesDbCachedWithScreenshots_PopulatesScreenshotPaths()
+    {
+        var game = AddGame();
+        _repository.BoxArtRecords.Add(new BoxArt
+        {
+            GameId = game.Id,
+            DescriptionStatus = BoxArtStatus.Cached,
+            ScreenshotLocalPaths = [@"C:\cache\shot1.jpg", @"C:\cache\shot2.jpg"]
+        });
+        _theGamesDbService.NextOutcome = TheGamesDbOutcome.Cached;
+        _viewModel.SetGame(game);
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal(2, _viewModel.ScreenshotPaths.Count);
+        Assert.True(_viewModel.HasScreenshots);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_NoScreenshots_HasScreenshotsIsFalse()
+    {
+        var game = AddGame();
+        _viewModel.SetGame(game);
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Empty(_viewModel.ScreenshotPaths);
+        Assert.False(_viewModel.HasScreenshots);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_TheGamesDbServiceThrowsOperationCanceled_Propagates()
+    {
+        var game = AddGame();
+        _theGamesDbService.ThrowOperationCanceled = true;
+        _viewModel.SetGame(game);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _viewModel.InitializeAsync());
+    }
+
+    [Fact]
+    public async Task InitializeAsync_CallsTheGamesDbServiceForTheSetGame()
+    {
+        var game = AddGame();
+        _theGamesDbService.NextOutcome = TheGamesDbOutcome.NotFound;
+        _viewModel.SetGame(game);
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Contains(game.Id, _theGamesDbService.CalledForGameIds);
     }
 }

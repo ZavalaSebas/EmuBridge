@@ -150,6 +150,7 @@ public partial class App : Application
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IImageCacheService, ImageCacheService>();
         services.AddSingleton<IMetadataService, MetadataService>();
+        services.AddSingleton<ITheGamesDbService, TheGamesDbService>();
         services.AddSingleton<IEmulatorService, EmulatorService>();
         services.AddSingleton<ILaunchService, LaunchService>();
         services.AddSingleton<IDownloadVerificationService, DownloadVerificationService>();

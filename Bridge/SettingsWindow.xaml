@@ -16,6 +16,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Emulators section -->
@@ -72,14 +73,26 @@
             </Grid>
         </GroupBox>
 
+        <!-- TheGamesDB API key section (metadata-source decision, 2026-08-04) -->
+        <GroupBox Grid.Row="2" Header="TheGamesDB API Key" Margin="0,12,0,0">
+            <Grid Margin="6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Text="{Binding TheGamesDbApiKey, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" />
+                <Button Grid.Column="1" Content="Save Key" Command="{Binding SaveTheGamesDbApiKeyCommand}" Margin="6,0,0,0" Padding="10,4" />
+            </Grid>
+        </GroupBox>
+
         <!-- Cheats section -->
-        <GroupBox Grid.Row="2" Header="Cheats" Margin="0,12,0,0">
+        <GroupBox Grid.Row="3" Header="Cheats" Margin="0,12,0,0">
             <CheckBox Margin="6" Content="Auto-apply cheats on launch"
                       IsChecked="{Binding AutoApplyCheatsOnLaunch}"
                       Command="{Binding SaveAutoApplyCheatsOnLaunchCommand}" />
         </GroupBox>
 
-        <Grid Grid.Row="3" Margin="0,8,0,0">
+        <Grid Grid.Row="4" Margin="0,8,0,0">
             <!-- Busy: auto-install progress -->
             <Grid Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>

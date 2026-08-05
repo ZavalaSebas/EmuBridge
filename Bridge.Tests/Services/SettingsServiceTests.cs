@@ -50,4 +50,42 @@ public class SettingsServiceTests : IDisposable
 
         Assert.DoesNotContain("my-secret-key", fileContents);
     }
+
+    [Fact]
+    public async Task GetTheGamesDbApiKeyAsync_NoSettingsFileYet_ReturnsNull()
+    {
+        var key = await _service.GetTheGamesDbApiKeyAsync();
+
+        Assert.Null(key);
+    }
+
+    [Fact]
+    public async Task SetThenGetTheGamesDbApiKeyAsync_RoundTripsCorrectly()
+    {
+        await _service.SetTheGamesDbApiKeyAsync("tgdb-secret-key");
+
+        var key = await _service.GetTheGamesDbApiKeyAsync();
+
+        Assert.Equal("tgdb-secret-key", key);
+    }
+
+    [Fact]
+    public async Task SetTheGamesDbApiKeyAsync_StoresKeyEncryptedNotPlainText()
+    {
+        await _service.SetTheGamesDbApiKeyAsync("tgdb-secret-key");
+
+        var fileContents = await File.ReadAllTextAsync(_settingsPath);
+
+        Assert.DoesNotContain("tgdb-secret-key", fileContents);
+    }
+
+    [Fact]
+    public async Task SetBothApiKeys_RoundTripIndependently()
+    {
+        await _service.SetSteamGridDbApiKeyAsync("sgdb-key");
+        await _service.SetTheGamesDbApiKeyAsync("tgdb-key");
+
+        Assert.Equal("sgdb-key", await _service.GetSteamGridDbApiKeyAsync());
+        Assert.Equal("tgdb-key", await _service.GetTheGamesDbApiKeyAsync());
+    }
 }

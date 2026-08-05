@@ -27,4 +27,26 @@ public class BoxArt
     // vertical one (or vice versa), since SteamGridDB's coverage per dimension varies per game.
     public string? VerticalLocalPath { get; set; }
     public BoxArtStatus VerticalStatus { get; set; } = BoxArtStatus.NotFetched;
+
+    // TheGamesDB (metadata-source decision, 2026-08-04 — see PLAN.md -> Timeline). Kept on BoxArt
+    // rather than a new entity, same reasoning ADR-19 already used for ReleaseYear: this is
+    // detail-panel metadata, not a separate concept with its own lifecycle. Fetched on demand when
+    // GameDetailWindow opens, not during the library scan (unlike Status/VerticalStatus) — a
+    // ~1000/month key allowance would be exhausted fast if every game's description/screenshots
+    // were pre-fetched for a library nobody has looked at yet.
+    public string? Description { get; set; }
+    public BoxArtStatus DescriptionStatus { get; set; } = BoxArtStatus.NotFetched;
+
+    // Set only when a fetch attempt returned a real rate-limit response (distinct from a generic
+    // FetchFailed) so the UI can show "resets at HH:mm" instead of a generic unavailable message —
+    // TheGamesDB's own response includes this, unlike SteamGridDB (see DEVELOPMENT.md -> Known
+    // Limitations). Null whenever DescriptionStatus isn't a rate-limited FetchFailed.
+    public DateTime? DescriptionRateLimitResetUtc { get; set; }
+
+    // Screenshots ride on the same DescriptionStatus gate (one TheGamesDB game lookup covers both),
+    // but degrade independently within a Cached status — the game can be found with a real overview
+    // and still end up with zero screenshots, either because TheGamesDB has none for it or because
+    // individual image downloads failed. No separate status field for that: a shorter, real list is
+    // itself the signal, same as CoverImagePath being null already means "nothing to show" elsewhere.
+    public List<string> ScreenshotLocalPaths { get; set; } = [];
 }

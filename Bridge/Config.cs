@@ -44,6 +44,10 @@ public static class Config
 
     public const string SteamGridDbBaseUrl = "https://www.steamgriddb.com/api/v2";
 
+    // Confirmed real (not assumed) via a live authenticated call during the metadata-source
+    // decision research, 2026-08-04 — see PLAN.md -> Timeline.
+    public const string TheGamesDbBaseUrl = "https://api.thegamesdb.net/v1";
+
     // Phase 1 cover grid tile size — a placeholder default (2:3, matching typical box art
     // proportions), not a final UI decision. Tune when the actual grid cell size is designed.
     public const int CoverWidth = 200;
