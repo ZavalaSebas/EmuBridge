@@ -8,7 +8,7 @@ This document records architectural decisions made during the development of Bri
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Views (WPF — stock; WPF-UI theming pending)      │
+│  Views (WPF + WPF-UI theming — MainWindow is Mica) │
 │  MainWindow · Library cover grid view            │
 ├─────────────────────────────────────────────────┤
 │  ViewModels (CommunityToolkit.Mvvm)              │
@@ -30,7 +30,7 @@ This document records architectural decisions made during the development of Bri
 | Decision | Choice | Why |
 |----------|--------|-----|
 | UI Framework | WPF (.NET 10) | Proven in production on prior projects (SteamManager, OrbSpoofer); single-file self-contained distribution already validated |
-| Styling/Theming | WPF-UI (lepo.co) — **decided, not yet integrated** | Mica, Fluent Design, already validated in a prior project (SteamManager). Confirmed via a documentation audit (2026-08-06) that Bridge ships on stock WPF today — zero `Wpf.Ui` package reference, no WPF-UI resource dictionaries in `App.xaml`. Tracked as an explicit Phase Polish item (`PLAN.md` → Roadmap), not assumed done just because it was decided early |
+| Styling/Theming | WPF-UI (lepo.co) — **integrated** | Mica, Fluent Design, already validated in a prior project (SteamManager). Decided early, actually integrated 2026-08-05 as Phase Polish item 1 (`PLAN.md` → Roadmap) — see ARCHITECTURE.md → ADR-29 for the real bugs found doing it |
 | WPF vs. WinUI 3 | WPF | WinUI 3's Composition API has a genuine edge for fluid animations, but WPF wins on proven real-world experience and reuse of the existing process/tooling template. If Phase 2/3 animation polish doesn't feel fluid enough with classic Storyboards, investigate Windows.UI.Composition interop as a targeted enhancement — not a reason to change the UI framework |
 | MVVM | CommunityToolkit.Mvvm | Consistent with prior projects |
 | DI | Microsoft.Extensions.DependencyInjection | Standard already in use |
@@ -1213,6 +1213,46 @@ Any of these three, if it turns out wrong in real use, fails the same visible wa
 - **LaunchBox Games Database:** rejected — no real API exists (confirmed via LaunchBox's own open feature request for one), only a static bulk XML export with no hash matching
 - **Pre-fetch description/screenshots for the whole library during the scan, matching box art's own timing:** rejected — the confirmed real ~1000/month allowance would be exhausted by a single scan of an ordinarily-sized library, for data most of it may never be viewed; on-demand fetch spends quota only on games the user actually opens
 - **A separate entity instead of extending `BoxArt`:** rejected — same reasoning ADR-19 already used for `ReleaseYear`; this is detail-panel metadata with no independent lifecycle of its own
+
+---
+
+### ADR-29: WPF-UI actually integrated (Phase Polish, item 1) — Mica on MainWindow, two real bugs found doing it
+
+**Status:** Accepted
+
+**Date:** 2026-08-05
+
+**Context:**
+WPF-UI (lepo.co) was decided as Bridge's theming library in the original foundation document (validated in a prior project, SteamManager) but never actually installed — Bridge shipped on stock WPF through `v0.10.0`, confirmed by the 2026-08-06 documentation audit (`PLAN.md` → Timeline item 27) that found this claimed-done-but-never-built gap documented in 3 places. `PLAN.md` → Roadmap → Phase Polish tracks it as item 1, an explicit prerequisite for the animation and general-UI-pass items later in that phase. First verified the library itself was still real and current before touching any code: WPF-UI 4.3.0 (NuGet, published 2026-05), target frameworks include `net10.0-windows7.0` explicitly — no framework mismatch to work around.
+
+**Decision — theme follows the real Windows setting, not a fixed default:** `ApplicationThemeManager.ApplySystemTheme()`, called once in `App.OnStartup` before `MainWindow` is constructed. Matches the "zero-friction setup" standard the foundation document already sets for the rest of Bridge — no new Settings UI added for this; a user-facing theme picker is Phase Polish's own later, separate item ("Theme customization / visual personalization"), not folded into this one.
+
+**Decision — Mica only on `MainWindow`, the other 4 windows get base theming without it:** `MainWindow` is Bridge's "shell" and the most visible surface, worth the real extra migration cost (below). `SettingsWindow`/`GameDetailWindow`/`CheatsWindow`/`EmulatorOverrideWindow` stay as plain `Window`, picking up WPF-UI's restyled controls (`Button`, `TextBox`, etc.) automatically from the `App.xaml` resource merge, with no backdrop. Revisit only if Phase Polish's later "general UI pass" decides it's worth the cost on the secondary windows too.
+
+**Decision — migration order was staged by risk, verified interactively at each step, not done all at once:** confirmed via `grep` that `MainWindow.xaml` has only 6 actual named (`x:Key`) resources despite 52 raw `Style`/`Template` references — checked all 6 against WPF-UI's real `ControlsDictionary` (traced through `Wpf.Ui.xaml`'s ~89 merged files) for a name collision before touching the window; none found, all of WPF-UI's own keys are generic per-control-type names. Order: (1) package + `App.xaml` resource merge, verified on `SettingsWindow` first (zero custom styles, the cleanest signal the base mechanism works); (2) the same fix applied to `GameDetailWindow`/`CheatsWindow`, plus `EmulatorOverrideWindow` — not originally in scope for this step, but sharing the identical, already-diagnosed problem, so included rather than left broken; (3) `MainWindow`'s `FluentWindow`/Mica migration last, the highest-risk window.
+
+**Two real bugs found via actual interactive use, not caught by build or the sparse official getting-started guide:**
+
+1. **A plain `Window` doesn't inherit WPF-UI's themed background at all — only individual controls do.** After step 1 above, `SettingsWindow` rendered with a white background and effectively invisible buttons. Root cause: WPF-UI's `ControlsDictionary` restyles specific control types (`Button`, `TextBox`, etc.) via implicit (`TargetType`-only) styles, but a plain `Window` isn't itself one of those restyled types — its `Background` stays WPF's own default, while button text picks up a light color meant for a dark backdrop that was never applied. Fixed by setting `Background="{DynamicResource ApplicationBackgroundBrush}"` explicitly on every window (real key confirmed directly against WPF-UI's own `Dark.xaml`, not guessed: `#FF202020`).
+2. **The same gap exists for text color, and it's a separate bug from #1, not the same fix.** After #1's Background fix, most controls looked correct but plain `TextBlock` labels (e.g. "Executable", "Argument Template") stayed black on the now-dark background. Root cause, confirmed directly against WPF-UI's own `TextBlock.xaml` source: its implicit `TextBlock` style is real but **empty** — no `Foreground` setter at all. Text color instead relies on ordinary WPF property-value inheritance from `TextElement.Foreground`, which nothing had set. Fixed by also setting `Foreground="{DynamicResource TextFillColorPrimaryBrush}"` on every window (confirmed key: `#FFFFFF`), which cascades down to any child `TextBlock`/`Label` that doesn't set its own explicit `Foreground`.
+
+Both fixes are per-window (`Background`/`Foreground` set on the root `Window`/`FluentWindow` element), applied identically across all 5 of Bridge's windows.
+
+**Decision — `MainWindow`'s migration to `FluentWindow` is a real structural change, not a class-name swap:** `ExtendsContentIntoTitleBar="True"` (required for `WindowBackdropType="Mica"` to have any visible effect) removes the native OS title bar entirely — minimize/maximize/close and window-dragging stop working unless replaced. Confirmed via WPF-UI's own gallery app source that a `ui:TitleBar` control is the real, expected replacement, not optional. `MainWindow.xaml`'s root `Grid` gained a new `Row="0"` for it; the 3 existing rows (toolbar, content, status bar) shifted down to `1`/`2`/`3`. The explicit `Background` from bug #1's fix was removed specifically on this window once Mica was added — keeping an opaque background would paint over the backdrop, defeating the point. `Foreground` stays, since bug #2's cause is unrelated to the backdrop.
+
+**Consequences:**
+- ✅ Bridge finally matches what 3 separate docs already claimed — WPF-UI is a real, running dependency, not an aspirational line item
+- ✅ Both real bugs were root-caused against WPF-UI's own actual source (`Dark.xaml`, `TextBlock.xaml`, the gallery app's `MainWindow.xaml`) after real interactive testing surfaced them — not assumed from the (sparse) official getting-started guide, which doesn't mention either gap
+- ✅ Confirmed via `grep` before touching `MainWindow.xaml` that none of its 6 real named resources collide with WPF-UI's own — a real check, not skipped because "it probably doesn't collide"
+- ✅ `MainWindow`'s Mica backdrop, `TitleBar` (drag/minimize/maximize/close), and Big Picture mode's `WindowState`-driven maximize were all confirmed working via real interactive use after the migration, not assumed from the base class change alone
+- ❌ Only `MainWindow` has Mica — the other 4 windows are themed but visually flatter; deferred, not forgotten (see the Mica-scope decision above)
+- ❌ Windows 10-vs-11 Mica support wasn't cleanly verified — this machine's own `[System.Environment]::OSVersion` reports `ProductName: Windows 10 Pro` but build `26200` (a build number range otherwise associated with Windows 11 24H2/25H2), an unresolved inconsistency in the registry data itself, not something this ADR resolves. Mica rendered visibly during real interactive testing regardless of what the version string claims — treat the empirical result as authoritative over the label
+
+**Alternatives considered:**
+
+- **Apply Mica to all 5 windows now, not just `MainWindow`:** rejected — the secondary windows are simpler, less-visited surfaces; the same real migration cost (structural `TitleBar` rework) 4 more times isn't justified until Phase Polish's later general-UI-pass item actually redesigns them
+- **Fix the background/text bugs by adding a global implicit `Style TargetType="Window"` Setter for Background/Foreground in `App.xaml`, instead of per-window attributes:** considered, not chosen for this pass — `MainWindow`'s Mica migration needs a *different* Background value (none) than the other 4 windows (the theme brush), so a single global style would need an override anyway; per-window attributes made the real difference between the Mica and non-Mica windows explicit rather than hidden behind an exception to a global rule
+- **Skip the risk-staged verification order and migrate all 5 windows in one pass:** rejected — the two real bugs above were caught specifically *because* `SettingsWindow` (simplest, 0 custom styles) was verified first in isolation; finding the same bugs for the first time on `MainWindow` (52 style/template references) would have made root-causing them meaningfully harder
 
 ---
 

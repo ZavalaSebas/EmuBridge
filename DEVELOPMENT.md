@@ -1018,7 +1018,7 @@ WPF follows the XAML declaration order by default — if your layout matches the
 
 ### Focus Indicators
 
-Bridge doesn't have WPF-UI integrated yet — decided in the original foundation document (WPF + WPF-UI over WinUI 3), but never actually installed; confirmed via the 2026-08-06 documentation audit that Bridge ships on stock WPF today (see PLAN.md → Roadmap → Phase Polish). Stock WPF's own default focus visual is sufficient for keyboard users to see where they are. **Do not disable or remove it** without providing an accessible replacement, and re-verify this guidance once WPF-UI is actually integrated — its own focus-indicator behavior may differ.
+WPF-UI is integrated (2026-08-05, ARCHITECTURE.md → ADR-29). Re-verified as this guidance's own note required: WPF-UI ships its own `FocusVisualStyle` (`DefaultFocusVisualStyle.xaml`, a rounded rectangle using `KeyboardFocusBorderColorBrush` instead of stock WPF's dotted rectangle) — confirmed present and visible, not disabled. **Do not disable or remove it** without providing an accessible replacement.
 
 ### Keyboard Shortcuts
 
