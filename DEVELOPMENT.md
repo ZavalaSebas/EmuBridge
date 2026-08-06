@@ -4,7 +4,9 @@ This document serves as a guide to this specific project AND as a reference for 
 
 ---
 
-## Current Status (as of 2026-08-03)
+## Current Status (as of 2026-08-06)
+
+**v1.0.0 shipped — Phase Polish complete.** All 7 items are done and verified (clean Release build, 373 `EmuBridge.Tests` + 16 `ManifestDriftCheck.Tests` passing, plus an isolated-publish launch smoke test): WPF-UI/Mica (ADR-29), transition animations, theme customization (ADR-31), welcome sentinel + what's-new (ADR-32), self-updater (ADR-33), sponsor/About (ADR-34), and the general UI pass. The v1.0 criterion — all of Phase 2 + all of Phase Polish (ADR-17) — is met. Phase 3 (metadata source, cheats/mods, RetroAchievements, disc-based systems) remains open and unstarted. The rest of this section is the chronological record leading up to it.
 
 Phase 1 (v0.1.0) shipped as a tagged GitHub Release. Phase 2 work has started: `EmulatorConfig` was replaced by an `Emulator`/`EmulatorProfile` split (one physical install can now back many per-platform launch configs — see ARCHITECTURE.md → ADR-11) plus a `DownloadVerificationService` (pinned-hash + exact-size verified downloads, staging-then-verify, never-fail-silently on mismatch) and a `KnownEmulators.json` catalog. Existing legacy `EmulatorConfig` data migrates automatically on first open. **The install orchestration is built, proven end-to-end, and has now been interactively tested for real across all 15 of 15 seed platforms** — `EmulatorInstallerService` downloads, extracts (`SharpCompress`, pure managed), and registers a working `Emulator`/`EmulatorProfile` for a platform, exposed via a new "Auto-Install" button in `SettingsWindow` (see ARCHITECTURE.md → ADR-14). 187 unit tests pass in Release, 186 in Debug — the Release-only manifest guard test passes because all 15 `KnownEmulatorCore` entries are fully verified data-wise, and now every one of them is also proven by a real Auto-Install click that launched a game. No seed platform remains data-verified-only.
 
@@ -183,6 +185,8 @@ EmuBridge/
 - `AssemblyVersion` derives from `$(Version)` so assembly version is correct (e.g., `0.1.0.0`)
 - **Updater pattern** (optional): fetch `https://api.github.com/repos/{owner}/{repo}/releases/latest`, compare `Version.TryParse(tag.TrimStart('v'))` against `Config.AssemblyVersion`. If remote is newer, download the `.exe` asset.
 
+  > **Implemented (2026-08-06, ADR-33):** this reference pattern is now the real `Services/UpdateService.cs` (`IUpdateService`), wired into startup + Settings. `UpdateService` adds SHA-256 verification (digest from the release asset metadata, `sha256:` prefix) before the swap, a `.old` rollback on the second move's failure, `CleanupOldExecutable()` on startup, and the same `Environment.Exit(0)` relaunch below. The check and apply surfaces are a silent startup check (gated by a Settings toggle, default on) plus a "Check for Updates Now" button.
+
   The most critical part is the **safe executable swap** — never overwrite the running `.exe` directly:
 
   ```csharp
@@ -206,6 +210,8 @@ EmuBridge/
 ### Welcome Sentinel
 
 Show a welcome dialog on first launch or after a version change:
+
+> **Implemented (2026-08-06, ADR-32):** this reference pattern is now the real `Services/WelcomeSentinelService.cs` (`IWelcomeSentinelService`), wired into `App.OnStartup` via `ShowWelcomeIfNewVersion`. Sentinel file: `%LocalAppData%\EmuBridge\welcome_sentinel.txt`, version-stamped. `ShouldShowWelcome()` returns true on first run or when the stamped version differs from the current assembly version; `MarkWelcomeShown()` writes the current version best-effort (logging only). The dialog is `WelcomeWindow.xaml`.
 
 ```csharp
 // In Config.cs
@@ -843,6 +849,8 @@ dotnet run --project EmuBridge/EmuBridge.csproj
 ---
 
 ## Branding & Sponsorship
+
+> **Implemented (2026-08-06, ADR-34):** the footer link, About dialog, and disclaimer below are now real — a persistent footer on `MainWindow` (version text, About button, "♥ Support on Ko-fi" link), `AboutWindow.xaml` (credits, GPL-3.0 license hyperlink, ROM-acquisition disclaimer), and `Config.SponsorUrl` → Ko-fi. `MainViewModel.OpenSponsorCommand`/`OpenAboutCommand` raise the `OpenAboutRequested` action handled in `App.OnStartup`.
 
 ### Heart Icon in Status Bar
 

@@ -8,7 +8,7 @@
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="Mica"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-        WindowState="{Binding IsBigPictureMode, Converter={StaticResource BoolToWindowStateConverter}}">
+        WindowState="{Binding IsBigPictureMode, Converter={StaticResource BoolToWindowStateConverter}, Mode=OneWay}">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
@@ -16,6 +16,10 @@
         <!-- Bypasses WPF's own process-level bitmap cache — see ARCHITECTURE.md -> ADR-23 (Update)
              and DEVELOPMENT.md -> Image Loading. -->
         <conv:CachedImagePathConverter x:Key="CachedImagePathConverter" />
+
+        <!-- Glyphs are Segoe MDL2 Assets (free, ships with Windows 10/11 — no image assets). -->
+        <!-- PillButtonStyle/PrimaryButtonStyle/GlyphTextStyle live in App.xaml (shared with the
+             Settings/Welcome/About windows). -->
 
         <!-- One shared menu for every tile now (View Details applies to any game; Remove from
              Library stays IsMissing-only, ADR-15) — only one instance is ever open at a time, so
@@ -52,95 +56,208 @@
                       CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
         </ContextMenu>
 
+        <!-- The game tile card. Both tile templates (normal grid + Big Picture) are cards with this
+             shared look: rounded corners, a 1px divider border that flips to the brand gradient on
+             hover, a soft radial glow that fades in behind the hovered card (a brush, not a
+             DropShadowEffect — see App.xaml's TileHoverGlowBrush comment), and a gentle scale-up.
+             Foreground is set explicitly because this keyed style replaces WPF-UI's implicit Button
+             style (a keyed style can't BasedOn an implicit one) — without it, tile text falls back
+             to stock WPF's black button foreground (the black-on-dark bug class ADR-29 fixed
+             per-window, fixed here per-style). -->
+        <Style x:Key="CardButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Glow" CornerRadius="12" Margin="-2"
+                                    Background="{StaticResource TileHoverGlowBrush}"
+                                    Opacity="0" IsHitTestVisible="False" />
+                            <Border x:Name="Card" CornerRadius="12"
+                                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <ContentPresenter />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource EmuBridgeAccentGradientBrush}" />
+                                <Setter TargetName="Card" Property="BorderThickness" Value="1.5" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.3" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource EmuBridgeAccentGradientBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <!-- IsMissing lives on the GameTile DataContext, not the Button, so it needs a
+                     DataTrigger. Dims the whole card, same intent as the old opacity dimming. -->
+                <DataTrigger Binding="{Binding IsMissing}" Value="True">
+                    <Setter Property="Opacity" Value="0.55" />
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Trigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(ScaleTransform.ScaleX)" To="1.035" Duration="0:0:0.18" />
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(ScaleTransform.ScaleY)" To="1.035" Duration="0:0:0.18" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                    <Trigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(ScaleTransform.ScaleX)" To="1" Duration="0:0:0.18" />
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(ScaleTransform.ScaleY)" To="1" Duration="0:0:0.18" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.ExitActions>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Normal grid tile: a portrait card — cover on top (clipped to the card's rounded corners
+             by the card Border's Background), title + year below, favorite star chip and missing
+             pill overlaid on the cover. -->
         <DataTemplate x:Key="GameTileTemplate" DataType="{x:Type vm:GameTile}">
             <Button Command="{Binding DataContext.LaunchGameCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                     CommandParameter="{Binding}"
                     Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                     ContextMenu="{StaticResource GameTileContextMenu}"
-                    Margin="6" Padding="0" BorderThickness="0" Background="Transparent" Cursor="Hand"
+                    Style="{StaticResource CardButtonStyle}"
                     ToolTip="{Binding Name}">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsMissing}" Value="True">
-                                <Setter Property="Opacity" Value="0.5" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Width="200">
-                    <Grid Height="300">
-                        <Border Background="#333333" CornerRadius="4">
-                            <TextBlock Text="No Cover" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Button.RenderTransform>
+                    <ScaleTransform ScaleX="1" ScaleY="1" />
+                </Button.RenderTransform>
+                <Grid Width="200" Margin="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="268" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Cover -->
+                    <Grid Grid.Row="0">
+                        <Border Background="{StaticResource CoverPlaceholderBrush}">
+                            <TextBlock Text="&#xE7FC;" Style="{StaticResource GlyphTextStyle}" FontSize="34"
+                                       Foreground="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <Image Source="{Binding CoverImagePath, Converter={StaticResource CachedImagePathConverter}}" Stretch="UniformToFill" />
-                        <TextBlock Text="&#9733;" FontSize="20" Foreground="Gold"
-                                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
-                                   Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <!-- Favorite star chip -->
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,8,0"
+                                Background="#B3000000" CornerRadius="10" Padding="6,3"
+                                Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="&#xE734;" Style="{StaticResource GlyphTextStyle}" FontSize="11" Foreground="#FFD34D" />
+                        </Border>
+
+                        <!-- Missing pill -->
+                        <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0"
+                                Background="#CC572B20" CornerRadius="9" Padding="8,3"
+                                Visibility="{Binding IsMissing, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="missing" FontSize="10" FontWeight="SemiBold" Foreground="#FFB06A" />
+                        </Border>
                     </Grid>
-                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" />
-                    <TextBlock Text="{Binding ReleaseYearText}" Foreground="Gray" FontSize="11"
-                               HorizontalAlignment="Center" Margin="0,2,0,0">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ReleaseYearText}" Value="{x:Null}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                    <TextBlock Text="(missing)" Foreground="OrangeRed" HorizontalAlignment="Center" FontSize="11"
-                               Visibility="{Binding IsMissing, Converter={StaticResource BoolToVisibilityConverter}}" />
-                </StackPanel>
+
+                    <!-- Title + year -->
+                    <StackPanel Grid.Row="1" Margin="10,10,10,12">
+                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center"
+                                   FontSize="13" FontWeight="SemiBold" LineHeight="18" />
+                        <TextBlock Text="{Binding ReleaseYearText}" TextAlignment="Center"
+                                   FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="0,3,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ReleaseYearText}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
             </Button>
         </DataTemplate>
 
-        <!-- Same bindings/ContextMenu as GameTileTemplate, just larger — Big Picture mode is a
-             different presentation of the same tiles, not different data (ARCHITECTURE.md -> ADR-22). -->
+        <!-- Same bindings/ContextMenu as GameTileTemplate, just a cinematic landscape presentation —
+             Big Picture mode is a different presentation of the same tiles, not different data
+             (ARCHITECTURE.md -> ADR-22). The cover fills the whole card and the title sits on a
+             dark scrim at the bottom, so it reads over any cover art. -->
         <DataTemplate x:Key="BigPictureTileTemplate" DataType="{x:Type vm:GameTile}">
             <Button Command="{Binding DataContext.LaunchGameCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                     CommandParameter="{Binding}"
                     Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                     ContextMenu="{StaticResource GameTileContextMenu}"
-                    Margin="10" Padding="0" BorderThickness="0" Background="Transparent" Cursor="Hand"
+                    Style="{StaticResource CardButtonStyle}"
                     ToolTip="{Binding Name}">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsMissing}" Value="True">
-                                <Setter Property="Opacity" Value="0.5" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel Width="460">
-                    <Grid Height="215">
-                        <Border Background="#333333" CornerRadius="6">
-                            <TextBlock Text="No Cover" Foreground="Gray" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <Image Source="{Binding BigPictureCoverImagePath, Converter={StaticResource CachedImagePathConverter}}" Stretch="UniformToFill" />
-                        <TextBlock Text="&#9733;" FontSize="28" Foreground="Gold"
-                                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0"
-                                   Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}" />
-                    </Grid>
-                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" FontSize="16" Margin="0,8,0,0" />
-                    <TextBlock Text="{Binding ReleaseYearText}" Foreground="Gray" FontSize="13"
-                               HorizontalAlignment="Center" Margin="0,2,0,0">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding ReleaseYearText}" Value="{x:Null}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                    <TextBlock Text="(missing)" Foreground="OrangeRed" HorizontalAlignment="Center" FontSize="13"
-                               Visibility="{Binding IsMissing, Converter={StaticResource BoolToVisibilityConverter}}" />
-                </StackPanel>
+                <Button.RenderTransform>
+                    <ScaleTransform ScaleX="1" ScaleY="1" />
+                </Button.RenderTransform>
+                <Grid Width="430" Height="200" Margin="6">
+                    <Border Background="{StaticResource CoverPlaceholderBrush}">
+                        <TextBlock Text="&#xE7FC;" Style="{StaticResource GlyphTextStyle}" FontSize="40"
+                                   Foreground="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Image Source="{Binding BigPictureCoverImagePath, Converter={StaticResource CachedImagePathConverter}}" Stretch="UniformToFill" />
+
+                    <!-- Title scrim -->
+                    <Border VerticalAlignment="Bottom" Background="{StaticResource BigPictureScrimBrush}" Padding="14,20">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="White" />
+                            <TextBlock Text="{Binding ReleaseYearText}" FontSize="12" Foreground="#CFFFFFFF" Margin="0,2,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#CFFFFFFF" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ReleaseYearText}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Favorite star chip -->
+                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0"
+                            Background="#B3000000" CornerRadius="12" Padding="8,4"
+                            Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="&#xE734;" Style="{StaticResource GlyphTextStyle}" FontSize="13" Foreground="#FFD34D" />
+                    </Border>
+
+                    <!-- Missing pill -->
+                    <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0"
+                            Background="#CC572B20" CornerRadius="10" Padding="10,4"
+                            Visibility="{Binding IsMissing, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="missing" FontSize="11" FontWeight="SemiBold" Foreground="#FFB06A" />
+                    </Border>
+                </Grid>
             </Button>
         </DataTemplate>
     </Window.Resources>
@@ -149,41 +266,167 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <ui:TitleBar Grid.Row="0" Title="EmuBridge" />
 
-        <!-- Toolbar -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8">
-            <Button Content="Add Folder" Command="{Binding AddFolderCommand}"
-                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
-                    Margin="0,0,8,0" Padding="10,4" />
-            <Button Content="Rescan" Command="{Binding RefreshLibraryCommand}"
-                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
-                    Margin="0,0,8,0" Padding="10,4" />
-            <Button Content="Settings" Command="{Binding OpenSettingsCommand}" Padding="10,4" Margin="0,0,16,0" />
+        <!-- Brand bar: wordmark on the left, primary/secondary actions on the right. -->
+        <Grid Grid.Row="1" Margin="18,10,18,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Sort:" VerticalAlignment="Center" Margin="0,0,4,0" />
-            <ComboBox SelectedValue="{Binding SortMode}" SelectedValuePath="Tag" Width="140" Margin="0,0,12,0">
-                <ComboBoxItem Content="Name" Tag="{x:Static vm:LibrarySortMode.Name}" />
-                <ComboBoxItem Content="Recently Played" Tag="{x:Static vm:LibrarySortMode.RecentlyPlayed}" />
-                <ComboBoxItem Content="Favorites First" Tag="{x:Static vm:LibrarySortMode.FavoritesFirst}" />
-            </ComboBox>
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Width="30" Height="30" CornerRadius="9"
+                        Background="{StaticResource EmuBridgeAccentGradientBrush}" Margin="0,0,11,0">
+                    <TextBlock Text="&#xE7FC;" Style="{StaticResource GlyphTextStyle}" FontSize="15"
+                               Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="EmuBridge" FontSize="23" FontWeight="Bold" VerticalAlignment="Center">
+                    <TextBlock.Foreground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#7C5CFF" Offset="0" />
+                            <GradientStop Color="#FF5FA2" Offset="1" />
+                        </LinearGradientBrush>
+                    </TextBlock.Foreground>
+                </TextBlock>
+            </StackPanel>
 
-            <CheckBox Content="Favorites only" IsChecked="{Binding ShowFavoritesOnly}" VerticalAlignment="Center" Margin="0,0,16,0" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding AddFolderCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
+                        Margin="0,0,8,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE710;" Style="{StaticResource GlyphTextStyle}" FontSize="12" Margin="0,0,7,0" />
+                        <TextBlock Text="Add Folder" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource PillButtonStyle}" Command="{Binding RefreshLibraryCommand}"
+                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
+                        Margin="0,0,8,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE72C;" Style="{StaticResource GlyphTextStyle}" FontSize="12" Margin="0,0,7,0" />
+                        <TextBlock Text="Rescan" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource PillButtonStyle}" Command="{Binding OpenSettingsCommand}"
+                        ToolTip="Settings" Width="38">
+                    <TextBlock Text="&#xE713;" Style="{StaticResource GlyphTextStyle}" FontSize="14" HorizontalAlignment="Center" />
+                </Button>
+            </StackPanel>
+        </Grid>
 
-            <CheckBox Content="Big Picture" IsChecked="{Binding IsBigPictureMode}" VerticalAlignment="Center" />
-        </StackPanel>
+        <!-- Hero banner: a compact brand-gradient strip over the library — shows how many games are
+             ready. Collapses to nothing when no scan folders exist yet (the empty state takes over). -->
+        <Border Grid.Row="2" Margin="18,14,18,0" Padding="20,15" CornerRadius="14"
+                Background="{StaticResource EmuBridgeAccentGradientBrush}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasNoScanFolders}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Grid>
+                <StackPanel>
+                    <TextBlock Text="Your library, ready to play." FontSize="17" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="{Binding Games.Count, StringFormat={}{0} games ready}" FontSize="12"
+                               Foreground="#DDFFFFFF" Margin="0,4,0,0" />
+                </StackPanel>
+                <TextBlock Text="&#xE7FC;" Style="{StaticResource GlyphTextStyle}" FontSize="46"
+                           Foreground="#26FFFFFF" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" />
+            </Grid>
+        </Border>
+
+        <!-- Filter bar: sort/filter controls in a subtle card, with the game count on the right. -->
+        <Border Grid.Row="3" Margin="18,12,18,14" Padding="14,9" CornerRadius="12"
+                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Sort:" VerticalAlignment="Center" Margin="0,0,8,0"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <ComboBox SelectedValue="{Binding SortMode}" SelectedValuePath="Tag" Width="150" Margin="0,0,20,0">
+                        <ComboBoxItem Content="Name" Tag="{x:Static vm:LibrarySortMode.Name}" />
+                        <ComboBoxItem Content="Recently Played" Tag="{x:Static vm:LibrarySortMode.RecentlyPlayed}" />
+                        <ComboBoxItem Content="Favorites First" Tag="{x:Static vm:LibrarySortMode.FavoritesFirst}" />
+                    </ComboBox>
+                    <CheckBox Content="Favorites only" IsChecked="{Binding ShowFavoritesOnly}" VerticalAlignment="Center" Margin="0,0,20,0" />
+                    <CheckBox Content="Big Picture" IsChecked="{Binding IsBigPictureMode}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding Games.Count, StringFormat={}{0} games}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
 
         <!-- Content -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="4">
+            <!-- Phase Polish -> "Polished transition animations": fade the whole content area in
+                 whenever the mode changes (Library <-> Big Picture). Both triggers fire on their
+                 respective toggle, so switching views reads as a soft crossfade instead of a hard
+                 cut — the same underlying data, just re-presented (ADR-22). -->
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsBigPictureMode}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.25" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsBigPictureMode}" Value="False">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.25" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+
             <!-- Empty state: no scan folders configured yet -->
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="420"
                         Visibility="{Binding HasNoScanFolders, Converter={StaticResource BoolToVisibilityConverter}}">
-                <TextBlock Text="No ROM folders configured yet" FontSize="16" HorizontalAlignment="Center" Margin="0,0,0,12" />
-                <Button Content="Add Folder" Command="{Binding AddFolderCommand}" Padding="20,10" HorizontalAlignment="Center" />
+                <Border Width="92" Height="92" CornerRadius="46"
+                        Background="{StaticResource EmuBridgeAccentGradientBrush}" Margin="0,0,0,20">
+                    <Border.Effect>
+                        <!-- Static, single-element halo around the empty-state icon — cheap enough to
+                             be the one allowed shadow in the app; tiles themselves use the radial glow
+                             brush instead (see CardButtonStyle). -->
+                        <DropShadowEffect BlurRadius="28" ShadowDepth="0" Opacity="0.45" Color="#7C5CFF" />
+                    </Border.Effect>
+                    <TextBlock Text="&#xE7FC;" Style="{StaticResource GlyphTextStyle}" FontSize="38"
+                               Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="No ROM folders yet" FontSize="21" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                <TextBlock Text="Add a folder and EmuBridge will detect your games, fetch cover art, and hook up the right emulator — no setup by hand."
+                           FontSize="13" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,22" />
+                <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding AddFolderCommand}" HorizontalAlignment="Center" Padding="26,11">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE710;" Style="{StaticResource GlyphTextStyle}" FontSize="12" Margin="0,0,8,0" />
+                        <TextBlock Text="Add Folder" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <!-- Cover grid (normal mode) -->
@@ -244,7 +487,8 @@
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
-                    <TextBlock Text="Try Something New" FontSize="22" FontWeight="Bold" Margin="16,16,16,8" />
+                    <TextBlock Text="Try Something New" FontSize="21" FontWeight="Bold" Margin="18,14,16,6"
+                               Foreground="{StaticResource EmuBridgeAccent2Brush}" />
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                         <ItemsControl ItemsSource="{Binding TrySomethingNewGames}" ItemTemplate="{StaticResource BigPictureTileTemplate}">
                             <ItemsControl.ItemsPanel>
@@ -271,16 +515,41 @@
         </Grid>
 
         <!-- Status bar: scan/box-art progress -->
-        <Grid Grid.Row="3" Margin="8" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+        <Grid Grid.Row="5" Margin="18,0,18,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
                 <ProgressBar IsIndeterminate="True" Height="4" Margin="0,0,0,4" />
-                <TextBlock Text="{Binding StatusMessage}" />
+                <TextBlock Text="{Binding StatusMessage}" FontSize="12" />
             </StackPanel>
-            <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelCommand}" Padding="10,4" Margin="8,0,0,0" />
+            <Button Grid.Column="1" Content="Cancel" Style="{StaticResource PillButtonStyle}"
+                    Command="{Binding CancelCommand}" Margin="12,0,0,0" />
+        </Grid>
+
+        <!-- Footer: version, About/credits, and the sponsor link — always reachable, never in the
+             way. The Ko-fi button uses the brand gradient so the one sponsorship surface in the app
+             is also its most eye-catching. -->
+        <Grid Grid.Row="6" Margin="18,10,18,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="{Binding AppVersionText}"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="11"
+                       VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="About" Style="{StaticResource PillButtonStyle}"
+                        Command="{Binding OpenAboutCommand}" Padding="12,5" Margin="0,0,8,0" />
+                <Button Style="{StaticResource PrimaryButtonStyle}" Command="{Binding OpenSponsorCommand}"
+                        ToolTip="Support the project" Padding="12,5">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xEA5A;" Style="{StaticResource GlyphTextStyle}" FontSize="12" Margin="0,0,6,0" />
+                        <TextBlock Text="Support on Ko-fi" FontSize="12" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </Grid>
     </Grid>
 </ui:FluentWindow>

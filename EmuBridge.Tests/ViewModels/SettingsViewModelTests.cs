@@ -14,6 +14,8 @@ public class SettingsViewModelTests
     private readonly FakeSettingsService _settingsService = new();
     private readonly FakeFilePickerService _filePicker = new();
     private readonly FakeMessageBoxService _messageBox = new();
+    private readonly FakeThemeService _themeService = new();
+    private readonly FakeUpdateService _updateService = new();
     private readonly SettingsViewModel _viewModel;
 
     public SettingsViewModelTests()
@@ -22,7 +24,7 @@ public class SettingsViewModelTests
         _repository.Platforms.Add(new Platform { Id = "nes", Name = "NES", Extensions = ["nes"] });
         _repository.Platforms.Add(new Platform { Id = "snes", Name = "SNES", Extensions = ["sfc"] });
 
-        _viewModel = new SettingsViewModel(_repository, _emulatorService, _installerService, _settingsService, _filePicker, _messageBox);
+        _viewModel = new SettingsViewModel(_repository, _emulatorService, _installerService, _settingsService, _filePicker, _messageBox, _themeService, _updateService);
     }
 
     [Fact]
@@ -298,6 +300,136 @@ public class SettingsViewModelTests
         await installTask;
 
         Assert.Equal("Cancelled.", _viewModel.StatusMessage);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LoadsPersistedTheme()
+    {
+        _settingsService.Theme = ThemePreference.Dark;
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Equal(ThemePreference.Dark, _viewModel.ThemePreference);
+    }
+
+    // Guarded by _isInitialized: loading the persisted value during InitializeAsync must not
+    // re-apply or re-write it — only a real user change should.
+    [Fact]
+    public async Task InitializeAsync_DoesNotApplyOrRewriteTheLoadedTheme()
+    {
+        _settingsService.Theme = ThemePreference.Dark;
+
+        await _viewModel.InitializeAsync();
+
+        Assert.Null(_themeService.LastAppliedTheme);
+        Assert.Equal(ThemePreference.Dark, _settingsService.Theme); // unchanged, still the loaded value
+    }
+
+    [Fact]
+    public async Task ChangingTheme_AppliesItAndPersistsIt()
+    {
+        await _viewModel.InitializeAsync();
+
+        _viewModel.ThemePreference = ThemePreference.Light;
+
+        Assert.Equal(ThemePreference.Light, _themeService.LastAppliedTheme);
+        Assert.Equal(ThemePreference.Light, _settingsService.Theme);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LoadsCheckForUpdatesOnStartup()
+    {
+        _settingsService.CheckForUpdatesOnStartup = false;
+
+        await _viewModel.InitializeAsync();
+
+        Assert.False(_viewModel.CheckForUpdatesOnStartup);
+    }
+
+    [Fact]
+    public async Task TogglingCheckForUpdatesOnStartup_PersistsIt()
+    {
+        await _viewModel.InitializeAsync();
+
+        _viewModel.CheckForUpdatesOnStartup = false;
+
+        Assert.False(_settingsService.CheckForUpdatesOnStartup);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesCommand_NoUpdateAvailable_ShowsInfoMessage()
+    {
+        await _viewModel.InitializeAsync();
+        _updateService.NextCheckResult = new UpdateCheckResult
+        {
+            IsUpdateAvailable = false,
+            CurrentVersionText = "1.0.0"
+        };
+
+        await _viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.True(_messageBox.ShowCalled);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesCommand_UserDeclines_DoesNotApply()
+    {
+        await _viewModel.InitializeAsync();
+        _updateService.NextCheckResult = new UpdateCheckResult
+        {
+            IsUpdateAvailable = true,
+            CurrentVersionText = "0.10.0",
+            LatestVersionText = "1.0.0"
+        };
+        _messageBox.NextResult = MessageBoxResult.No;
+
+        await _viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Null(_updateService.LastAppliedUpdate);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesCommand_UserConfirms_AppliesUpdate()
+    {
+        await _viewModel.InitializeAsync();
+        var update = new UpdateCheckResult
+        {
+            IsUpdateAvailable = true,
+            CurrentVersionText = "0.10.0",
+            LatestVersionText = "1.0.0"
+        };
+        _updateService.NextCheckResult = update;
+        _messageBox.NextResult = MessageBoxResult.Yes;
+
+        await _viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Same(update, _updateService.LastAppliedUpdate);
+        Assert.False(_viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesCommand_ApplyFails_ShowsErrorMessage()
+    {
+        await _viewModel.InitializeAsync();
+        _updateService.NextCheckResult = new UpdateCheckResult
+        {
+            IsUpdateAvailable = true,
+            CurrentVersionText = "0.10.0",
+            LatestVersionText = "1.0.0"
+        };
+        _updateService.NextApplyResult = new UpdateApplyResult
+        {
+            Outcome = UpdateApplyOutcome.VerificationFailed,
+            ErrorMessage = "The downloaded update failed verification and was not applied."
+        };
+        _messageBox.NextResult = MessageBoxResult.Yes;
+
+        await _viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Equal("The downloaded update failed verification and was not applied.", _messageBox.LastMessage);
         Assert.False(_viewModel.IsBusy);
     }
 }

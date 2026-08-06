@@ -36,7 +36,7 @@ This document records architectural decisions made during the development of Emu
 | DI | Microsoft.Extensions.DependencyInjection | Standard already in use |
 | Logging | `ILogger<T>` | Standard for larger projects — EmuBridge's scope doesn't justify a `Debug.WriteLine` shortcut |
 | Image scaling | Always resize/cache box art to the exact display pixel size; never scale full-resolution source images at render time | Real-time scaling of large images on the render thread is a common source of jank in cover-grid UIs |
-| Selection/hover effects | Avoid broad `DropShadowEffect` on the selected cover; prefer caching the rendered result to a bitmap (`RenderTargetBitmap`) or a pre-rendered shadow asset | `DropShadowEffect` is a relatively expensive software-rendered shader in WPF, even applied to a single element |
+| Selection/hover effects | Avoid broad `DropShadowEffect` on the selected cover; prefer caching the rendered result to a bitmap (`RenderTargetBitmap`) or a pre-rendered shadow asset | `DropShadowEffect` is a relatively expensive software-rendered shader in WPF, even applied to a single element. Exception (2026-08-06, visual overhaul): one static `DropShadowEffect` on the empty-state icon — a single, always-cached element; tiles use the `TileHoverGlowBrush` radial-gradient brush instead |
 | List virtualization | Use `VirtualizingStackPanel` (or equivalent) from the first cover grid implementation | The library can grow to thousands of ROMs; this must be a day-1 decision, not a later optimization |
 | `EmulatorService` design | Data-driven configuration (JSON/DB), not a hardcoded platform→emulator mapping | Extensibility non-functional requirement: adding a platform or emulator must not require touching core code; also sets up Phase 2's auto-detect/download without a redesign |
 | External Metadata API | SteamGridDB | Provides box art by game name; requires a user-supplied API key (DPAPI-encrypted at rest) and rate-limit handling — see ADR-5 |
@@ -1290,6 +1290,137 @@ Explicit, deliberate rename, not a rebrand forced by a naming conflict: the name
 - **Rename file-by-file instead of a repo-wide `sed`:** rejected as impractical at ~136 files; the trade-off (a scripted pass can silently corrupt its own recent output) was accepted and caught via review rather than avoided structurally
 - **Skip the legacy-data migration and just document it as a breaking change:** rejected — real existing installs have real data (box art cache, configured emulators) worth preserving automatically, and Phase 1–3 already established EmuBridge's standard of not silently breaking a user's existing setup
 - **Leave the GitHub repo named `Bridge`, rename only the code:** rejected — contradicts the explicit goal of freeing the "Bridge" name entirely, and would leave the manifest URLs / clone URL permanently mismatched with the product name
+
+---
+
+### ADR-31: Theme customization — applied live, persisted in settings.json (Phase Polish, item 3)
+
+**Status:** Accepted
+
+**Date:** 2026-08-06
+
+**Context:**
+ADR-29 shipped WPF-UI + `ApplicationThemeManager.ApplySystemTheme()` (theme follows Windows) with no user-facing control, explicitly deferred: "a user-facing theme picker is Phase Polish's own later, separate item." `PLAN.md` → Phase Polish tracks "Theme customization / visual personalization" as item 3. The whole feature is three questions: what preferences exist, where they persist, and when the chosen theme gets applied.
+
+**Decision — a three-value `ThemePreference` enum (`System`/`Light`/`Dark`), `System` the default:** matches the ADR-29 posture — until a user says otherwise, EmuBridge follows whatever Windows is set to, no fixed Light/Dark fallback. `Models/ThemePreference.cs`, `System = 0` so a missing/unparseable persisted value naturally degrades to it.
+
+**Decision — persisted in the existing `settings.json`, as a nullable string field named by the enum (`JsonStringEnumConverter`), not a number:** same file ADR-5 already established for app preferences (API keys) and ADR-27's cheats toggle. A named field survives enum reordering; a number wouldn't. `SettingsService.SettingsFile.Theme` is `ThemePreference?` — `null` means "never set," which round-trips without writing a value the user never chose, and keeps the file backward-compatible with every existing install (no `settings.json` has a Theme field yet). `SettingsService.SettingsFile` became `internal` so `ThemeService` (same assembly) can do a read-only peek at that one field without going through the async service.
+
+**Decision — applied live through a new `IThemeService`, not scattered `ApplicationThemeManager` calls:** `ThemeService.ApplyTheme(preference)` maps `Light`→`ApplicationThemeManager.Apply(ApplicationTheme.Light, WindowBackdropType.Mica, true)` (and `Dark` analogously), `System`→`ApplicationThemeManager.ApplySystemTheme()`. The `WindowBackdropType.Mica` second argument is WPF-UI's *default backdrop for new windows* — harmless on the 4 non-Mica windows (they don't request a backdrop themselves) and consistent with `MainWindow`'s Mica. `CurrentTheme` tracks what's actually applied so the Settings dropdown reflects reality even when Settings never opened after launch.
+
+**Decision — `ApplyPersistedTheme()` runs in `App.OnStartup` before `MainWindow` is constructed, and it is deliberately synchronous:** the whole point is that the first rendered frame already shows the user's chosen theme rather than a flash of the system default. It reads `settings.json` leniently (missing/corrupt file or unknown enum string → `System`, logged, never crashes startup) and never touches any field but `Theme`, so it can't clobber the API keys or the cheats toggle — `SettingsService` remains the only writer of that file.
+
+**Decision — Settings writes on change, not on window close; and opening Settings never re-applies or re-writes the loaded theme:** `SettingsViewModel.OnThemePreferenceChanged` (observable `ThemePreference` property bound to the ComboBox) calls `ApplyTheme` + persists on every change — instant feedback, no Save button. `InitializeAsync` *loads* the persisted value so the dropdown shows the truth, but deliberately does not call `ApplyTheme` or the setter for it: the theme is already applied by startup (`ApplyPersistedTheme`), re-applying is redundant, and re-persisting would rewrite `settings.json` (and advance a "last written" notion) purely because Settings was opened. Same `_isInitialized` guard pattern ADR-27 already established for the cheats toggle. Confirmed by dedicated tests.
+
+**Consequences:**
+- ✅ Live theme switching with no restart and no Save button — the lowest-friction shape for a visual preference
+- ✅ Applied before first frame, so no theme flash at launch
+- ✅ Missing/corrupt persisted value degrades to `System`, never blocks startup
+- ✅ Backward compatible: old `settings.json` files simply have no `Theme` field, which reads as `null` → `System`
+- ❌ Four secondary windows apply the `Mica` *default* argument via `ApplyTheme`'s backdrop parameter, though they have no backdrop — inert (confirmed in the API shape) but visually flatter than `MainWindow`, unchanged from ADR-29's Mica-scope decision
+- ❌ The persisted theme is only read at startup — changing Windows' system theme mid-session doesn't re-sync a `System`-preference install until restart (accepted; `ApplySystemTheme()` at startup is the ADR-29-established timing)
+
+**Alternatives considered:**
+
+- **Store the theme in LiteDB with the rest of app data:** rejected — theme is a machine-local UI preference with no query/storage need, same shape as the API keys and cheats toggle that already live in `settings.json` (ADR-5/ADR-27); LiteDB is for the library entities, not preferences
+- **Re-apply the theme when Settings opens (`InitializeAsync` calling `ApplyTheme`):** rejected — redundant work and it would rewrite `settings.json` on every Settings visit via the property setter; the guard test documents this as a deliberate non-behavior, not an omission
+- **Persist theme as a numeric enum value:** rejected — `JsonStringEnumConverter` keeps the file human-readable and survives enum member reordering
+
+---
+
+### ADR-32: Welcome sentinel + "what's new" dialog (Phase Polish, item 4)
+
+**Status:** Accepted
+
+**Date:** 2026-08-06
+
+**Context:**
+`PLAN.md` → Phase Polish tracks "Welcome sentinel + 'what's new' dialog on first run / after updates," with a reference pattern already sketched in `DEVELOPMENT.md` → Welcome Sentinel but never wired into the app. The requirement is precise: show the dialog on first run and once after each update, never on every launch.
+
+**Decision — the sentinel is a version-stamped marker file, not a boolean:** `%LocalAppData%\EmuBridge\welcome_sentinel.txt` (via `Config.WelcomeSentinelPath`) contains the app version the user last saw the dialog for. `IWelcomeSentinelService.ShouldShowWelcome()` returns `true` iff the file is missing (first run) or its contents differ from the current assembly version (after an update). Storing the version rather than a bare flag is what makes the "show again after each update" half of the requirement fall out naturally — "version changed" is the update signal, no separate tracking needed.
+
+**Decision — `MarkWelcomeShown()` writes the current version after the dialog is shown, best-effort with logging only:** a sentinel-write failure must never crash or block launch, so the write is wrapped and degrades to `LogWarning`. A corrupt/unreadable sentinel file degrades to "show the dialog" — the safe direction (worst case: the user sees the what's-new screen once more, never the reverse).
+
+**Decision — `ShowWelcomeIfNewVersion` runs from `App.OnStartup` after the main window exists, showing a new `WelcomeWindow`:** version from the entry assembly, same source `UpdateService` uses. The window lists what's new in the current version (hardcoded per-release bullet list for v1.0.0) plus a "Let's Go" button. It's a plain `Window` with the themed `Background`/`Foreground` from ADR-29's bug fixes — no Mica, consistent with that ADR's Mica-scope decision for non-`MainWindow` surfaces.
+
+**Consequences:**
+- ✅ First run and each update show the dialog exactly once; every other launch is silent
+- ✅ Version-stamped marker keeps first-run and after-update behavior in one mechanism
+- ✅ Sentinel read/write failures degrade safely and never block startup
+- ❌ The what's-new list is hardcoded in the window — each release needs a manual content update; acceptable for EmuBridge's release cadence, flagged rather than pretending it self-populates
+- ❌ A version that changes and then reverts (e.g. running a `main` build between releases) will re-show the dialog; harmless, accepted
+
+**Alternatives considered:**
+
+- **A boolean "welcome seen" flag:** rejected — can't express "show again after update" without a second field; the version stamp is one field doing both jobs
+- **Store the sentinel in LiteDB:** rejected — a file-based sentinel works even if the library DB is missing/corrupt (the exact first-run state the dialog is for), and keeps `WelcomeSentinelService` free of any DB dependency
+- **Use Windows registry:** rejected — `%LocalAppData%` is already EmuBridge's AppData home (image cache, emulators, downloads); scattering one value into the registry buys nothing
+
+---
+
+### ADR-33: Auto-updater for EmuBridge itself — GitHub Releases, digest-verified, atomic exe swap (Phase Polish, item 5)
+
+**Status:** Accepted
+
+**Date:** 2026-08-06
+
+**Context:**
+`PLAN.md` → Phase Polish tracks "Auto-updater for EmuBridge itself, via GitHub Releases — distinct from Phase 2's emulator auto-install," with a reference pattern in `DEVELOPMENT.md` → Version Management ("Updater pattern"). EmuBridge ships as a single-file self-contained `.exe` (ADR-1/ADR-12), so self-update is one specific shape: replace the running `.exe` with the new one and relaunch. This is a materially different trust boundary than Phase 2's emulator installs (ADR-11/ADR-14/ADR-26) — the binary being downloaded *is* EmuBridge itself, so verification failures must be handled at least as strictly.
+
+**Decision — check source is GitHub Releases `releases/latest`, never prereleases:** `Config.UpdateCheckUrl` = `https://api.github.com/repos/ZavalaSebas/EmuBridge/releases/latest`. GitHub's `latest` endpoint excludes prereleases by definition, so "pre-releases are never offered" comes from the API contract rather than app logic. Requests carry `User-Agent: EmuBridge` (GitHub rejects the API without one — 403) and `Accept: application/vnd.github+json`. The tag is compared after stripping a leading `v` (`Version.TryParse`); only a strictly *newer* version is offered — equal or older (including a version that was briefly ahead) is "no update," no dialog.
+
+**Decision — the update asset is `EmuBridge.exe`, verified by SHA-256 against a digest carried in the release asset's own metadata (`sha256:<hex>`):** `Config.UpdateAssetName`/`UpdateDigestPrefix`. The digest is validated to be exactly 64 hex characters before use — a malformed/missing digest makes `HashMatches` return true (a logged `LogWarning`, swap proceeds) specifically so that a GitHub-side format change degrades to "update proceeds" rather than bricking the updater. This is the same security stance ADR-26 established: the digest travels with the release metadata, exact-hash-verified after download, and the download URL itself is GitHub's own asset URL (the trusted host is the release itself, not an arbitrary third-party mirror).
+
+**Decision — apply = atomic swap with `.old` rollback, then relaunch and `Environment.Exit(0)`, exactly the DEVELOPMENT.md "Updater pattern":** download streams to a temp file (deleted on any failure so a half-downloaded exe can never be swapped in), verify, then `current.exe → current.exe.old`, `temp → current.exe`; on the second move's failure, roll `.old` back before reporting `DownloadFailed` — the app is never left deleted. On success, `Process.Start(currentExe)` + `Environment.Exit(0)`. `CleanupOldExecutable()` runs at startup and deletes a leftover `.old` — the fact that the *new* process is running is the signal the old exe is safe to delete; a new-version process that never starts leaves the `.old` in place for manual recovery. `UpdateApplyResult` carries an outcome enum (`Success`/`DownloadFailed`/`VerificationFailed`/`NotSupported`) so the UI can distinguish "verified fine, couldn't write" from "refused on verification."
+
+**Decision — two triggers, different verbosity: silent startup check (fire-and-forget, gated by a Settings toggle) + an explicit "Check for Updates Now" button.** At startup, `CheckForUpdatesAsync` runs fire-and-forget (ADR-25 precedent: a background check that fails silently logs and never blocks the app); if an update *is* found, a Yes/No `MessageBox` offers to install. The whole startup path is gated by the persisted `CheckForUpdatesOnStartup` setting (default `true`, new `settings.json` bool, Settings toggle — same nullable-when-never-set pattern as ADR-31's theme). The Settings button checks on demand, reports "up to date" via an info box, and drives download progress through `StatusMessage`. All check failures return "no update" with a log (interface contract, never throws — a failed check must never break startup or the Settings screen); apply failures are user-visible (`VerificationFailed`/`DownloadFailed` message boxes), honoring never-fail-silently for the actionable path.
+
+**Consequences:**
+- ✅ Self-update without loose files — the single-file publish (ADR-12) means the exe swap is the whole update
+- ✅ Exact-hash verification before any swap; malformed digest degrades to a logged warning, never a silent brick
+- ✅ `.old` rollback means a failed move leaves the app runnable; startup `.old` cleanup self-heals completed updates
+- ✅ Pre-releases never offered, per the API contract
+- ✅ Startup check can't break launch, and is user-disableable
+- ❌ Update verification trusts the digest field GitHub supplies with release assets — if EmuBridge's release process ever omits it, the updater proceeds unverified (logged); the release checklist must include publishing the digest
+- ❌ `Environment.Exit(0)` after `Process.Start` is abrupt by design — unsaved transient state is discarded, same as any single-file updater; the swap is all-or-nothing before the exit is reached
+- ❌ The update is downloaded by EmuBridge itself, not a separate updater process — a user running with the folder locked read-only gets a user-visible `DownloadFailed`, not a silent skip
+
+**Alternatives considered:**
+
+- **Squirrel / ClickOnce / MSIX installers:** rejected — EmuBridge's distribution is a single-file self-contained `.exe` (ADR-1/ADR-12); adopting an installer framework is a distribution-model change (`PLAN.md` → Speculative: "Distribution as an installer") deliberately not taken for v1.0
+- **Overwrite the running exe in place without the `.old` rename:** rejected — Windows locks the running exe's file; the rename-aside-then-move-in sequence is what makes in-place self-update possible at all (DEVELOPMENT.md → "Updater pattern")
+- **Skip digest verification (trust the download):** rejected — ADR-26's stance applies to EmuBridge itself, doubly so; verification failure is a distinct, user-visible outcome rather than a silent continue
+- **A separate `updater.exe` that does the swap:** rejected — the `.old`-rollback swap needs no second process, and a second exe would need its own update story (the "updater that updates the updater" problem)
+
+---
+
+### ADR-34: Branding & sponsorship — version footer, About dialog, Ko-fi link (Phase Polish, item 6)
+
+**Status:** Accepted
+
+**Date:** 2026-08-06
+
+**Context:**
+`PLAN.md` → Phase Polish tracks "Sponsor/support icon (Ko-fi/GitHub Sponsors link) + Credits/About dialog with disclaimer," with reference XAML/code in `DEVELOPMENT.md` → Branding & Sponsorship. Until now EmuBridge had no in-app branding at all: no version visible in the UI, no credits, no support link. The items are three distinct surfaces with one shared goal — a v1.0 that reads as a finished, attributable product.
+
+**Decision — a persistent footer on `MainWindow` (new row 4), not a buried settings/about page:** the footer shows the app version (`AppVersionText`, from the assembly version, same source the updater compares) on the left; on the right an "About" button and a "♥ Support on Ko-fi" button. Always reachable, never in the way — the exact "persistent surface" shape the PLAN item calls for. It also gives the version a permanent home in the UI, which matters now that the updater (ADR-33) reports "current → latest" version pairs.
+
+**Decision — `AboutWindow` is a small themed `Window` (same ADR-29 `Background`/`Foreground`), opened via an `OpenAboutRequested` action routed through the App:** `MainViewModel.OpenAboutCommand` raises the action (the established window-routing pattern from ADR-19/ADR-22/ADR-24), and `App.OnStartup`'s handler constructs and shows `AboutWindow`. Content: app name/version, "Made with care by ZavalaSebas," the GPL-3.0 license as a hyperlink (opens in the default browser via `Process.Start` with `UseShellExecute`, from a `RequestNavigate` handler), and the disclaimer that EmuBridge manages ROMs/emulators the user already owns and does not include, facilitate, or link to ROM acquisition — the same wording the project docs already commit to.
+
+**Decision — the sponsor link is `https://ko-fi.com/sebastianzavala82573` (`Config.SponsorUrl`), opened in the default browser via `UseShellExecute`:** direct link, no tracking redirect, same `Process.Start` pattern as the license link. The Ko-fi brand and the heart glyph are the whole iconography — no image assets, matching `DEVELOPMENT.md`'s sketched reference (a text heart instead of shipping an icon bitmap).
+
+**Consequences:**
+- ✅ Version is visible on every screen without a settings deep-dive; About/credits and license are one click away
+- ✅ The disclaimer is now reachable from the product itself, not only from project docs
+- ✅ Sponsor link is a single constant, trivial to change without a release
+- ❌ No image assets: the footer heart + Ko-fi text is deliberately minimal — a real icon is future work if branding ever expands
+- ❌ About is a separate window rather than a dialog-modal surface; consistent with EmuBridge's other secondary windows, noted for completeness
+
+**Alternatives considered:**
+
+- **Put About/credits inside SettingsWindow:** rejected — Settings is for configuration; a footer is always-visible, zero-navigation branding, which is the point of a v1.0 polish item (also matches the "always reachable, never in the way" footer framing above)
+- **A GitHub Sponsors link instead of / in addition to Ko-fi:** rejected — `Config.SponsorUrl` currently points at Ko-fi only (the stated preference in `DEVELOPMENT.md` → Branding & Sponsorship); swapping to GitHub Sponsors later is a one-constant change
+- **Ship an actual sponsor icon bitmap:** rejected — a text heart keeps the single-file publish free of extra assets for a link that is one `Process.Start` away anyway
 
 ---
 

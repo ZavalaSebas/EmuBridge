@@ -6,7 +6,6 @@ using EmuBridge.Services;
 using EmuBridge.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui.Appearance;
 
 namespace EmuBridge;
 
@@ -63,11 +62,11 @@ public partial class App : Application
         // startup step depends on the data already being at the new path by the time it runs.
         Services.GetRequiredService<IAppDataMigrationService>().MigrateIfNeeded();
 
-        // Overrides App.xaml's Theme="Dark" fallback with whatever Windows is actually set to —
-        // "follow the system theme" was the explicit choice for this item (Phase Polish ->
-        // "Integrate WPF-UI"), not a fixed Light/Dark default. Theme customization/personalization
-        // is its own, later Phase Polish item — this doesn't add a user-facing toggle.
-        ApplicationThemeManager.ApplySystemTheme();
+        // Applies the user's persisted theme before the first window is created, so the first
+        // frame already shows it instead of a flash of the system default. Overrides App.xaml's
+        // Theme="Dark" fallback; System (follow Windows) is the default unless the user picked
+        // Light/Dark in Settings (Phase Polish -> "Theme customization").
+        Services.GetRequiredService<IThemeService>().ApplyPersistedTheme();
 
         // Fire-and-forget, deliberately not awaited: never delays showing the library, and by
         // the time a user actually clicks "Auto-Install" (a later, human-initiated action, never
@@ -76,16 +75,84 @@ public partial class App : Application
         // is silent rather than surfaced.
         _ = Services.GetRequiredService<IManifestUpdateService>().RefreshAsync();
 
+        // A running process is the signal the previous update's new version started fine, so any
+        // leftover current-exe.old from that swap is now safe to delete (UpdateService).
+        Services.GetRequiredService<IUpdateService>().CleanupOldExecutable();
+
         var mainWindow = new MainWindow();
         var mainViewModel = Services.GetRequiredService<MainViewModel>();
         mainViewModel.OpenSettingsRequested = () => OpenSettings(mainWindow);
         mainViewModel.OpenGameDetailsRequested = game => OpenGameDetails(mainWindow, game);
         mainViewModel.OpenEmulatorOverrideRequested = game => OpenEmulatorOverride(mainWindow, game);
         mainViewModel.OpenCheatsRequested = game => OpenCheats(mainWindow, game);
+        mainViewModel.OpenAboutRequested = () => OpenAbout(mainWindow);
         mainWindow.DataContext = mainViewModel;
 
         MainWindow = mainWindow;
         mainWindow.Show();
+
+        ShowWelcomeIfNewVersion(mainWindow);
+
+        // Fire-and-forget update check (respects the Settings toggle): non-blocking, never
+        // surfaces errors, and any dialog it shows is marshalled back onto the UI thread because
+        // the awaits below capture the dispatcher SynchronizationContext at this call site.
+        _ = CheckForUpdatesAsync(mainWindow);
+    }
+
+    private void ShowWelcomeIfNewVersion(Window owner)
+    {
+        var sentinel = Services.GetRequiredService<IWelcomeSentinelService>();
+        if (!sentinel.ShouldShowWelcome())
+        {
+            return;
+        }
+
+        var welcome = new WelcomeWindow { Owner = owner };
+        welcome.ShowDialog();
+        sentinel.MarkWelcomeShown();
+    }
+
+    // The auto-updater's startup path (Phase Polish -> "Auto-updater"): silent when there's
+    // nothing newer or the check itself fails, and interactive only when an update is genuinely
+    // available — offering to download/apply it then and there. The actual swap restarts the app,
+    // so everything here is fire-and-forget from OnStartup's perspective.
+    private async Task CheckForUpdatesAsync(Window owner)
+    {
+        try
+        {
+            var settings = Services.GetRequiredService<ISettingsService>();
+            if (!await settings.GetCheckForUpdatesOnStartupAsync())
+            {
+                return;
+            }
+
+            var updateService = Services.GetRequiredService<IUpdateService>();
+            var update = await updateService.CheckForUpdateAsync();
+            if (!update.IsUpdateAvailable)
+            {
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"EmuBridge {update.CurrentVersionText} is installed, and {update.LatestVersionText} is available.\n\n" +
+                "Download and install it now? EmuBridge will restart automatically.",
+                "Update Available",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            var progress = new Progress<string>(message => owner.Title = $"EmuBridge — {message}");
+            await updateService.DownloadAndApplyAsync(update, progress);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Never let a background update check crash or nag — it's an offer, not a requirement.
+            Services.GetService<ILogger<App>>()?.LogWarning(ex, "Background update check failed.");
+        }
     }
 
     private void OpenSettings(Window owner)
@@ -134,6 +201,12 @@ public partial class App : Application
         cheatsWindow.ShowDialog();
     }
 
+    private void OpenAbout(Window owner)
+    {
+        var aboutWindow = new AboutWindow { Owner = owner };
+        aboutWindow.ShowDialog();
+    }
+
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging(builder =>
@@ -171,6 +244,9 @@ public partial class App : Application
         services.AddSingleton<IManifestUpdateService, ManifestUpdateService>();
         services.AddSingleton<IEmulatorInstallerService, EmulatorInstallerService>();
         services.AddSingleton<ICheatService, CheatService>();
+        services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<IWelcomeSentinelService, WelcomeSentinelService>();
+        services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<IMessageBoxService, MessageBoxService>();
         services.AddSingleton<IFolderPickerService, FolderPickerService>();
         services.AddSingleton<IFilePickerService, FilePickerService>();

@@ -21,6 +21,99 @@
                  parsed as a later property element) — Application.Resources loads before any Window,
                  so it's already in scope by the time MainWindow's XAML is parsed. -->
             <conv:BoolToWindowStateConverter x:Key="BoolToWindowStateConverter" />
+
+            <!-- EmuBridge brand palette (visual overhaul). A violet→magenta gradient used for the
+                 wordmark, hero banner, primary actions, section accents and card hover glows. Kept
+                 constant across Light/Dark themes — it's brand color, not background color, so it
+                 reads the same in both. -->
+            <Color x:Key="EmuBridgeAccentColor">#7C5CFF</Color>
+            <Color x:Key="EmuBridgeAccent2Color">#FF5FA2</Color>
+
+            <LinearGradientBrush x:Key="EmuBridgeAccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#7C5CFF" Offset="0" />
+                <GradientStop Color="#A64DFF" Offset="0.5" />
+                <GradientStop Color="#FF5FA2" Offset="1" />
+            </LinearGradientBrush>
+
+            <SolidColorBrush x:Key="EmuBridgeAccentBrush" Color="#7C5CFF" />
+            <SolidColorBrush x:Key="EmuBridgeAccent2Brush" Color="#FF5FA2" />
+
+            <!-- Cover placeholder (no box art fetched yet): a cool two-stop gradient instead of the
+                 old flat #333 block, plus it's where the "No Cover" glyph sits. -->
+            <LinearGradientBrush x:Key="CoverPlaceholderBrush" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#3C3C49" Offset="0" />
+                <GradientStop Color="#24242D" Offset="1" />
+            </LinearGradientBrush>
+
+            <!-- Card hover glow: a radial accent bloom behind the hovered tile. Deliberately a brush,
+                 not a DropShadowEffect — the architecture doc rejects that shader as expensive even on
+                 a single element (ARCHITECTURE.md -> Key Design Decisions), and a radial gradient
+                 fakes the same soft halo without a per-frame effect. -->
+            <RadialGradientBrush x:Key="TileHoverGlowBrush" Center="0.5,0.42" GradientOrigin="0.5,0.42"
+                                 RadiusX="0.58" RadiusY="0.58">
+                <GradientStop Color="#3D7C5CFF" Offset="0" />
+                <GradientStop Color="#007C5CFF" Offset="1" />
+            </RadialGradientBrush>
+
+            <!-- Big Picture title scrim: dark fade at the bottom of each landscape tile so the game
+                 title stays readable over any cover art, Light or Dark theme alike. -->
+            <LinearGradientBrush x:Key="BigPictureScrimBrush" StartPoint="0,1" EndPoint="0,0">
+                <GradientStop Color="#E6000000" Offset="0" />
+                <GradientStop Color="#00000000" Offset="1" />
+            </LinearGradientBrush>
+
+            <!-- Glyphs are Segoe MDL2 Assets (free, ships with Windows 10/11 — no image assets). -->
+            <Style x:Key="GlyphTextStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <!-- Rounded "pill" button for secondary actions, shared by every window. Its own template
+                 (WPF-UI's implicit style can't be BasedOn by a keyed style), so Foreground must be set
+                 explicitly — the same bug class ADR-29 fixed per-window, here per-style. -->
+            <Style x:Key="PillButtonStyle" TargetType="Button">
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+                <Setter Property="Padding" Value="14,7" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="B" CornerRadius="16"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="B" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="B" Property="Opacity" Value="0.8" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="B" Property="Opacity" Value="0.45" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Primary CTA: the brand gradient fill + white text. -->
+            <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+                <Setter Property="Foreground" Value="White" />
+                <Setter Property="Background" Value="{StaticResource EmuBridgeAccentGradientBrush}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
+            <!-- A section header inside Settings/Welcome/About cards: bold text with a short brand
+                 gradient bar on the left — a clean accent that needs no icon asset. -->
+            <Style x:Key="SectionHeaderStyle" TargetType="StackPanel">
+                <Setter Property="Orientation" Value="Horizontal" />
+                <Setter Property="Margin" Value="0,0,0,12" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

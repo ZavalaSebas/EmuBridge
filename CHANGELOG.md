@@ -5,10 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] - 2026-08-06
+
+**Phase Polish complete — v1.0.0.** Everything that makes EmuBridge feel like a finished product rather than just functional: WPF-UI/Mica theming, transition animations, theme customization, a first-run/what's-new welcome dialog, an auto-updater for EmuBridge itself, branding (About + sponsor link), and a general UI pass. All of Phase 2 + all of Phase Polish, the stated v1.0 criterion (ARCHITECTURE.md → ADR-17). 373 unit tests pass in Release, 372 in Debug (`EmuBridge.Tests`); 16 in `ManifestDriftCheck.Tests`.
+
+**Visual overhaul (post-v1.0 polish).** A full brand identity pass on top of the Phase Polish bar: violet→magenta gradient identity (`EmuBridgeAccentGradientBrush`), card-based layout, glow/hover treatment on tiles, and a redesigned library header, hero banner, filter bar, and footer — applied consistently across the main window, Settings, About, and Welcome.
+
+### Added
+- **Theme customization** — Appearance section in Settings with Follow Windows (default) / Light / Dark. Applied live on change, persisted in `settings.json`, picked up automatically on next launch. See ARCHITECTURE.md → ADR-31.
+- **Welcome sentinel + "what's new" dialog** — shown on first run and after each update (version change), listing what's new in this version. `%LocalAppData%\EmuBridge\welcome_sentinel.txt` records the last-seen version. See ARCHITECTURE.md → ADR-32.
+- **Auto-updater for EmuBridge itself** — checks GitHub Releases on startup (silent when up to date) and on demand from Settings; downloads, verifies the SHA-256 digest from the release asset metadata, and applies via an atomic swap with a `.old` rollback. Pre-release releases are never offered. Distinct from Phase 2's emulator auto-install. See ARCHITECTURE.md → ADR-33.
+- **Branding & sponsorship** — a footer on the main window with the app version, an About dialog (credits, license, disclaimer), and a "Support on Ko-fi" link. See ARCHITECTURE.md → ADR-34.
+- **Brand palette (visual overhaul)** — shared app-level palette: `EmuBridgeAccentColor #7C5CFF` / `EmuBridgeAccent2Color #FF5FA2`, the `EmuBridgeAccentGradientBrush` identity gradient, `CoverPlaceholderBrush` cover placeholder gradient, `TileHoverGlowBrush` (radial hover glow, deliberately a brush rather than a `DropShadowEffect`), and `BigPictureScrimBrush` (title readability fade). Shared pill/primary button styles and a section-header style moved to App.xaml so every window uses the same language.
+- **New library layout (visual overhaul)** — brand bar (gradient mark + wordmark, Add Folder primary action, Rescan, Settings), a collapsible gradient hero banner ("N games ready"), a filter bar card (sort, favorites-only, a Big Picture toggle right in the bar), a footer with version/About/Ko-fi — all on a 18px structural margin. Game tiles and Big Picture tiles are cards with gradient border + radial glow on hover, missing-game dimming, and favorite/missing chips.
 
 ### Changed
-- Renamed the project from Bridge to EmuBridge, code and GitHub repo alike, to free the "Bridge" name for a future, larger version of the app. Existing installs migrate their `%LOCALAPPDATA%\Bridge` data automatically on first launch after updating — box art cache and auto-installed emulator paths are rewritten in place. See ARCHITECTURE.md → ADR-30.
+- **Project renamed from Bridge to EmuBridge**, code and GitHub repo alike, to free the "Bridge" name for a future, larger version of the app. Existing installs migrate their `%LOCALAPPDATA%\Bridge` data automatically on first launch after updating — box art cache and auto-installed emulator paths are rewritten in place. See ARCHITECTURE.md → ADR-30.
+- **Polished transition animations** — cover tiles gently scale up on hover, the library↔Big Picture mode switch crossfades, and the window fades in on launch. Matches the visual bar set by the rest of the polish phase.
+- **General UI pass** — the grid and Settings screen brought to the polish bar: shared tile style (missing-game dimming + hover animation), a status footer, and grouped, themed Settings sections. Settings' Emulators section now keeps a fixed, generous height (its platform list no longer collapses to one item at a time) with the rest of the page scrolling as a single unit.
+- **Settings, About, and Welcome rebuilt as cards (visual overhaul)** — Settings sections are rounded cards with a gradient accent header bar (emulators, SteamGridDB/TheGamesDB keys, cheats, appearance, updates); About and Welcome lead with a gradient brand mark and use the shared button/card styles.
+
+### Added
+- **Theme customization** — Appearance section in Settings with Follow Windows (default) / Light / Dark. Applied live on change, persisted in `settings.json`, picked up automatically on next launch. See ARCHITECTURE.md → ADR-31.
+- **Welcome sentinel + "what's new" dialog** — shown on first run and after each update (version change), listing what's new in this version. `%LocalAppData%\EmuBridge\welcome_sentinel.txt` records the last-seen version. See ARCHITECTURE.md → ADR-32.
+- **Auto-updater for EmuBridge itself** — checks GitHub Releases on startup (silent when up to date) and on demand from Settings; downloads, verifies the SHA-256 digest from the release asset metadata, and applies via an atomic swap with a `.old` rollback. Pre-release releases are never offered. Distinct from Phase 2's emulator auto-install. See ARCHITECTURE.md → ADR-33.
+- **Branding & sponsorship** — a footer on the main window with the app version, an About dialog (credits, license, disclaimer), and a "Support on Ko-fi" link. See ARCHITECTURE.md → ADR-34.
+
+### Changed
+- **Project renamed from Bridge to EmuBridge**, code and GitHub repo alike, to free the "Bridge" name for a future, larger version of the app. Existing installs migrate their `%LOCALAPPDATA%\Bridge` data automatically on first launch after updating — box art cache and auto-installed emulator paths are rewritten in place. See ARCHITECTURE.md → ADR-30.
+- **Polished transition animations** — cover tiles gently scale up on hover, the library↔Big Picture mode switch crossfades, and the window fades in on launch. Matches the visual bar set by the rest of the polish phase.
+- **General UI pass** — the grid and Settings screen brought to the polish bar: shared tile style (missing-game dimming + hover animation), a status footer, and grouped, themed Settings sections. Settings' Emulators section now keeps a fixed, generous height (its platform list no longer collapses to one item at a time) with the rest of the page scrolling as a single unit.
+
+### Fixed
+- **Cover titles rendered black-on-dark in the dark theme** — the shared `TileButtonStyle` introduced by the polish pass replaces WPF-UI's implicit `Button` style (a keyed style can't `BasedOn` an implicit one), so tile text fell back to stock WPF's black button foreground. The style now sets `Foreground` to the theme brush explicitly, the same fix ADR-29 already applied per-window.
+- **Crash on maximizing/fullscreen while not in Big Picture** — `WindowState` is a two-way-by-default WPF dependency property, so a manual window-state change (titlebar maximize, Win+Up) pushed back through `BoolToWindowStateConverter.ConvertBack`, which throws `NotSupportedException`. The binding is now `Mode=OneWay`, and the mode↔window-state round-trip moved to `MainWindow.OnStateChanged` (maximizing engages Big Picture, restoring exits it, minimizing preserves the mode) — keeping ADR-22's "maximizes on activation" without the crash.
 
 ## [0.10.0] - 2026-08-04
 

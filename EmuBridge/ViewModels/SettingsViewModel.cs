@@ -16,8 +16,16 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IFilePickerService _filePickerService;
     private readonly IMessageBoxService _messageBoxService;
+    private readonly IThemeService _themeService;
+    private readonly IUpdateService _updateService;
 
     private CancellationTokenSource? _installCts;
+
+    // Guards the On*Changed partial hooks below so InitializeAsync's own load of persisted values
+    // never triggers a spurious write/apply — only a real user change should. Same idiom the
+    // CheckBox Command binding uses elsewhere (a Command only fires on a real click); a plain
+    // ComboBox has no Command, so the flag stands in for it.
+    private bool _isInitialized;
 
     [ObservableProperty]
     private ObservableCollection<PlatformConfigItem> _platforms = new();
@@ -45,6 +53,14 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _autoApplyCheatsOnLaunch;
 
+    // Phase Polish -> "Theme customization": System/Light/Dark, applied live on change.
+    [ObservableProperty]
+    private ThemePreference _themePreference = ThemePreference.System;
+
+    // Phase Polish -> "Auto-updater": whether startup checks GitHub Releases for a newer build.
+    [ObservableProperty]
+    private bool _checkForUpdatesOnStartup = true;
+
     [ObservableProperty]
     private string _statusMessage = string.Empty;
 
@@ -57,7 +73,9 @@ public partial class SettingsViewModel : ObservableObject
         IEmulatorInstallerService installerService,
         ISettingsService settingsService,
         IFilePickerService filePickerService,
-        IMessageBoxService messageBoxService)
+        IMessageBoxService messageBoxService,
+        IThemeService themeService,
+        IUpdateService updateService)
     {
         _libraryRepository = libraryRepository;
         _emulatorService = emulatorService;
@@ -65,6 +83,8 @@ public partial class SettingsViewModel : ObservableObject
         _settingsService = settingsService;
         _filePickerService = filePickerService;
         _messageBoxService = messageBoxService;
+        _themeService = themeService;
+        _updateService = updateService;
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)
@@ -73,6 +93,30 @@ public partial class SettingsViewModel : ObservableObject
         SteamGridDbApiKey = await _settingsService.GetSteamGridDbApiKeyAsync(ct) ?? string.Empty;
         TheGamesDbApiKey = await _settingsService.GetTheGamesDbApiKeyAsync(ct) ?? string.Empty;
         AutoApplyCheatsOnLaunch = await _settingsService.GetAutoApplyCheatsOnLaunchAsync(ct);
+        ThemePreference = await _settingsService.GetThemePreferenceAsync(ct);
+        CheckForUpdatesOnStartup = await _settingsService.GetCheckForUpdatesOnStartupAsync(ct);
+        _isInitialized = true;
+    }
+
+    partial void OnThemePreferenceChanged(ThemePreference value)
+    {
+        if (!_isInitialized)
+        {
+            return;
+        }
+
+        _themeService.ApplyTheme(value);
+        _ = _settingsService.SetThemePreferenceAsync(value);
+    }
+
+    partial void OnCheckForUpdatesOnStartupChanged(bool value)
+    {
+        if (!_isInitialized)
+        {
+            return;
+        }
+
+        _ = _settingsService.SetCheckForUpdatesOnStartupAsync(value);
     }
 
     partial void OnSelectedPlatformChanged(PlatformConfigItem? value)
@@ -224,6 +268,69 @@ public partial class SettingsViewModel : ObservableObject
     private async Task SaveAutoApplyCheatsOnLaunchAsync()
     {
         await _settingsService.SetAutoApplyCheatsOnLaunchAsync(AutoApplyCheatsOnLaunch);
+    }
+
+    // Phase Polish -> "Auto-updater": the manual "Check for Updates" button. Interactive by
+    // design (the user asked for this check), unlike the silent startup check — an available
+    // update is offered directly, and confirmation runs the download+swap which restarts the app.
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = string.Empty;
+        try
+        {
+            var update = await _updateService.CheckForUpdateAsync();
+            if (!update.IsUpdateAvailable)
+            {
+                _messageBoxService.Show(
+                    $"You're up to date — EmuBridge {update.CurrentVersionText ?? "?"} is the latest version.",
+                    "No Update Available",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var confirmed = _messageBoxService.Show(
+                $"EmuBridge {update.CurrentVersionText} is installed, and {update.LatestVersionText} is available.\n\n" +
+                "Download and install it now? EmuBridge will restart automatically.",
+                "Update Available",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirmed != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            StatusMessage = "Downloading update...";
+            var progress = new Progress<string>(message => StatusMessage = message);
+            var result = await _updateService.DownloadAndApplyAsync(update, progress);
+
+            if (result.Outcome != UpdateApplyOutcome.Success)
+            {
+                _messageBoxService.Show(
+                    result.ErrorMessage ?? "The update could not be applied.",
+                    "Update Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            StatusMessage = string.Empty;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = string.Empty;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task LoadPlatformsAsync(CancellationToken ct = default)

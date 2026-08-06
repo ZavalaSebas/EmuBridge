@@ -44,6 +44,34 @@ public static class Config
 
     public const string SteamGridDbBaseUrl = "https://www.steamgriddb.com/api/v2";
 
+    // GitHub Releases API for the auto-updater (Phase Polish -> "Auto-updater for EmuBridge
+    // itself, via GitHub Releases"). Returns the latest tagged release's metadata, including the
+    // EmuBridge.exe asset's browser_download_url and its SHA-256 digest. The GitHub API requires a
+    // User-Agent header on every request — UpdateService sets one explicitly.
+    public const string UpdateCheckUrl = "https://api.github.com/repos/ZavalaSebas/EmuBridge/releases/latest";
+
+    // The single-file self-contained publish is the only artifact whose layout the exe-swap
+    // updater supports (ADR-12: everything EmuBridge needs is inside the one .exe). The release
+    // asset carries exactly this name.
+    public const string UpdateAssetName = "EmuBridge.exe";
+
+    // GitHub's per-release-asset SHA-256 digest. Format is "sha256:<hex>" (confirmed against the
+    // real Releases API response shape, 2026-08-06). UpdateService parses and compares against
+    // this before any exe is swapped — see ADR-26 for why the hash check matters here too.
+    public const string UpdateDigestPrefix = "sha256:";
+
+    // Human-facing landing page for update prompts that need a link beyond the auto-download.
+    public const string UpdateReleasesPageUrl = "https://github.com/ZavalaSebas/EmuBridge/releases";
+
+    // Sponsor/About (Phase Polish -> "Sponsor/support icon + Credits/About dialog"). Ko-fi chosen
+    // as the primary sponsor link — the same one already published in README.md.
+    public const string SponsorUrl = "https://ko-fi.com/sebastianzavala82573";
+
+    // Welcome sentinel (Phase Polish -> "Welcome sentinel + 'what's new' dialog") — a small file
+    // recording the last app version whose welcome/"what's new" was shown, so it appears on first
+    // run and after each version change, never on every launch.
+    public static string WelcomeSentinelPath => Path.Combine(AppDataPath, "welcome_sentinel.txt");
+
     // Confirmed real (not assumed) via a live authenticated call during the metadata-source
     // decision research, 2026-08-04 — see PLAN.md -> Timeline.
     public const string TheGamesDbBaseUrl = "https://api.thegamesdb.net/v1";

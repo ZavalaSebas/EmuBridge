@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Reflection;
 using System.Windows;
 using EmuBridge.Exceptions;
 using EmuBridge.Models;
@@ -56,6 +58,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<GameTile> _trySomethingNewGames = new();
 
+    // Shown in MainWindow's footer (Phase Polish -> "Branding & Sponsorship"). Derived from the
+    // assembly version so it can never drift from the actual build like a hardcoded string could.
+    public string AppVersionText =>
+        $"v{Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "?"}";
+
     partial void OnSortModeChanged(LibrarySortMode value) => RebuildGameTiles();
 
     partial void OnShowFavoritesOnlyChanged(bool value) => RebuildGameTiles();
@@ -76,6 +83,10 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Same wiring shape as OpenEmulatorOverrideRequested — this ViewModel doesn't need to
     /// know about CheatsWindow/CheatsViewModel (ARCHITECTURE.md -> ADR-27).</summary>
     public Action<Game>? OpenCheatsRequested { get; set; }
+
+    /// <summary>Same wiring shape as OpenSettingsRequested — opens the About/credits dialog
+    /// (Phase Polish -> "Sponsor/support icon + Credits/About dialog").</summary>
+    public Action? OpenAboutRequested { get; set; }
 
     public MainViewModel(
         IRomScannerService romScannerService,
@@ -329,6 +340,27 @@ public partial class MainViewModel : ObservableObject
         }
 
         OpenCheatsRequested?.Invoke(game);
+    }
+
+    [RelayCommand]
+    private void OpenAbout()
+    {
+        OpenAboutRequested?.Invoke();
+    }
+
+    // Phase Polish -> "Sponsor/support icon": opens the Ko-fi sponsor page in the user's default
+    // browser. Best-effort — a machine with no browser configured (rare) must not crash the app.
+    [RelayCommand]
+    private void OpenSponsor()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = Config.SponsorUrl, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not open the sponsor link {SponsorUrl}.", Config.SponsorUrl);
+        }
     }
 
     [RelayCommand]

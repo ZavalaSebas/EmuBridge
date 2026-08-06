@@ -7,7 +7,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square&logo=dotnet&logoColor=white&labelColor=1a1a2e)](https://dotnet.microsoft.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows-00a4ef?style=flat-square&logo=windows&logoColor=white&labelColor=1a1a2e)](https://github.com/ZavalaSebas/EmuBridge)
-[![Version](https://img.shields.io/badge/Version-0.10.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/EmuBridge/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.0-57F287?style=flat-square&labelColor=1a1a2e)](https://github.com/ZavalaSebas/EmuBridge/releases)
 
 A retro emulation launcher that detects your ROMs, fetches box art, and launches everything — zero manual configuration.
 
@@ -70,7 +70,7 @@ dotnet publish EmuBridge -c Release -r win-x64 --self-contained true -p:PublishS
 
 ## Features
 
-> EmuBridge is functional and shipping — v0.10.0. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete. Phase 2 is complete too. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completed the "Big Picture" group — a streaming-style mode with real box art per view; `v0.7.0` added per-game emulator configuration and hardened the download-verification guard against the libretro nightly channel's real rebuild frequency; `v0.7.1` was a same-day patch re-verifying the entire emulator catalog against that same channel; `v0.8.0` closed the loop with a full catalog-maintenance system — automated drift detection with a human-reviewed pull request, EmuBridge fetching its own catalog fresh on every startup, and a hardcoded allow-list of trusted download hosts as a second line of defense; `v0.9.0` was the first item of Phase 3 — cheats management per game for RetroArch-based platforms; `v0.10.0` is Phase 3's second item — TheGamesDB as a second, additive metadata source for the game detail panel's description and screenshots.
+> EmuBridge is functional and shipping — **v1.0.0, all of Phase 2 + all of Phase Polish**. Phase 1 (scan ROMs, fetch box art, configure and launch emulators) is complete; Phase 2 is complete. `v0.3.0` shipped removing a confirmed-gone game from the library and a ROM-detection fix; `v0.4.0` added offering Auto-Install inline right from the launch flow; `v0.5.0` completed the "Full library" group — a refined library view with sorting and filtering, favorites, recently played, and a game detail panel; `v0.6.0` completed the "Big Picture" group — a streaming-style mode with real box art per view; `v0.7.0` added per-game emulator configuration and hardened the download-verification guard against the libretro nightly channel's real rebuild frequency; `v0.7.1` was a same-day patch re-verifying the entire emulator catalog against that same channel; `v0.8.0` closed the loop with a full catalog-maintenance system — automated drift detection with a human-reviewed pull request, EmuBridge fetching its own catalog fresh on every startup, and a hardcoded allow-list of trusted download hosts as a second line of defense; `v0.9.0` was the first item of Phase 3 — cheats management per game for RetroArch-based platforms; `v0.10.0` was Phase 3's second item — TheGamesDB as a second, additive metadata source for the game detail panel's description and screenshots; **`v1.0.0` completed Phase Polish — WPF-UI/Mica theming, transition animations, theme customization, a welcome/what's-new dialog, a self-updater, sponsor/About branding, and a general UI pass — meeting the v1.0 criterion (all of Phase 2 + all of Phase Polish).**
 
 - Scan your ROM folders and automatically detect which system each game belongs to
 - Fetch box art automatically from SteamGridDB
@@ -89,17 +89,22 @@ dotnet publish EmuBridge -c Release -r win-x64 --self-contained true -p:PublishS
 - The built-in emulator catalog stays current on its own — a scheduled check re-verifies it against the real libretro build channel and opens a human-reviewed pull request if anything drifted, and EmuBridge fetches the latest verified catalog on every startup so a fix reaches you without waiting for a new release
 - Cheats for RetroArch-based platforms (right-click a game → "Cheats...") — fetched on demand from the same public cheat database RetroArch itself uses, with an optional "Auto-apply cheats on launch" toggle so enabled cheats apply automatically without a manual step in RetroArch's own menu
 - Real game descriptions and screenshots in the detail panel, fetched on demand from TheGamesDB — SteamGridDB keeps handling box art, TheGamesDB fills the gap it doesn't cover
+- Choose between Light / Dark / follow-Windows themes, applied live from Settings (WPF-UI + Mica on the main window)
+- A welcome/what's-new dialog on first run and after each update
+- EmuBridge updates itself from GitHub Releases — a silent startup check (toggleable in Settings) or an on-demand check, with SHA-256-verified downloads and a safe atomic swap
+- Version, About/credits, license, and a "Support on Ko-fi" link always one glance away in the footer
+- Polished transition animations — tiles gently scale on hover, the Library ↔ Big Picture switch crossfades, the window fades in on launch
 
 **Known limitations** (see [DEVELOPMENT.md](DEVELOPMENT.md#known-limitations) for full detail):
 - Removing a game from the library only works for entries already marked "missing" — there's no way to remove a game that's still present but you no longer want tracked
 - TheGamesDB doesn't catalog ROM hacks — a game sourced from the ROM-hacking community will always show "Description: not available" in the detail panel, confirmed via a real coverage test, not a bug
-- A core picker UI, the rest of Phase 3 (achievements, mods, video previews, recommendations, disc-based systems), and Phase Polish (animations, theming, welcome sentinel, auto-updater, sponsor/credits, general UI pass) haven't been started
+- The rest of Phase 3 (achievements, mods, video previews, recommendations, disc-based systems) and a core picker UI haven't been started
 
 ---
 
 ## Architecture
 
-EmuBridge is organized around eleven focused services — scanning (`RomScannerService`), box-art lookup (`MetadataService`), description/screenshot lookup (`TheGamesDbService`), image caching (`ImageCacheService`), settings (`SettingsService`), emulator configuration (`EmulatorService`), launching (`LaunchService`), verified downloads (`DownloadVerificationService`), automatic emulator installation (`EmulatorInstallerService`), catalog freshness (`ManifestUpdateService`), and cheats (`CheatService`) — following a standard Services/Models/ViewModels/Views separation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full breakdown and the reasoning behind each decision.
+EmuBridge is organized around fourteen focused services — scanning (`RomScannerService`), box-art lookup (`MetadataService`), description/screenshot lookup (`TheGamesDbService`), image caching (`ImageCacheService`), settings (`SettingsService`), emulator configuration (`EmulatorService`), launching (`LaunchService`), verified downloads (`DownloadVerificationService`), automatic emulator installation (`EmulatorInstallerService`), catalog freshness (`ManifestUpdateService`), cheats (`CheatService`), theming (`ThemeService`), welcome/what's-new (`WelcomeSentinelService`), and self-updating (`UpdateService`) — following a standard Services/Models/ViewModels/Views separation. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full breakdown and the reasoning behind each decision.
 
 ---
 

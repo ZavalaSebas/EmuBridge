@@ -1,4 +1,5 @@
 using System.IO;
+using EmuBridge.Models;
 using EmuBridge.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -87,5 +88,57 @@ public class SettingsServiceTests : IDisposable
 
         Assert.Equal("sgdb-key", await _service.GetSteamGridDbApiKeyAsync());
         Assert.Equal("tgdb-key", await _service.GetTheGamesDbApiKeyAsync());
+    }
+
+    [Fact]
+    public async Task GetThemePreferenceAsync_NoSettingsFileYet_DefaultsToSystem()
+    {
+        var theme = await _service.GetThemePreferenceAsync();
+
+        Assert.Equal(ThemePreference.System, theme);
+    }
+
+    [Fact]
+    public async Task SetThenGetThemePreferenceAsync_RoundTrips()
+    {
+        await _service.SetThemePreferenceAsync(ThemePreference.Dark);
+
+        var theme = await _service.GetThemePreferenceAsync();
+
+        Assert.Equal(ThemePreference.Dark, theme);
+    }
+
+    [Fact]
+    public async Task ThemeIsPersistedByNameNotNumber()
+    {
+        await _service.SetThemePreferenceAsync(ThemePreference.Dark);
+
+        var fileContents = await File.ReadAllTextAsync(_settingsPath);
+
+        Assert.Contains("Dark", fileContents);
+        Assert.DoesNotContain("\"2\"", fileContents);
+    }
+
+    [Fact]
+    public async Task SetThemePreferenceAsync_DoesNotClobberExistingApiKey()
+    {
+        await _service.SetSteamGridDbApiKeyAsync("keep-me");
+        await _service.SetThemePreferenceAsync(ThemePreference.Dark);
+
+        Assert.Equal("keep-me", await _service.GetSteamGridDbApiKeyAsync());
+    }
+
+    [Fact]
+    public async Task GetCheckForUpdatesOnStartupAsync_NoSettingsFileYet_DefaultsToTrue()
+    {
+        Assert.True(await _service.GetCheckForUpdatesOnStartupAsync());
+    }
+
+    [Fact]
+    public async Task SetThenGetCheckForUpdatesOnStartupAsync_RoundTrips()
+    {
+        await _service.SetCheckForUpdatesOnStartupAsync(false);
+
+        Assert.False(await _service.GetCheckForUpdatesOnStartupAsync());
     }
 }
