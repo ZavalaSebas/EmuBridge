@@ -12,10 +12,10 @@
         "Id": "fceumm",
         "PlatformId": "nes",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/fceumm_libretro.dll.zip",
-        "Sha256": "41F949ED1D0E97E07C14293DB62BE7A4DA0818B93522C7896F385EFD299A4A4B",
-        "ExpectedSizeBytes": 635596,
+        "Sha256": "7B6AD62A77647BC8106B79ABE3D8BB7CE161A7B5B3C94AC5A9D7E522BB0BCAD8",
+        "ExpectedSizeBytes": 635594,
         "CoreFileName": "fceumm_libretro.dll",
-        "CapturedAt": "2026-08-06"
+        "CapturedAt": "2026-08-07"
       },
       {
         "Id": "snes9x",
@@ -57,10 +57,10 @@
         "Id": "mupen64plus_next",
         "PlatformId": "n64",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mupen64plus_next_libretro.dll.zip",
-        "Sha256": "3B76EC0D7C554077F4AAE8FF3108DA01C3183A3A25EB60A75040CF60B4F560B7",
+        "Sha256": "72B44F136935718159D69498404224D9709E14DA10D9F8613D7248F3E449FA5F",
         "ExpectedSizeBytes": 2892984,
         "CoreFileName": "mupen64plus_next_libretro.dll",
-        "CapturedAt": "2026-08-06"
+        "CapturedAt": "2026-08-07"
       },
       {
         "Id": "melondsds",
@@ -102,10 +102,10 @@
         "Id": "stella",
         "PlatformId": "atari2600",
         "DownloadUrl": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/stella_libretro.dll.zip",
-        "Sha256": "28EA683C6E9BCB9D3C9004A4879B22BFE13DBE76221EB359E49B601D4D3DAB3D",
-        "ExpectedSizeBytes": 1433564,
+        "Sha256": "F811D2B197D29845998AA36E53E5115816B760E020CFDB8792D68E79F648B1A5",
+        "ExpectedSizeBytes": 1803116,
         "CoreFileName": "stella_libretro.dll",
-        "CapturedAt": "2026-08-06"
+        "CapturedAt": "2026-08-07"
       },
       {
         "Id": "prosystem",
